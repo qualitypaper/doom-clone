@@ -1,0 +1,164 @@
+{
+	"abstract" : true,
+	"artifacts" : 
+	[
+		{
+			"path" : "/usr/lib/x86_64-linux-gnu/libSDL2.a"
+		}
+	],
+	"backtrace" : 3,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"find_package",
+			"set_target_properties"
+		],
+		"files" : 
+		[
+			"/usr/lib/x86_64-linux-gnu/cmake/SDL2/sdl2-config.cmake",
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 1
+			},
+			{
+				"command" : 1,
+				"file" : 1,
+				"line" : 31,
+				"parent" : 0
+			},
+			{
+				"file" : 0,
+				"parent" : 1
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 164,
+				"parent" : 2
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 165,
+				"parent" : 2
+			}
+		]
+	},
+	"codemodelVersion" : 
+	{
+		"major" : 2,
+		"minor" : 9
+	},
+	"id" : "SDL2::SDL2-static::@6890427a1f51a3e7e1df",
+	"imported" : true,
+	"interfaceLinkLibraries" : 
+	[
+		{
+			"backtrace" : 4,
+			"fragment" : "m"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "asound"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "m"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "dl"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "pthread"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "pulse"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "-pthread"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "samplerate"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "X11"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "Xext"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "Xcursor"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "Xi"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "Xfixes"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "Xrandr"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "Xss"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "drm"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "gbm"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "wayland-egl"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "wayland-client"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "wayland-cursor"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "xkbcommon"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "decor-0"
+		},
+		{
+			"backtrace" : 4,
+			"fragment" : "pthread"
+		}
+	],
+	"local" : true,
+	"name" : "SDL2::SDL2-static",
+	"nameOnDisk" : "libSDL2.a",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sources" : [],
+	"type" : "STATIC_LIBRARY"
+}

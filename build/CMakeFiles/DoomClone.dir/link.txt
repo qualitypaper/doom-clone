@@ -1,0 +1,1 @@
+/usr/bin/clang++ -g -Xlinker --dependency-file=CMakeFiles/DoomClone.dir/link.d CMakeFiles/DoomClone.dir/src/main.cpp.o -o DoomClone  /usr/lib/x86_64-linux-gnu/libSDL2.so /usr/lib/x86_64-linux-gnu/libSDL2main.a
