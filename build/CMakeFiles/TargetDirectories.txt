@@ -1,7 +1,0 @@
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/DoomClone.dir
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/edit_cache.dir
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/rebuild_cache.dir
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/list_install_components.dir
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/install.dir
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/install/local.dir
-/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles/install/strip.dir

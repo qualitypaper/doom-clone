@@ -5,6 +5,11 @@
 
 namespace game_loop
 {
+    struct WorldState
+    {
+        // BSP nodes, sectors,
+    };
+    
     struct GameState
     {
         entity::Player playerState;
@@ -14,7 +19,4 @@ namespace game_loop
         time_t gameTime;
     };
 
-    struct WorldState {
-        // BSP nodes, sectors, 
-    };
 }

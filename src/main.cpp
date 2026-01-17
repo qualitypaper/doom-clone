@@ -1,29 +1,28 @@
-
-#include "config.h"
-#include "sdl_window.h"
+#include "framebuffer.h"
 
 int main()
 {
-    if (!sdl_window::init())
-        return 1;
+    framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer();
 
-    constexpr uint32_t n = config::WINDOW_WIDTH * config::WINDOW_HEIGHT;
-    static uint32_t pixels[n];
+    uint8_t r = 255, g = 255, b = 0, alpha = 255;
+    uint32_t yellow = (r << 24) | (g << 16) | (b << 8) | alpha;
 
+    std::cout << "Set up window" << '\n';
 
-    for (uint32_t i = 0; i < n; ++i)
+    for (int i = 0; i < config::CANVAS_WIDTH; ++i)
     {
-        uint8_t r = 255, b = 255, g = 0, alpha = 255;
-
-        pixels[i] = (r << 24) | (b << 16) | (g << 8) | alpha;
+        for (int j = 0; j < config::CANVAS_HEIGHT; ++j)
+        {
+            (*fb).color(glm::vec2{i,j}, yellow);
+        }
     }
 
-    sdl_window::updatePixels(pixels);
-    sdl_window::updateScreen();
+    std::cout << "Colored with yellow" << '\n';
+    (*fb).update();
 
     system("sleep 5");
 
-    sdl_window::kill();
+    delete fb;
 
     return 0;
 }
