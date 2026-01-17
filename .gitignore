@@ -3,3 +3,5 @@
 .cursor
 *.log
 *.tmp
+
+build/

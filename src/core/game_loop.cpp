@@ -1,3 +1,2 @@
-#include "entity.h";
-#include <vector>;
-
+#include "entity.h"
+#include <vector>

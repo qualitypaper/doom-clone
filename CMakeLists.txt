@@ -25,7 +25,7 @@ target_compile_options(project_warnings INTERFACE
 )
 
 # ---- Main executable ----
-file(GLOB SOURCES "src/*.cpp")
+file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 find_package(glm REQUIRED)
 find_package(SDL2 REQUIRED)

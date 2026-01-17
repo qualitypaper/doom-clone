@@ -8,7 +8,13 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
+  "/home/qualitypaper/IdeaProjects/doom-clone/src/core/game_loop.cpp" "CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o.d"
+  "/home/qualitypaper/IdeaProjects/doom-clone/src/core/math.cpp" "CMakeFiles/DoomClone.dir/src/core/math.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/core/math.cpp.o.d"
+  "/home/qualitypaper/IdeaProjects/doom-clone/src/core/sdl_window.cpp" "CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o.d"
+  "/home/qualitypaper/IdeaProjects/doom-clone/src/game/entity.cpp" "CMakeFiles/DoomClone.dir/src/game/entity.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/game/entity.cpp.o.d"
   "/home/qualitypaper/IdeaProjects/doom-clone/src/main.cpp" "CMakeFiles/DoomClone.dir/src/main.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/main.cpp.o.d"
+  "/home/qualitypaper/IdeaProjects/doom-clone/src/renderer/camera.cpp" "CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o.d"
+  "/home/qualitypaper/IdeaProjects/doom-clone/src/renderer/rasterizer.cpp" "CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o" "gcc" "CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o.d"
   "" "DoomClone" "gcc" "CMakeFiles/DoomClone.dir/link.d"
   )
 

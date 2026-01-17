@@ -2,7 +2,13 @@ DoomClone: \
   /lib/x86_64-linux-gnu/Scrt1.o \
   /lib/x86_64-linux-gnu/crti.o \
   /usr/lib/gcc/x86_64-linux-gnu/15/crtbeginS.o \
+  CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o \
+  CMakeFiles/DoomClone.dir/src/core/math.cpp.o \
+  CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o \
+  CMakeFiles/DoomClone.dir/src/game/entity.cpp.o \
   CMakeFiles/DoomClone.dir/src/main.cpp.o \
+  CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o \
+  CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o \
   /usr/lib/x86_64-linux-gnu/libSDL2.so \
   /usr/lib/x86_64-linux-gnu/libSDL2main.a \
   /usr/lib/gcc/x86_64-linux-gnu/15/libstdc++.so \
@@ -88,7 +94,19 @@ DoomClone: \
 
 /usr/lib/gcc/x86_64-linux-gnu/15/crtbeginS.o:
 
+CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o:
+
+CMakeFiles/DoomClone.dir/src/core/math.cpp.o:
+
+CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o:
+
+CMakeFiles/DoomClone.dir/src/game/entity.cpp.o:
+
 CMakeFiles/DoomClone.dir/src/main.cpp.o:
+
+CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o:
+
+CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o:
 
 /usr/lib/x86_64-linux-gnu/libSDL2.so:
 

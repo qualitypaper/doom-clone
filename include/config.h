@@ -10,8 +10,8 @@ namespace config
     constexpr uint16_t CANVAS_WIDTH = 320;
     constexpr uint16_t CANVAS_HEIGHT = 200;
 
-    constexpr float_t SCALE_X = WINDOW_WIDTH / CANVAS_WIDTH;
-    constexpr float_t SCALE_Y = WINDOW_HEIGHT / CANVAS_HEIGHT;
+    constexpr float SCALE_X = WINDOW_WIDTH / CANVAS_WIDTH;
+    constexpr float SCALE_Y = WINDOW_HEIGHT / CANVAS_HEIGHT;
 
     constexpr uint8_t VIEWPORT_WIDTH = 1;
     constexpr uint8_t VIEWPORT_HEIGHT = 1;

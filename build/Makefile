@@ -174,6 +174,102 @@ DoomClone/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/build
 .PHONY : DoomClone/fast
 
+src/core/game_loop.o: src/core/game_loop.cpp.o
+.PHONY : src/core/game_loop.o
+
+# target to build an object file
+src/core/game_loop.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o
+.PHONY : src/core/game_loop.cpp.o
+
+src/core/game_loop.i: src/core/game_loop.cpp.i
+.PHONY : src/core/game_loop.i
+
+# target to preprocess a source file
+src/core/game_loop.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.i
+.PHONY : src/core/game_loop.cpp.i
+
+src/core/game_loop.s: src/core/game_loop.cpp.s
+.PHONY : src/core/game_loop.s
+
+# target to generate assembly for a file
+src/core/game_loop.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.s
+.PHONY : src/core/game_loop.cpp.s
+
+src/core/math.o: src/core/math.cpp.o
+.PHONY : src/core/math.o
+
+# target to build an object file
+src/core/math.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/math.cpp.o
+.PHONY : src/core/math.cpp.o
+
+src/core/math.i: src/core/math.cpp.i
+.PHONY : src/core/math.i
+
+# target to preprocess a source file
+src/core/math.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/math.cpp.i
+.PHONY : src/core/math.cpp.i
+
+src/core/math.s: src/core/math.cpp.s
+.PHONY : src/core/math.s
+
+# target to generate assembly for a file
+src/core/math.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/math.cpp.s
+.PHONY : src/core/math.cpp.s
+
+src/core/sdl_window.o: src/core/sdl_window.cpp.o
+.PHONY : src/core/sdl_window.o
+
+# target to build an object file
+src/core/sdl_window.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o
+.PHONY : src/core/sdl_window.cpp.o
+
+src/core/sdl_window.i: src/core/sdl_window.cpp.i
+.PHONY : src/core/sdl_window.i
+
+# target to preprocess a source file
+src/core/sdl_window.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.i
+.PHONY : src/core/sdl_window.cpp.i
+
+src/core/sdl_window.s: src/core/sdl_window.cpp.s
+.PHONY : src/core/sdl_window.s
+
+# target to generate assembly for a file
+src/core/sdl_window.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.s
+.PHONY : src/core/sdl_window.cpp.s
+
+src/game/entity.o: src/game/entity.cpp.o
+.PHONY : src/game/entity.o
+
+# target to build an object file
+src/game/entity.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/game/entity.cpp.o
+.PHONY : src/game/entity.cpp.o
+
+src/game/entity.i: src/game/entity.cpp.i
+.PHONY : src/game/entity.i
+
+# target to preprocess a source file
+src/game/entity.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/game/entity.cpp.i
+.PHONY : src/game/entity.cpp.i
+
+src/game/entity.s: src/game/entity.cpp.s
+.PHONY : src/game/entity.s
+
+# target to generate assembly for a file
+src/game/entity.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/game/entity.cpp.s
+.PHONY : src/game/entity.cpp.s
+
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -198,6 +294,54 @@ src/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/main.cpp.s
 .PHONY : src/main.cpp.s
 
+src/renderer/camera.o: src/renderer/camera.cpp.o
+.PHONY : src/renderer/camera.o
+
+# target to build an object file
+src/renderer/camera.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o
+.PHONY : src/renderer/camera.cpp.o
+
+src/renderer/camera.i: src/renderer/camera.cpp.i
+.PHONY : src/renderer/camera.i
+
+# target to preprocess a source file
+src/renderer/camera.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.i
+.PHONY : src/renderer/camera.cpp.i
+
+src/renderer/camera.s: src/renderer/camera.cpp.s
+.PHONY : src/renderer/camera.s
+
+# target to generate assembly for a file
+src/renderer/camera.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.s
+.PHONY : src/renderer/camera.cpp.s
+
+src/renderer/rasterizer.o: src/renderer/rasterizer.cpp.o
+.PHONY : src/renderer/rasterizer.o
+
+# target to build an object file
+src/renderer/rasterizer.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o
+.PHONY : src/renderer/rasterizer.cpp.o
+
+src/renderer/rasterizer.i: src/renderer/rasterizer.cpp.i
+.PHONY : src/renderer/rasterizer.i
+
+# target to preprocess a source file
+src/renderer/rasterizer.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.i
+.PHONY : src/renderer/rasterizer.cpp.i
+
+src/renderer/rasterizer.s: src/renderer/rasterizer.cpp.s
+.PHONY : src/renderer/rasterizer.s
+
+# target to generate assembly for a file
+src/renderer/rasterizer.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/DoomClone.dir/build.make CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.s
+.PHONY : src/renderer/rasterizer.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -211,9 +355,27 @@ help:
 	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... DoomClone"
+	@echo "... src/core/game_loop.o"
+	@echo "... src/core/game_loop.i"
+	@echo "... src/core/game_loop.s"
+	@echo "... src/core/math.o"
+	@echo "... src/core/math.i"
+	@echo "... src/core/math.s"
+	@echo "... src/core/sdl_window.o"
+	@echo "... src/core/sdl_window.i"
+	@echo "... src/core/sdl_window.s"
+	@echo "... src/game/entity.o"
+	@echo "... src/game/entity.i"
+	@echo "... src/game/entity.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
+	@echo "... src/renderer/camera.o"
+	@echo "... src/renderer/camera.i"
+	@echo "... src/renderer/camera.s"
+	@echo "... src/renderer/rasterizer.o"
+	@echo "... src/renderer/rasterizer.i"
+	@echo "... src/renderer/rasterizer.s"
 .PHONY : help
 
 

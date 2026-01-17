@@ -72,10 +72,66 @@ include CMakeFiles/DoomClone.dir/flags.make
 CMakeFiles/DoomClone.dir/codegen:
 .PHONY : CMakeFiles/DoomClone.dir/codegen
 
+CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o: CMakeFiles/DoomClone.dir/flags.make
+CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/core/game_loop.cpp
+CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o -MF CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o.d -o CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/core/game_loop.cpp
+
+CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.i"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qualitypaper/IdeaProjects/doom-clone/src/core/game_loop.cpp > CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.i
+
+CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.s"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/core/game_loop.cpp -o CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.s
+
+CMakeFiles/DoomClone.dir/src/core/math.cpp.o: CMakeFiles/DoomClone.dir/flags.make
+CMakeFiles/DoomClone.dir/src/core/math.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/core/math.cpp
+CMakeFiles/DoomClone.dir/src/core/math.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/DoomClone.dir/src/core/math.cpp.o"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/core/math.cpp.o -MF CMakeFiles/DoomClone.dir/src/core/math.cpp.o.d -o CMakeFiles/DoomClone.dir/src/core/math.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/core/math.cpp
+
+CMakeFiles/DoomClone.dir/src/core/math.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DoomClone.dir/src/core/math.cpp.i"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qualitypaper/IdeaProjects/doom-clone/src/core/math.cpp > CMakeFiles/DoomClone.dir/src/core/math.cpp.i
+
+CMakeFiles/DoomClone.dir/src/core/math.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/core/math.cpp.s"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/core/math.cpp -o CMakeFiles/DoomClone.dir/src/core/math.cpp.s
+
+CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o: CMakeFiles/DoomClone.dir/flags.make
+CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/core/sdl_window.cpp
+CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o -MF CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o.d -o CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/core/sdl_window.cpp
+
+CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.i"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qualitypaper/IdeaProjects/doom-clone/src/core/sdl_window.cpp > CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.i
+
+CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.s"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/core/sdl_window.cpp -o CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.s
+
+CMakeFiles/DoomClone.dir/src/game/entity.cpp.o: CMakeFiles/DoomClone.dir/flags.make
+CMakeFiles/DoomClone.dir/src/game/entity.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/game/entity.cpp
+CMakeFiles/DoomClone.dir/src/game/entity.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/DoomClone.dir/src/game/entity.cpp.o"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/game/entity.cpp.o -MF CMakeFiles/DoomClone.dir/src/game/entity.cpp.o.d -o CMakeFiles/DoomClone.dir/src/game/entity.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/game/entity.cpp
+
+CMakeFiles/DoomClone.dir/src/game/entity.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DoomClone.dir/src/game/entity.cpp.i"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qualitypaper/IdeaProjects/doom-clone/src/game/entity.cpp > CMakeFiles/DoomClone.dir/src/game/entity.cpp.i
+
+CMakeFiles/DoomClone.dir/src/game/entity.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/game/entity.cpp.s"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/game/entity.cpp -o CMakeFiles/DoomClone.dir/src/game/entity.cpp.s
+
 CMakeFiles/DoomClone.dir/src/main.cpp.o: CMakeFiles/DoomClone.dir/flags.make
 CMakeFiles/DoomClone.dir/src/main.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/main.cpp
 CMakeFiles/DoomClone.dir/src/main.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/DoomClone.dir/src/main.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/DoomClone.dir/src/main.cpp.o"
 	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/main.cpp.o -MF CMakeFiles/DoomClone.dir/src/main.cpp.o.d -o CMakeFiles/DoomClone.dir/src/main.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/main.cpp
 
 CMakeFiles/DoomClone.dir/src/main.cpp.i: cmake_force
@@ -86,20 +142,60 @@ CMakeFiles/DoomClone.dir/src/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/main.cpp.s"
 	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/main.cpp -o CMakeFiles/DoomClone.dir/src/main.cpp.s
 
+CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o: CMakeFiles/DoomClone.dir/flags.make
+CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/camera.cpp
+CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o -MF CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o.d -o CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/camera.cpp
+
+CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.i"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/camera.cpp > CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.i
+
+CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.s"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/camera.cpp -o CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.s
+
+CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o: CMakeFiles/DoomClone.dir/flags.make
+CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o: /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/rasterizer.cpp
+CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o: CMakeFiles/DoomClone.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o -MF CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o.d -o CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o -c /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/rasterizer.cpp
+
+CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.i"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/rasterizer.cpp > CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.i
+
+CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.s"
+	/usr/bin/clang++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/qualitypaper/IdeaProjects/doom-clone/src/renderer/rasterizer.cpp -o CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.s
+
 # Object files for target DoomClone
 DoomClone_OBJECTS = \
-"CMakeFiles/DoomClone.dir/src/main.cpp.o"
+"CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o" \
+"CMakeFiles/DoomClone.dir/src/core/math.cpp.o" \
+"CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o" \
+"CMakeFiles/DoomClone.dir/src/game/entity.cpp.o" \
+"CMakeFiles/DoomClone.dir/src/main.cpp.o" \
+"CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o" \
+"CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o"
 
 # External object files for target DoomClone
 DoomClone_EXTERNAL_OBJECTS =
 
+DoomClone: CMakeFiles/DoomClone.dir/src/core/game_loop.cpp.o
+DoomClone: CMakeFiles/DoomClone.dir/src/core/math.cpp.o
+DoomClone: CMakeFiles/DoomClone.dir/src/core/sdl_window.cpp.o
+DoomClone: CMakeFiles/DoomClone.dir/src/game/entity.cpp.o
 DoomClone: CMakeFiles/DoomClone.dir/src/main.cpp.o
+DoomClone: CMakeFiles/DoomClone.dir/src/renderer/camera.cpp.o
+DoomClone: CMakeFiles/DoomClone.dir/src/renderer/rasterizer.cpp.o
 DoomClone: CMakeFiles/DoomClone.dir/build.make
 DoomClone: CMakeFiles/DoomClone.dir/compiler_depend.ts
 DoomClone: /usr/lib/x86_64-linux-gnu/libSDL2.so
 DoomClone: /usr/lib/x86_64-linux-gnu/libSDL2main.a
 DoomClone: CMakeFiles/DoomClone.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable DoomClone"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/qualitypaper/IdeaProjects/doom-clone/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX executable DoomClone"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/DoomClone.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
