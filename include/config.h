@@ -10,16 +10,16 @@ namespace config
     constexpr uint16_t CANVAS_WIDTH = 320;
     constexpr uint16_t CANVAS_HEIGHT = 200;
 
-    constexpr float SCALE_X = WINDOW_WIDTH / CANVAS_WIDTH;
-    constexpr float SCALE_Y = WINDOW_HEIGHT / CANVAS_HEIGHT;
+    constexpr float SCALE_X = (float) WINDOW_WIDTH / (float) CANVAS_WIDTH;
+    constexpr float SCALE_Y = (float) WINDOW_HEIGHT / (float) CANVAS_HEIGHT;
 
     constexpr uint8_t VIEWPORT_WIDTH = 1;
     constexpr uint8_t VIEWPORT_HEIGHT = 1;
 
-    constexpr uint32_t CAMERA_DEPTH = 1;
+    constexpr const uint32_t CAMERA_DEPTH = 1;
 
     // made for fov of 90 degress, where tan(FOV/2) equals 1, if desired to change add (...)/tan(FOV/2)
-    constexpr uint32_t PROJECTION_PLANE_DISTANCE = (CANVAS_WIDTH/ 2);
+    constexpr const uint32_t PROJECTION_PLANE_DISTANCE = (CANVAS_WIDTH/ 2);
 
     constexpr uint8_t FOV = 90;
 }

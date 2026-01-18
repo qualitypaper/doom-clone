@@ -38,7 +38,8 @@ namespace framebuffer
             sdl_window::kill();
         }
 
-        void color(glm::vec2 point, uint32_t color);
+        void drawVerticalLine(uint16_t x, uint16_t y0, uint16_t y1, uint32_t color);
         void update();
+        void pollEvents();
     };
 }
