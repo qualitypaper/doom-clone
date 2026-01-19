@@ -7,10 +7,11 @@ namespace entity
 
     struct Player
     {
-        glm::vec2 position;
-        float_t z;
+        int16_t x;
+        int16_t y;
+        int16_t z;
         float_t velocity;
-        float angle;
+        float_t angle;
         uint8_t health{100};
         uint8_t armor;
         uint8_t current_weapon;

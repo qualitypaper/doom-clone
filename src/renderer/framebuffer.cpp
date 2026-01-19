@@ -4,8 +4,38 @@ namespace framebuffer
 {
     bool isOutOfBounds(uint16_t y)
     {
-        return (y < 0 || y >= config::WINDOW_HEIGHT);
+        return (y >= config::WINDOW_HEIGHT);
     }
+
+    void FrameBuffer::drawHorizontalLine(uint16_t y, uint16_t x0, uint16_t x1, uint32_t color)
+    {
+        // scale the point to the window size
+        uint16_t scaledY = config::SCALE_Y * y;
+        uint16_t transformedX0 = config::SCALE_X * x0;
+        uint16_t transformedX1 = config::SCALE_X * x1;
+
+        if (transformedX0 > transformedX1)
+        {
+            auto temp = transformedX0;
+            transformedX0 = transformedX1;
+            transformedX1 = transformedX0;
+        }
+
+        // using window width as the pitch, because the current
+        // implementation doesn't leave any extra pixels
+        uint16_t pitch = config::WINDOW_WIDTH;
+
+        for (uint16_t i = 0; i < config::SCALE_Y + 1; i++)
+        {
+            uint32_t *ptr = this->pixels + (scaledY + i)*pitch + (transformedX0);
+
+            for (uint16_t x = transformedX0; x <= transformedX1; x++)
+            {
+                *(uint32_t *)ptr = color;
+                ptr++;
+            }
+        }
+        }
 
     void FrameBuffer::drawVerticalLine(uint16_t x, uint16_t y0, uint16_t y1, uint32_t color)
     {
@@ -14,9 +44,16 @@ namespace framebuffer
         uint16_t transformedY0 = config::SCALE_Y * y0;
         uint16_t transformedY1 = config::SCALE_Y * y1;
 
-        if (scaledX < 0 || scaledX > config::WINDOW_WIDTH || isOutOfBounds(transformedY0) || isOutOfBounds(transformedY1))
+        if (scaledX > config::WINDOW_WIDTH || isOutOfBounds(transformedY0) || isOutOfBounds(transformedY1))
         {
             return;
+        }
+
+        if (transformedY0 > transformedY1)
+        {
+            auto temp = transformedY0;
+            transformedY0 = transformedY1;
+            transformedY1 = temp;
         }
 
         // using window width as the pitch, because the current
@@ -48,12 +85,12 @@ namespace framebuffer
         {
             switch (event.type)
             {
-                case SDL_QUIT: 
-                    // destroy
-                    break;
-                case SDL_KEYDOWN:
-                    
-                    break;
+            case SDL_QUIT:
+                // destroy
+                break;
+            case SDL_KEYDOWN:
+
+                break;
             }
         }
     }

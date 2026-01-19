@@ -37,7 +37,8 @@ namespace framebuffer
             delete[] pixels;
             sdl_window::kill();
         }
-
+        
+        void drawHorizontalLine(uint16_t y, uint16_t x0, uint16_t x1, uint32_t color);
         void drawVerticalLine(uint16_t x, uint16_t y0, uint16_t y1, uint32_t color);
         void update();
         void pollEvents();

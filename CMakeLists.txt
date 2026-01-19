@@ -13,7 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # ---- Build type default ----
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
 # ---- Compiler warnings ----
