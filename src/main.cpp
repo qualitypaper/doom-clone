@@ -24,8 +24,8 @@ static const glm::vec2 vertices[] = {
 
 static const gameloop::Sector sectors[] = {
     {
-        .floorHeight = 0,
-        .ceilingHeight = 128,
+        .floorHeight = 10,
+        .ceilingHeight = 256,
         .lightLevel = 192,
     }};
 
@@ -62,8 +62,8 @@ int main()
     gameloop::GameState gameState{};
 
     gameState.playerState = entity::Player{
-        .x = 0,
-        .y = 0,
+        .x = 50,
+        .y = 250,
         .z = 0,
         .velocity = 1.0f,
         .angle = 0,
@@ -107,7 +107,7 @@ void poll_sdl_events(InputState &input)
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
-        std::cout << "Event type: " << event.type << '\n';
+        // std::cout << "Event type: " << event.type << '\n';
 
         switch (event.type)
         {
@@ -138,34 +138,49 @@ void render(const gameloop::GameState &gameState, InputState &input)
     // fb->drawVerticalLine(50, 50, 100, YELLOW);
 
     // fb->update();
-    
 
     for (auto &ld : linedefs)
     {
         auto &sidedef = sidedefs[ld.frontSidedef];
-
-        auto projected1 = camera::project(vertices[ld.start].x, vertices[ld.start].y, 1);
-        auto projected2 = camera::project(vertices[ld.end].x, vertices[ld.end].y, 1);
-
         auto &sector = sectors[sidedef.sectorId];
 
-        int startX, endX;
-        int startY = sector.ceilingHeight, endY = sector.floorHeight;
+        // apply translation and rotation depending on the player's position
+        int16_t startX = vertices[ld.start].x - gameState.playerState.x;
+        int16_t startY = vertices[ld.start].y - gameState.playerState.y;
 
-        if (projected1.x > projected2.x)
-        {
-            startX = projected2.x;
-            endX = projected1.x;
-        }
-        else
-        {
-            startX = projected1.x;
-            endX = projected2.x;
-        }
+        int16_t endX = vertices[ld.end].x - gameState.playerState.x;
+        int16_t endY = vertices[ld.end].y - gameState.playerState.y;
 
-        for (int i = startX; i <= endX; i++)
+        // Calculate floor and ceiling heights relative to player
+        int16_t floorZ = sector.floorHeight - gameState.playerState.z;
+        int16_t ceilingZ = sector.ceilingHeight - gameState.playerState.z;
+
+        int16_t viewX1 = startX * std::cos(gameState.playerState.angle) - startY * std::sin(gameState.playerState.angle);
+        int16_t viewY1 = startX * std::sin(gameState.playerState.angle) + startY * std::cos(gameState.playerState.angle);
+        int16_t viewX2 = endX * std::cos(gameState.playerState.angle) - endY * std::sin(gameState.playerState.angle);
+        int16_t viewY2 = endX * std::sin(gameState.playerState.angle) + endY * std::cos(gameState.playerState.angle);
+
+        // near plane clipping
+        // if (viewY1 < 1 || viewY2 < 1) continue;
+
+        int16_t projectedStartX = config::CANVAS_WIDTH/2 + viewX1 / viewY1;
+        int16_t projectedEndX = config::CANVAS_WIDTH/2 + viewX2 / viewY2;
+
+        int16_t start = std::min(projectedStartX, projectedEndX);
+        int16_t end = std::max(projectedStartX, projectedEndX);
+
+        for (int i = start; i <= end; i++)
         {
-            fb->drawVerticalLine(i, startY, endY, YELLOW);
+            double_t inv_y1 = 1 / (double) viewY1;
+            double_t inv_y2 = 1 / (double) viewY2;
+            double_t t = double(i - start) / double(end - start);
+            double_t inv_y = lerp(inv_y1, inv_y2, t);
+            int16_t projectedFloorZ = config::CANVAS_HEIGHT/2 - floorZ * inv_y;
+            int16_t projectedCeilingZ = config::CANVAS_HEIGHT/2 - ceilingZ * inv_y;
+
+            std::cout << "top: " << projectedCeilingZ << ", bottom: " << projectedFloorZ << '\n';
+
+            fb->drawVerticalLine(i, projectedCeilingZ, projectedFloorZ, mapColor(0, 255, 0, 255));
         }
     }
 

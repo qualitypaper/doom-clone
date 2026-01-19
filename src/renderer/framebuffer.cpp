@@ -7,7 +7,7 @@ namespace framebuffer
         return (y >= config::WINDOW_HEIGHT);
     }
 
-    void FrameBuffer::drawHorizontalLine(uint16_t y, uint16_t x0, uint16_t x1, uint32_t color)
+    void FrameBuffer::drawHorizontalLine(int16_t y, int16_t x0, int16_t x1, uint32_t color)
     {
         // scale the point to the window size
         uint16_t scaledY = config::SCALE_Y * y;
@@ -27,7 +27,7 @@ namespace framebuffer
 
         for (uint16_t i = 0; i < config::SCALE_Y + 1; i++)
         {
-            uint32_t *ptr = this->pixels + (scaledY + i)*pitch + (transformedX0);
+            uint32_t *ptr = this->pixels + (scaledY + i) * pitch + (transformedX0);
 
             for (uint16_t x = transformedX0; x <= transformedX1; x++)
             {
@@ -35,9 +35,9 @@ namespace framebuffer
                 ptr++;
             }
         }
-        }
+    }
 
-    void FrameBuffer::drawVerticalLine(uint16_t x, uint16_t y0, uint16_t y1, uint32_t color)
+    void FrameBuffer::drawVerticalLine(int16_t x, int16_t y0, int16_t y1, uint32_t color)
     {
         // scale the point to the window size
         uint16_t scaledX = config::SCALE_X * x;
