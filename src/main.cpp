@@ -18,9 +18,13 @@ bool running;
 
 static const glm::vec2 vertices[] = {
     {0, 0},
-    {256, 0},
-    {256, 256},
-    {0, 256}};
+    {100, 0},
+    {100, 100},
+    {0, 100},
+    // {0, -256},
+    // {-256, -256},
+    // {-256, 0},
+};
 
 static const gameloop::Sector sectors[] = {
     {
@@ -37,10 +41,14 @@ static const gameloop::SideDef sidedefs[] = {
 };
 
 static const gameloop::LineDef linedefs[] = {
-    {0, 1, gameloop::LineDefType::REGULAR, 0, -1},
+    // {0, 1, gameloop::LineDefType::REGULAR, 0, -1},
     {1, 2, gameloop::LineDefType::REGULAR, 1, -1},
     {2, 3, gameloop::LineDefType::REGULAR, 2, -1},
     {3, 1, gameloop::LineDefType::REGULAR, 3, -1},
+    // {4, 5, gameloop::LineDefType::REGULAR, 3, -1},
+    // {5, 6, gameloop::LineDefType::REGULAR, 3, -1},
+    // {6, 0, gameloop::LineDefType::REGULAR, 3, -1},
+    // {0, 4, gameloop::LineDefType::REGULAR, 3, -1},
 };
 
 int main()
@@ -62,9 +70,9 @@ int main()
     gameloop::GameState gameState{};
 
     gameState.playerState = entity::Player{
-        .x = 50,
-        .y = 250,
-        .z = 0,
+        .x = 0,
+        .y = 0,
+        .z = 5,
         .velocity = 1.0f,
         .angle = 0,
         .health = 100,
@@ -128,6 +136,14 @@ void poll_sdl_events(InputState &input)
 
 void update(const gameloop::GameState &gameState) {}
 
+void clipNearPlane(double_t &x1, double_t &y1, double_t &x2, double_t &y2)
+{
+    double_t t = (config::NEAR_CLIPPING - y1) / (y2 - y1);
+
+    x1 += t * (x2 - x1);
+    y1 = config::NEAR_CLIPPING;
+}
+
 void render(const gameloop::GameState &gameState, InputState &input)
 {
 
@@ -138,6 +154,10 @@ void render(const gameloop::GameState &gameState, InputState &input)
     // fb->drawVerticalLine(50, 50, 100, YELLOW);
 
     // fb->update();
+
+    constexpr double_t FOV = 90.0;
+    const double_t TAN_HALF_FOV = std::tan((FOV / 2.0) * (3.14159265 / 180.0));
+    const double_t FOCAL_LENGTH = (config::CANVAS_WIDTH / 2.0) / TAN_HALF_FOV;
 
     for (auto &ld : linedefs)
     {
@@ -155,32 +175,59 @@ void render(const gameloop::GameState &gameState, InputState &input)
         int16_t floorZ = sector.floorHeight - gameState.playerState.z;
         int16_t ceilingZ = sector.ceilingHeight - gameState.playerState.z;
 
-        int16_t viewX1 = startX * std::cos(gameState.playerState.angle) - startY * std::sin(gameState.playerState.angle);
-        int16_t viewY1 = startX * std::sin(gameState.playerState.angle) + startY * std::cos(gameState.playerState.angle);
-        int16_t viewX2 = endX * std::cos(gameState.playerState.angle) - endY * std::sin(gameState.playerState.angle);
-        int16_t viewY2 = endX * std::sin(gameState.playerState.angle) + endY * std::cos(gameState.playerState.angle);
+        double_t viewX1 = startX * std::cos(gameState.playerState.angle) - startY * std::sin(gameState.playerState.angle);
+        double_t viewY1 = startX * std::sin(gameState.playerState.angle) + startY * std::cos(gameState.playerState.angle);
+        double_t viewX2 = endX * std::cos(gameState.playerState.angle) - endY * std::sin(gameState.playerState.angle);
+        double_t viewY2 = endX * std::sin(gameState.playerState.angle) + endY * std::cos(gameState.playerState.angle);
 
         // near plane clipping
-        // if (viewY1 < 1 || viewY2 < 1) continue;
-
-        int16_t projectedStartX = config::CANVAS_WIDTH/2 + viewX1 / viewY1;
-        int16_t projectedEndX = config::CANVAS_WIDTH/2 + viewX2 / viewY2;
-
-        int16_t start = std::min(projectedStartX, projectedEndX);
-        int16_t end = std::max(projectedStartX, projectedEndX);
-
-        for (int i = start; i <= end; i++)
+        if (viewY1 < config::NEAR_CLIPPING && viewY2 < config::NEAR_CLIPPING)
+            continue;
+        else if (viewY1 < config::NEAR_CLIPPING)
         {
-            double_t inv_y1 = 1 / (double) viewY1;
-            double_t inv_y2 = 1 / (double) viewY2;
+            clipNearPlane(viewX1, viewY1, viewX2, viewY2);
+        }
+        else if (viewY2 < config::NEAR_CLIPPING)
+        {
+            clipNearPlane(viewX2, viewY2, viewX1, viewY1);
+        }
+
+        int16_t projectedStartX = config::CANVAS_WIDTH / 2 + viewX1 * FOCAL_LENGTH / (viewY1);
+        int16_t projectedEndX = config::CANVAS_WIDTH / 2 + viewX2 * FOCAL_LENGTH / (viewY2);
+
+        int16_t start, end;
+        double_t inv_y1, inv_y2;
+
+        if (projectedStartX > projectedEndX)
+        {
+            start = projectedEndX;
+            end = projectedStartX;
+            inv_y1 = 1 / viewY2;
+            inv_y2 = 1 / viewY1;
+        }
+        else
+        {
+            start = projectedStartX;
+            end = projectedEndX;
+            inv_y1 = 1 / (double) viewY1;
+            inv_y2 = 1 / (double) viewY2;
+        }
+
+        for (int i = start; i < end; i++)
+        {
             double_t t = double(i - start) / double(end - start);
             double_t inv_y = lerp(inv_y1, inv_y2, t);
-            int16_t projectedFloorZ = config::CANVAS_HEIGHT/2 - floorZ * inv_y;
-            int16_t projectedCeilingZ = config::CANVAS_HEIGHT/2 - ceilingZ * inv_y;
+
+            int32_t projectedFloorZ = config::CANVAS_HEIGHT / 2 - floorZ * inv_y;
+            int32_t projectedCeilingZ = config::CANVAS_HEIGHT / 2 - ceilingZ * inv_y;
+
+            if (projectedCeilingZ < 0) {
+                std::cout << "below zero\n"; 
+            }
 
             std::cout << "top: " << projectedCeilingZ << ", bottom: " << projectedFloorZ << '\n';
 
-            fb->drawVerticalLine(i, projectedCeilingZ, projectedFloorZ, mapColor(0, 255, 0, 255));
+            fb->drawVerticalLine(i, projectedFloorZ, projectedCeilingZ, mapColor(0, 255, 0, 255));
         }
     }
 
