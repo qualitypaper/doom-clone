@@ -2,6 +2,7 @@
 
 #include "entity.h"
 #include "sdl_window.h"
+#include "config.h"
 #include <vector>
 
 /* 
@@ -11,7 +12,6 @@
 
 namespace gameloop
 {
-
     void handleMouseMovement(SDL_Event &event, InputState &input);
     void handleKeyInput(SDL_Event &event, InputState &input);
 
