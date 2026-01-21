@@ -8,6 +8,9 @@
 static int32_t floorClipping[config::CANVAS_WIDTH];
 static int32_t ceilClipping[config::CANVAS_WIDTH];
 
+static int32_t lastCeilingZ[config::CANVAS_WIDTH];
+static int32_t lastFloorZ[config::CANVAS_WIDTH];
+
 void poll_sdl_events(InputState &input);
 void update(const gameloop::GameState &gameState);
 void render(const gameloop::GameState &gameState, InputState &input);
@@ -77,10 +80,6 @@ int main()
     .x = 50, .y = 50, .z = 10, .velocity = 1.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
-  for (int i = 0; i < config::CANVAS_WIDTH; ++i) {
-    ceilClipping[i] = 0;
-    floorClipping[i] = config::CANVAS_HEIGHT;
-  }
 
   running = true;
   // game loop
@@ -89,6 +88,12 @@ int main()
   std::cout << "Start timestamp: " << timestamp << '\n';
 
   while (running) {
+    for (int i = 0; i < config::CANVAS_WIDTH; ++i) {
+      ceilClipping[i] = 0;
+      floorClipping[i] = config::CANVAS_HEIGHT;
+      lastCeilingZ[i] = 0;
+      lastFloorZ[i] = config::CANVAS_HEIGHT;
+    }
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
@@ -165,9 +170,7 @@ void applyTransformations(const entity::Player &playerState,
 }
 
 
-int32_t clamp(int32_t val, int32_t min, int32_t max) {
-  return std::min(max, std::max(min, val));
-}
+int32_t clamp(int32_t val, int32_t min, int32_t max) { return std::min(max, std::max(min, val)); }
 
 void render(const gameloop::GameState &gameState, InputState &input)
 {
@@ -203,8 +206,10 @@ void render(const gameloop::GameState &gameState, InputState &input)
       clipNearPlane(viewX2, viewY2, viewX1, viewY1);
     }
 
-    int32_t projectedStartX = clamp((int32_t) config::CANVAS_WIDTH / 2 + viewX1 * FOCAL_LENGTH / (viewY1), 0, config::CANVAS_WIDTH);
-    int32_t projectedEndX = clamp((int32_t) config::CANVAS_WIDTH / 2 + viewX2 * FOCAL_LENGTH / (viewY2), 0, config::CANVAS_WIDTH);
+    int32_t projectedStartX =
+      clamp((int32_t)config::CANVAS_WIDTH / 2 + viewX1 * FOCAL_LENGTH / (viewY1), 0, config::CANVAS_WIDTH);
+    int32_t projectedEndX =
+      clamp((int32_t)config::CANVAS_WIDTH / 2 + viewX2 * FOCAL_LENGTH / (viewY2), 0, config::CANVAS_WIDTH);
 
     int16_t start, end;
     double_t inv_y1, inv_y2;
@@ -221,9 +226,6 @@ void render(const gameloop::GameState &gameState, InputState &input)
       inv_y2 = 1 / (double)viewY2;
     }
 
-    transformedY0 = std::max(0, transformedY0);
-transformedY1 = std::min(config::WINDOW_HEIGHT - 1, transformedY1);
-
     for (int i = start; i < end; i++) {
       double_t t = double(i - start) / double(end - start);
       double_t inv_y = lerp(inv_y1, inv_y2, t);
@@ -231,12 +233,25 @@ transformedY1 = std::min(config::WINDOW_HEIGHT - 1, transformedY1);
       int32_t projectedFloorZ = config::CANVAS_HEIGHT / 2 - floorZ * FOCAL_LENGTH * inv_y;
       int32_t projectedCeilingZ = config::CANVAS_HEIGHT / 2 - ceilingZ * FOCAL_LENGTH * inv_y;
 
-      ceilClipping[i] = std::max(ceilClipping[i], projectedFloorZ + 1);
-      floorClipping[i] = std::min(floorClipping[i], projectedCeilingZ - 1);
 
       if (projectedCeilingZ < 0) { projectedCeilingZ = 0; }
 
-      fb->drawVerticalLine(i, projectedFloorZ, projectedCeilingZ, mapColor(0, 255, std::rand(), 255));
+
+      int drawTop = std::max(projectedCeilingZ, ceilClipping[i]);
+      int drawBottom = std::min(projectedFloorZ, floorClipping[i]);
+
+      if (drawTop <= drawBottom) {
+        fb->drawVerticalLine(i, drawTop, drawBottom, mapColor(std::rand(), 255, 255, 255));
+
+        ceilClipping[i] = std::max(ceilClipping[i], projectedCeilingZ);
+        floorClipping[i] = std::min(floorClipping[i], projectedFloorZ);
+
+        lastCeilingZ[i] = projectedCeilingZ;
+        lastFloorZ[i] = projectedFloorZ;
+      }
+
+      fb->drawVerticalLine(i, 0, ceilClipping[i], mapColor(255, 0, 0, 255));
+      fb->drawVerticalLine(i, config::CANVAS_HEIGHT - 1, floorClipping[i], mapColor(255, 255, 0, 255));
     }
   }
 

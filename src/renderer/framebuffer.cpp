@@ -33,24 +33,24 @@ void FrameBuffer::drawHorizontalLine(int16_t y, int16_t x0, int16_t x1, uint32_t
 void FrameBuffer::drawVerticalLine(int16_t x, int16_t y0, int16_t y1, uint32_t color)
 {
   // scale the point to the window size
-  int16_t scaledX = config::SCALE_X * x;
-  int16_t transformedY0 = config::SCALE_Y * y0;
-  int16_t transformedY1 = config::SCALE_Y * y1;
+  int32_t scaledX = config::SCALE_X * x;
+  int32_t transformedY0 = config::SCALE_Y * y0;
+  int32_t transformedY1 = config::SCALE_Y * y1;
 
-  if (scaledX < 0 || scaledX > config::WINDOW_WIDTH - 1 || transformedY0 < 0 || transformedY0 > config::WINDOW_HEIGHT - 1
-      || transformedY1 < 0 || transformedY1 > config::WINDOW_HEIGHT - 1) {
+  if (scaledX < 0 || scaledX > config::WINDOW_WIDTH - 1 || transformedY0 < 0
+      || transformedY0 > config::WINDOW_HEIGHT - 1 || transformedY1 < 0 || transformedY1 > config::WINDOW_HEIGHT - 1) {
     return;
   }
 
-  if (transformedY0 > transformedY1) {
-    transformedY0 ^= transformedY1;
-    transformedY1 ^= transformedY0;
-    transformedY0 ^= transformedY1;
-  }
+  if (transformedY0 > transformedY1)
+    std::swap(transformedY0, transformedY1);
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
   uint32_t pitch = config::WINDOW_WIDTH;
+
+  transformedY0 = std::max(0, transformedY0);
+  transformedY1 = std::min(config::WINDOW_HEIGHT - 1, transformedY1);
 
   for (uint32_t i = 0; i < config::SCALE_X + 1; i++) {
     uint32_t *ptr = this->pixels + (transformedY0)*pitch + (scaledX + i);
