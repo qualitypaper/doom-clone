@@ -7,9 +7,9 @@ namespace entity
 
     struct Player
     {
-        int16_t x;
-        int16_t y;
-        int16_t z;
+        float_t x;
+        float_t y;
+        float_t z;
         float_t velocity;
         float_t angle;
         uint8_t health{100};

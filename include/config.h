@@ -15,9 +15,11 @@ namespace config
 
     constexpr float NEAR_CLIPPING = 1;
 
-    constexpr uint8_t VIEWPORT_WIDTH = 320;
-    constexpr uint8_t VIEWPORT_HEIGHT = 200;
+    constexpr uint8_t VIEWPORT_WIDTH = CANVAS_WIDTH;
+    constexpr uint8_t VIEWPORT_HEIGHT = CANVAS_HEIGHT;
     constexpr const uint32_t CAMERA_DEPTH = 1;
+
+    constexpr uint8_t DESIRED_FRAMERATE = 60;
 
     // made for fov of 90 degress, where tan(FOV/2) equals 1, if desired to change add (...)/tan(FOV/2)
     constexpr const uint32_t PROJECTION_PLANE_DISTANCE = 1;

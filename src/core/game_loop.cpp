@@ -17,6 +17,5 @@ namespace gameloop
         bool pressed = (event.type == SDL_KEYDOWN);
         SDL_Scancode scancode = event.key.keysym.scancode;
         input.keys[scancode] = pressed;
-        std::cout << "Pressed: " << (char) event.key.keysym.sym << '\n';
     }
 }

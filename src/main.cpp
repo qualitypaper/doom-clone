@@ -12,8 +12,8 @@ static int32_t lastCeilingZ[config::CANVAS_WIDTH];
 static int32_t lastFloorZ[config::CANVAS_WIDTH];
 
 void poll_sdl_events(InputState &input);
-void update(const gameloop::GameState &gameState);
-void render(const gameloop::GameState &gameState, InputState &input);
+void update(gameloop::GameState &gameState, InputState &input, const double_t dt);
+void render(const gameloop::GameState &gameState);
 
 constexpr uint32_t mapColor(uint8_t r, uint8_t g, uint8_t b, uint8_t alpha)
 {
@@ -27,9 +27,9 @@ bool running;
 
 static const glm::vec2 vertices[] = {
   { 0, 0 },
-  { 100, 0 },
-  { 100, 100 },
-  { 0, 100 },
+  { 50, 0 },
+  { 50, 50 },
+  { 0, 50 },
   // {0, -256},
   // {-256, -256},
   // {-256, 0},
@@ -69,23 +69,24 @@ int main()
 
   fb = new framebuffer::FrameBuffer();
 
-  // SDL_SetRelativeMouseMode(SDL_TRUE);
-
   std::cout << "Set up window" << '\n';
 
   InputState input{};
   gameloop::GameState gameState{};
 
   gameState.playerState = entity::Player{
-    .x = 50, .y = 50, .z = 10, .velocity = 1.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
+    .x = 25, .y = 25, .z = 10, .velocity = 2.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
-
 
   running = true;
   // game loop
-  time_t timestamp = time(0);
+  const double dt = 1 / (double)config::DESIRED_FRAMERATE;
+  double acc = 0.0;
 
-  std::cout << "Start timestamp: " << timestamp << '\n';
+  uint64_t prev = SDL_GetPerformanceCounter();
+  
+  int16_t frameCount = 0;
+  double fpsAccumulator = 0.0;
 
   while (running) {
     for (int i = 0; i < config::CANVAS_WIDTH; ++i) {
@@ -99,11 +100,27 @@ int main()
 
     poll_sdl_events(input);
 
-    update(gameState);
-    render(gameState, input);
-    system("sleep 1");
+    uint64_t now = SDL_GetPerformanceCounter();
+    double frameTime = double(now - prev) / SDL_GetPerformanceFrequency();
+    prev = now;
+    if (frameTime > 0.25) frameTime = 0.25;
+    acc += frameTime;
 
-    if (time(0) - timestamp > 5000) { running = false; }
+    while (acc >= dt) {
+      update(gameState, input, dt);
+      acc -= dt;
+    }
+
+    render(gameState);
+    
+    // FPS tracking
+    frameCount++;
+    fpsAccumulator += frameTime;
+    if (fpsAccumulator >= 1.0) {
+      std::printf("FPS: %d\n", frameCount);
+      frameCount = 0;
+      fpsAccumulator = 0.0;
+    }
   }
 
   if (fb) { delete fb; }
@@ -114,8 +131,8 @@ int main()
 void poll_sdl_events(InputState &input)
 {
   SDL_Event event;
+
   while (SDL_PollEvent(&event)) {
-    // std::cout << "Event type: " << event.type << '\n';
 
     switch (event.type) {
     case SDL_QUIT:
@@ -130,10 +147,34 @@ void poll_sdl_events(InputState &input)
       break;
     }
   }
-  std::printf("Finished polling events \n");
 }
 
-void update(const gameloop::GameState &gameState) {}
+void update(gameloop::GameState &gameState, InputState &input, const double_t dt)
+{
+  // update the movement of the player
+
+  // keyboard
+  float_t &x = gameState.playerState.x, &y = gameState.playerState.y;
+
+  for (uint32_t i = 0; i < sizeof(input.keys); i++) {
+    if (!input.keys[i]) continue;
+
+    SDL_Scancode scancode = static_cast<SDL_Scancode>(i);
+    SDL_Keycode keycode = SDL_GetKeyFromScancode(scancode);
+    const char *sym = SDL_GetKeyName(keycode);
+    const char lower = tolower(sym[0]);
+
+    if (lower == 'w') {
+      y += dt * gameState.playerState.velocity;
+    } else if (lower == 's') {
+      y -= dt * gameState.playerState.velocity;
+    } else if (lower == 'a') {
+      x -= dt * gameState.playerState.velocity;
+    } else if (lower == 'd') {
+      x += dt * gameState.playerState.velocity;
+    }
+  }
+}
 
 void clipNearPlane(double_t &x1, double_t &y1, double_t &x2, double_t &y2)
 {
@@ -153,12 +194,11 @@ void applyTransformations(const entity::Player &playerState,
   int16_t &floorZ,
   int16_t &ceilingZ)
 {
+  float_t startX = vertices[ld.start].x - playerState.x;
+  float_t startY = vertices[ld.start].y - playerState.y;
 
-  int16_t startX = vertices[ld.start].x - playerState.x;
-  int16_t startY = vertices[ld.start].y - playerState.y;
-
-  int16_t endX = vertices[ld.end].x - playerState.x;
-  int16_t endY = vertices[ld.end].y - playerState.y;
+  float_t endX = vertices[ld.end].x - playerState.x;
+  float_t endY = vertices[ld.end].y - playerState.y;
 
   floorZ = sector.floorHeight - playerState.z;
   ceilingZ = sector.ceilingHeight - playerState.z;
@@ -172,20 +212,10 @@ void applyTransformations(const entity::Player &playerState,
 
 int32_t clamp(int32_t val, int32_t min, int32_t max) { return std::min(max, std::max(min, val)); }
 
-void render(const gameloop::GameState &gameState, InputState &input)
+void render(const gameloop::GameState &gameState)
 {
-
-  // for (int i = 0; i < 50; i++)
-  // {
-  //     fb->drawHorizontalLine(i, 50, 100, YELLOW);
-  // }
-  // fb->drawVerticalLine(50, 50, 100, YELLOW);
-
-  // fb->update();
-
-  constexpr double_t FOV = 90.0;
-  const double_t TAN_HALF_FOV = std::tan((FOV / 2.0) * (3.14159265 / 180.0));
-  const double_t FOCAL_LENGTH = (20 / 2.0) / TAN_HALF_FOV;
+  const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
+  const double_t FOCAL_LENGTH = (120 / 2.0) / TAN_HALF_FOV;
   // const double_t FOCAL_LENGTH = 1;
 
   for (gameloop::LineDef ld : linedefs) {
@@ -206,12 +236,10 @@ void render(const gameloop::GameState &gameState, InputState &input)
       clipNearPlane(viewX2, viewY2, viewX1, viewY1);
     }
 
-    int32_t projectedStartX =
-      clamp((int32_t)config::CANVAS_WIDTH / 2 + viewX1 * FOCAL_LENGTH / (viewY1), 0, config::CANVAS_WIDTH);
-    int32_t projectedEndX =
-      clamp((int32_t)config::CANVAS_WIDTH / 2 + viewX2 * FOCAL_LENGTH / (viewY2), 0, config::CANVAS_WIDTH);
+    int32_t projectedStartX = config::CANVAS_WIDTH / 2 + viewX1 * FOCAL_LENGTH / (viewY1);
+    int32_t projectedEndX = config::CANVAS_WIDTH / 2 + viewX2 * FOCAL_LENGTH / (viewY2);
 
-    int16_t start, end;
+    int32_t start, end;
     double_t inv_y1, inv_y2;
 
     if (projectedStartX > projectedEndX) {
@@ -222,26 +250,24 @@ void render(const gameloop::GameState &gameState, InputState &input)
     } else {
       start = projectedStartX;
       end = projectedEndX;
-      inv_y1 = 1 / (double)viewY1;
-      inv_y2 = 1 / (double)viewY2;
+      inv_y1 = 1 / viewY1;
+      inv_y2 = 1 / viewY2;
     }
 
-    for (int i = start; i < end; i++) {
+    for (int i = std::max(0, start); i < std::min(static_cast<int32_t>(config::CANVAS_WIDTH), end); i++) {
       double_t t = double(i - start) / double(end - start);
       double_t inv_y = lerp(inv_y1, inv_y2, t);
 
       int32_t projectedFloorZ = config::CANVAS_HEIGHT / 2 - floorZ * FOCAL_LENGTH * inv_y;
       int32_t projectedCeilingZ = config::CANVAS_HEIGHT / 2 - ceilingZ * FOCAL_LENGTH * inv_y;
 
-
       if (projectedCeilingZ < 0) { projectedCeilingZ = 0; }
 
-
-      int drawTop = std::max(projectedCeilingZ, ceilClipping[i]);
-      int drawBottom = std::min(projectedFloorZ, floorClipping[i]);
+      int32_t drawTop = std::max(projectedCeilingZ, ceilClipping[i]);
+      int32_t drawBottom = std::min(projectedFloorZ, floorClipping[i]);
 
       if (drawTop <= drawBottom) {
-        fb->drawVerticalLine(i, drawTop, drawBottom, mapColor(std::rand(), 255, 255, 255));
+        fb->drawVerticalLine(i, drawTop, drawBottom, mapColor(0, 255, 255, 255));
 
         ceilClipping[i] = std::max(ceilClipping[i], projectedCeilingZ);
         floorClipping[i] = std::min(floorClipping[i], projectedFloorZ);
