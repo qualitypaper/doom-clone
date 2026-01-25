@@ -45,18 +45,21 @@ static const glm::vec2 vertices[] = {
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static const gameloop::Sector sectors[] = { {
-                                              // Sector 0
-                                              .floorHeight = 0,
-                                              .ceilingHeight = 36,
-                                              .lightLevel = 192,
-                                            },
+static const gameloop::Sector sectors[] = {
+
+  {
+    // Sector 0
+    .floorHeight = 0,
+    .ceilingHeight = 36,
+    .lightLevel = 192,
+  },
   {
     // Sector 1 (Taller and deeper)
     .floorHeight = -10,
     .ceilingHeight = 50,
     .lightLevel = 128,
-  } };
+  }
+};
 
 // ==========================================
 // 3. SIDEDEFS (Visual sides of lines)
@@ -214,39 +217,17 @@ void update(gameloop::GameState &gameState, InputState &input, const double_t dt
   float_t sin = std::sin(gameState.playerState.angle);
   float_t cos = std::cos(gameState.playerState.angle);
 
-  for (uint32_t i = 0; i < sizeof(input.keys); i++) {
-    if (!input.keys[i]) continue;
+  int8_t moveSide = 0, moveForward = 0;
 
-    SDL_Scancode scancode = static_cast<SDL_Scancode>(i);
-    SDL_Keycode keycode = SDL_GetKeyFromScancode(scancode);
-    const char *sym = SDL_GetKeyName(keycode);
-    const char lower = tolower(sym[0]);
+  if (input.keys[SDL_SCANCODE_W]) moveForward += 1;
+  if (input.keys[SDL_SCANCODE_S]) moveForward -= 1;
+  if (input.keys[SDL_SCANCODE_A]) moveSide -= 1;
+  if (input.keys[SDL_SCANCODE_D]) moveSide += 1;
 
-    double_t directionX = std::sin(gameState.playerState.angle);
-    double_t directionY = std::cos(gameState.playerState.angle);
+  float_t velocity = gameState.playerState.velocity;
 
-    float_t velocity = gameState.playerState.velocity;
-
-    double_t xDiff = dt * directionX * velocity;
-    double_t yDiff = dt * directionY * velocity;
-
-    if (lower == 'w') {
-      x += xDiff;
-      y += yDiff;
-    }
-    if (lower == 's') {
-      y -= yDiff;
-      x -= xDiff;
-    }
-    if (lower == 'a') {
-      x += yDiff;
-      y += xDiff;
-    }
-    if (lower == 'd') {
-      x -= yDiff;
-      y -= xDiff;
-    }
-  }
+  x += (moveSide * cos + moveForward * sin) * dt * velocity;
+  y += (moveSide * (-sin) + moveForward * cos) * dt * velocity;
 }
 
 void clipNearPlane(double_t &x1, double_t &y1, double_t &x2, double_t &y2)
@@ -352,7 +333,6 @@ void render(const gameloop::GameState &gameState)
         int16_t nextCeilZ = nextSector.ceilingHeight - gameState.playerState.z;
         int16_t nextFloorZ = nextSector.floorHeight - gameState.playerState.z;
 
-        // Project them to screen Y
         int32_t nextCeilY = config::CANVAS_HEIGHT / 2 - nextCeilZ * FOCAL_LENGTH * inv_y;
         int32_t nextFloorY = config::CANVAS_HEIGHT / 2 - nextFloorZ * FOCAL_LENGTH * inv_y;
 
@@ -384,6 +364,9 @@ void render(const gameloop::GameState &gameState)
       // draw floor
       fb->drawVerticalLine(i, config::CANVAS_HEIGHT - 1, floorClipping[i], mapColor(255, 255, 0, 255));
     }
+
+    // debug
+    fb->update();
   }
 
   fb->update();
