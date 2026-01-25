@@ -14,6 +14,8 @@ static int32_t lastFloorZ[config::CANVAS_WIDTH];
 void poll_sdl_events(InputState &input);
 void update(gameloop::GameState &gameState, InputState &input, const double_t dt);
 void render(const gameloop::GameState &gameState);
+void drawSolidWall(int x, int32_t &projectedCeilingZ, int32_t &projectedFloorZ);
+void rotate(float_t x, float_t y, double_t angle, double_t &xRes, double_t &yRes);
 
 constexpr uint32_t mapColor(uint8_t r, uint8_t g, uint8_t b, uint8_t alpha)
 {
@@ -25,38 +27,86 @@ constexpr uint32_t YELLOW = mapColor(255, 255, 0, 255);
 framebuffer::FrameBuffer *fb;
 bool running;
 
+// ==========================================
+// 1. VERTICES (World Coordinates)
+// ==========================================
 static const glm::vec2 vertices[] = {
-  { 0, 0 },
-  { 50, 0 },
-  { 50, 50 },
-  { 0, 50 },
-  // {0, -256},
-  // {-256, -256},
-  // {-256, 0},
+  // Sector 0 (The Starting Room)
+  { 0, 0 },// 0
+  { 50, 0 },// 1
+  { 50, 50 },// 2
+  { 0, 50 },// 3
+
+  // Sector 1 (The Connected Hallway - shares 1 and 2 with Sector 0)
+  { 100, 0 },// 4
+  { 100, 50 }// 5
 };
 
+// ==========================================
+// 2. SECTORS (Rooms)
+// ==========================================
 static const gameloop::Sector sectors[] = { {
-  .floorHeight = 0,
-  .ceilingHeight = 36,
-  .lightLevel = 192,
-} };
+                                              // Sector 0
+                                              .floorHeight = 0,
+                                              .ceilingHeight = 36,
+                                              .lightLevel = 192,
+                                            },
+  {
+    // Sector 1 (Taller and deeper)
+    .floorHeight = -10,
+    .ceilingHeight = 50,
+    .lightLevel = 128,
+  } };
 
+// ==========================================
+// 3. SIDEDEFS (Visual sides of lines)
+// ==========================================
+// Note: You usually add textures here. For now, we just link to sectors.
 static const gameloop::SideDef sidedefs[] = {
-  { 0, 0, 0 },
-  { 0, 0, 0 },
-  { 0, 0, 0 },
-  { 0, 0, 0 },
+  // -- Sector 0 Sides --
+  { .sectorId = 0 },// 0: South wall
+  { .sectorId = 0 },// 1: Portal line (facing Sector 1)
+  { .sectorId = 0 },// 2: North wall
+  { .sectorId = 0 },// 3: West wall
+
+  // -- Sector 1 Sides --
+  { .sectorId = 1 },// 4: Portal line (facing Sector 0)
+  { .sectorId = 1 },// 5: North wall
+  { .sectorId = 1 },// 6: East wall
+  { .sectorId = 1 },// 7: South wall
 };
 
+// ==========================================
+// 4. LINEDEFS (The Geometry)
+// ==========================================
+// -1 indicates "No Side" (Solid wall)
 static const gameloop::LineDef linedefs[] = {
-  // { 0, 1, gameloop::LineDefType::REGULAR, 0, -1 },
-  { 1, 2, gameloop::LineDefType::REGULAR, 1, -1 },
+  // --- SECTOR 0 (Square) ---
+  // Start, End, Type, FrontSide, BackSide
+
+  // Wall: (0,0) to (50,0)
+  { 0, 1, gameloop::LineDefType::REGULAR, 0, -1 },
+
+  // PORTAL: (50,0) to (50,50) -> Connects Sector 0 and 1
+  // Notice it has a Back SideDef (index 4)
+  { 1, 2, gameloop::LineDefType::REGULAR, 1, 4 },
+
+  // Wall: (50,50) to (0,50)
   { 2, 3, gameloop::LineDefType::REGULAR, 2, -1 },
+
+  // Wall: (0,50) to (0,0)
   { 3, 0, gameloop::LineDefType::REGULAR, 3, -1 },
-  // {4, 5, gameloop::LineDefType::REGULAR, 3, -1},
-  // {5, 6, gameloop::LineDefType::REGULAR, 3, -1},
-  // {6, 0, gameloop::LineDefType::REGULAR, 3, -1},
-  // {0, 4, gameloop::LineDefType::REGULAR, 3, -1},
+
+  // --- SECTOR 1 (Rectangular extension) ---
+
+  // Wall: (50,50) to (100,50)
+  { 2, 5, gameloop::LineDefType::REGULAR, 5, -1 },
+
+  // Wall: (100,50) to (100,0)
+  { 5, 4, gameloop::LineDefType::REGULAR, 6, -1 },
+
+  // Wall: (100,0) to (50,0)
+  { 4, 1, gameloop::LineDefType::REGULAR, 7, -1 },
 };
 
 int main()
@@ -75,7 +125,7 @@ int main()
   gameloop::GameState gameState{};
 
   gameState.playerState = entity::Player{
-    .x = 25, .y = 25, .z = 10, .velocity = 2.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
+    .x = 25, .y = 25, .z = 10, .velocity = 5.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
   running = true;
@@ -84,7 +134,7 @@ int main()
   double acc = 0.0;
 
   uint64_t prev = SDL_GetPerformanceCounter();
-  
+
   int16_t frameCount = 0;
   double fpsAccumulator = 0.0;
 
@@ -95,6 +145,7 @@ int main()
       lastCeilingZ[i] = 0;
       lastFloorZ[i] = config::CANVAS_HEIGHT;
     }
+    fb->reset();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
@@ -112,7 +163,7 @@ int main()
     }
 
     render(gameState);
-    
+
     // FPS tracking
     frameCount++;
     fpsAccumulator += frameTime;
@@ -149,12 +200,19 @@ void poll_sdl_events(InputState &input)
   }
 }
 
+// updates the game state with a constant rate of @param dt
 void update(gameloop::GameState &gameState, InputState &input, const double_t dt)
 {
-  // update the movement of the player
+
+  // mouse
+  double_t angleDiff = std::atan(config::MOUSE_SENSITIVITY * input.mouse_dx / config::PROJECTION_PLANE_DISTANCE);
+  gameState.playerState.angle += angleDiff;
 
   // keyboard
   float_t &x = gameState.playerState.x, &y = gameState.playerState.y;
+
+  float_t sin = std::sin(gameState.playerState.angle);
+  float_t cos = std::cos(gameState.playerState.angle);
 
   for (uint32_t i = 0; i < sizeof(input.keys); i++) {
     if (!input.keys[i]) continue;
@@ -164,14 +222,29 @@ void update(gameloop::GameState &gameState, InputState &input, const double_t dt
     const char *sym = SDL_GetKeyName(keycode);
     const char lower = tolower(sym[0]);
 
+    double_t directionX = std::sin(gameState.playerState.angle);
+    double_t directionY = std::cos(gameState.playerState.angle);
+
+    float_t velocity = gameState.playerState.velocity;
+
+    double_t xDiff = dt * directionX * velocity;
+    double_t yDiff = dt * directionY * velocity;
+
     if (lower == 'w') {
-      y += dt * gameState.playerState.velocity;
-    } else if (lower == 's') {
-      y -= dt * gameState.playerState.velocity;
-    } else if (lower == 'a') {
-      x -= dt * gameState.playerState.velocity;
-    } else if (lower == 'd') {
-      x += dt * gameState.playerState.velocity;
+      x += xDiff;
+      y += yDiff;
+    }
+    if (lower == 's') {
+      y -= yDiff;
+      x -= xDiff;
+    }
+    if (lower == 'a') {
+      x += yDiff;
+      y += xDiff;
+    }
+    if (lower == 'd') {
+      x -= yDiff;
+      y -= xDiff;
     }
   }
 }
@@ -203,10 +276,15 @@ void applyTransformations(const entity::Player &playerState,
   floorZ = sector.floorHeight - playerState.z;
   ceilingZ = sector.ceilingHeight - playerState.z;
 
-  viewX1 = startX * std::cos(playerState.angle) - startY * std::sin(playerState.angle);
-  viewY1 = startX * std::sin(playerState.angle) + startY * std::cos(playerState.angle);
-  viewX2 = endX * std::cos(playerState.angle) - endY * std::sin(playerState.angle);
-  viewY2 = endX * std::sin(playerState.angle) + endY * std::cos(playerState.angle);
+  rotate(startX, startY, playerState.angle, viewX1, viewY1);
+  rotate(endX, endY, playerState.angle, viewX2, viewY2);
+}
+
+void rotate(float_t x, float_t y, double_t angle, double_t &xRes, double_t &yRes)
+{
+
+  xRes = x * std::cos(angle) - y * std::sin(angle);
+  yRes = x * std::sin(angle) + y * std::cos(angle);
 }
 
 
@@ -214,8 +292,8 @@ int32_t clamp(int32_t val, int32_t min, int32_t max) { return std::min(max, std:
 
 void render(const gameloop::GameState &gameState)
 {
-  const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
-  const double_t FOCAL_LENGTH = (120 / 2.0) / TAN_HALF_FOV;
+  static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
+  static const double_t FOCAL_LENGTH = (120 / 2.0) / TAN_HALF_FOV;
   // const double_t FOCAL_LENGTH = 1;
 
   for (gameloop::LineDef ld : linedefs) {
@@ -263,23 +341,67 @@ void render(const gameloop::GameState &gameState)
 
       if (projectedCeilingZ < 0) { projectedCeilingZ = 0; }
 
-      int32_t drawTop = std::max(projectedCeilingZ, ceilClipping[i]);
-      int32_t drawBottom = std::min(projectedFloorZ, floorClipping[i]);
+      if (ld.backSidedef == -1) {
+        // solid wall
+        drawSolidWall(i, projectedCeilingZ, projectedFloorZ);
+      } else {
+        // portal
+        gameloop::SideDef backSidedef = sidedefs[ld.backSidedef];
+        gameloop::Sector nextSector = sectors[backSidedef.sectorId];
 
-      if (drawTop <= drawBottom) {
-        fb->drawVerticalLine(i, drawTop, drawBottom, mapColor(0, 255, 255, 255));
+        int16_t nextCeilZ = nextSector.ceilingHeight - gameState.playerState.z;
+        int16_t nextFloorZ = nextSector.floorHeight - gameState.playerState.z;
 
-        ceilClipping[i] = std::max(ceilClipping[i], projectedCeilingZ);
-        floorClipping[i] = std::min(floorClipping[i], projectedFloorZ);
+        // Project them to screen Y
+        int32_t nextCeilY = config::CANVAS_HEIGHT / 2 - nextCeilZ * FOCAL_LENGTH * inv_y;
+        int32_t nextFloorY = config::CANVAS_HEIGHT / 2 - nextFloorZ * FOCAL_LENGTH * inv_y;
 
-        lastCeilingZ[i] = projectedCeilingZ;
-        lastFloorZ[i] = projectedFloorZ;
+        // C. Render UPPER Wall (The "step down" from our ceiling to theirs)
+        // We only draw if the neighbor's ceiling is lower than ours (physically)
+        // or visually lower on screen.
+        int32_t upperDrawTop = std::max(projectedCeilingZ, ceilClipping[i]);
+        int32_t upperDrawBottom = std::min(nextCeilY, floorClipping[i]);// Stop at neighbor's ceiling
+
+        if (upperDrawTop < upperDrawBottom) {
+          fb->drawVerticalLine(i, upperDrawTop, upperDrawBottom, YELLOW);
+          // Important: Update clipping so nothing draws over this upper wall later
+          ceilClipping[i] = std::max(ceilClipping[i], upperDrawBottom);
+        }
+
+        // D. Render LOWER Wall (The "step up" from our floor to theirs)
+        int32_t lowerDrawTop = std::max(nextFloorY, ceilClipping[i]);// Start at neighbor's floor
+        int32_t lowerDrawBottom = std::min(projectedFloorZ, floorClipping[i]);
+
+        if (lowerDrawTop < lowerDrawBottom) {
+          fb->drawVerticalLine(i, lowerDrawTop, lowerDrawBottom, YELLOW);
+          // Important: Update clipping
+          floorClipping[i] = std::min(floorClipping[i], lowerDrawTop);
+        }
       }
 
+      // draw ceiling
       fb->drawVerticalLine(i, 0, ceilClipping[i], mapColor(255, 0, 0, 255));
+      // draw floor
       fb->drawVerticalLine(i, config::CANVAS_HEIGHT - 1, floorClipping[i], mapColor(255, 255, 0, 255));
     }
   }
 
   fb->update();
+}
+
+void drawSolidWall(int x, int32_t &projectedCeilingZ, int32_t &projectedFloorZ)
+{
+
+  int32_t drawTop = std::max(projectedCeilingZ, ceilClipping[x]);
+  int32_t drawBottom = std::min(projectedFloorZ, floorClipping[x]);
+
+  if (drawTop <= drawBottom) {
+    fb->drawVerticalLine(x, drawTop, drawBottom, mapColor(0, 255, 255, 255));
+
+    ceilClipping[x] = std::max(ceilClipping[x], projectedCeilingZ);
+    floorClipping[x] = std::min(floorClipping[x], projectedFloorZ);
+
+    lastCeilingZ[x] = projectedCeilingZ;
+    lastFloorZ[x] = projectedFloorZ;
+  }
 }

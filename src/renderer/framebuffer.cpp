@@ -42,8 +42,7 @@ void FrameBuffer::drawVerticalLine(int16_t x, int16_t y0, int16_t y1, uint32_t c
     return;
   }
 
-  if (transformedY0 > transformedY1)
-    std::swap(transformedY0, transformedY1);
+  if (transformedY0 > transformedY1) std::swap(transformedY0, transformedY1);
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
@@ -80,6 +79,13 @@ void FrameBuffer::pollEvents()
 
       break;
     }
+  }
+}
+
+
+void FrameBuffer::reset() {
+  for(int i =0 ; i < sizeof(this->pixels); i++) {
+    this->pixels[i] = 0;
   }
 }
 }// namespace framebuffer

@@ -39,7 +39,7 @@ namespace gameloop
 
     enum class LineDefType
     {
-        REGULAR
+        REGULAR, DOOR
     };
 
     struct LineDef

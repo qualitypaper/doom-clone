@@ -37,5 +37,6 @@ public:
   void drawVerticalLine(int16_t x, int16_t y0, int16_t y1, uint32_t color);
   void update();
   void pollEvents();
+  void reset();
 };
 }// namespace framebuffer
