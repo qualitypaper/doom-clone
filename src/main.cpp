@@ -211,7 +211,6 @@ void update(gameloop::GameState &gameState, InputState &input, const double_t dt
   double_t angleDiff = std::atan(config::MOUSE_SENSITIVITY * input.mouse_dx / config::PROJECTION_PLANE_DISTANCE);
   gameState.playerState.angle += angleDiff;
 
-  // keyboard
   float_t &x = gameState.playerState.x, &y = gameState.playerState.y;
 
   float_t sin = std::sin(gameState.playerState.angle);
@@ -322,6 +321,18 @@ void render(const gameloop::GameState &gameState)
 
       if (projectedCeilingZ < 0) { projectedCeilingZ = 0; }
 
+      // draw floor
+      if (floorClipping[i] > projectedFloorZ) {
+        fb->drawVerticalLine(i, config::CANVAS_HEIGHT - 1, projectedFloorZ, mapColor(255, 255, 0, 255));
+        floorClipping[i] = projectedFloorZ;
+      }
+
+      if (ceilClipping[i] < projectedCeilingZ) {
+        // draw ceiling
+        fb->drawVerticalLine(i, 0, projectedCeilingZ, mapColor(255, 0, 0, 255));
+        ceilClipping[i] = projectedCeilingZ;
+      }
+
       if (ld.backSidedef == -1) {
         // solid wall
         drawSolidWall(i, projectedCeilingZ, projectedFloorZ);
@@ -343,7 +354,7 @@ void render(const gameloop::GameState &gameState)
         int32_t upperDrawBottom = std::min(nextCeilY, floorClipping[i]);// Stop at neighbor's ceiling
 
         if (upperDrawTop < upperDrawBottom) {
-          fb->drawVerticalLine(i, upperDrawTop, upperDrawBottom, YELLOW);
+          fb->drawVerticalLine(i, upperDrawTop, upperDrawBottom, mapColor(0, 255, 0, 255));
           // Important: Update clipping so nothing draws over this upper wall later
           ceilClipping[i] = std::max(ceilClipping[i], upperDrawBottom);
         }
@@ -353,16 +364,11 @@ void render(const gameloop::GameState &gameState)
         int32_t lowerDrawBottom = std::min(projectedFloorZ, floorClipping[i]);
 
         if (lowerDrawTop < lowerDrawBottom) {
-          fb->drawVerticalLine(i, lowerDrawTop, lowerDrawBottom, YELLOW);
+          fb->drawVerticalLine(i, lowerDrawTop, lowerDrawBottom, mapColor(0, 255, 0, 255));
           // Important: Update clipping
           floorClipping[i] = std::min(floorClipping[i], lowerDrawTop);
         }
       }
-
-      // draw ceiling
-      fb->drawVerticalLine(i, 0, ceilClipping[i], mapColor(255, 0, 0, 255));
-      // draw floor
-      fb->drawVerticalLine(i, config::CANVAS_HEIGHT - 1, floorClipping[i], mapColor(255, 255, 0, 255));
     }
 
     // debug
@@ -381,8 +387,8 @@ void drawSolidWall(int x, int32_t &projectedCeilingZ, int32_t &projectedFloorZ)
   if (drawTop <= drawBottom) {
     fb->drawVerticalLine(x, drawTop, drawBottom, mapColor(0, 255, 255, 255));
 
-    ceilClipping[x] = std::max(ceilClipping[x], projectedCeilingZ);
-    floorClipping[x] = std::min(floorClipping[x], projectedFloorZ);
+    ceilClipping[x] = drawTop;
+    floorClipping[x] = drawBottom;
 
     lastCeilingZ[x] = projectedCeilingZ;
     lastFloorZ[x] = projectedFloorZ;
