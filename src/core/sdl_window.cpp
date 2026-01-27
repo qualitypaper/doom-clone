@@ -12,6 +12,7 @@ SDL_Window *window;
 SDL_Surface *surface;
 SDL_Renderer *renderer;
 SDL_Texture *texture;
+ImGuiIO &io = ImGui::GetIO();
 
 void updatePixels(uint32_t *pixels)
 {
@@ -65,14 +66,14 @@ bool init()
   }
 
   // print Renderer info
-  SDL_RendererInfo *info;
-  SDL_GetRendererInfo(renderer, info);
-  SDL_Log("Current SDL_Renderer: %s", info->name);
+  // SDL_RendererInfo *info;
+  // SDL_GetRendererInfo(renderer, info);
+  // SDL_Log("Current SDL_Renderer: %s", info->name);
 
   // Setup Dear ImGUI context
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
+  io = ImGui::GetIO();
   (void)io;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;// Enable Keyboard Controls
 
@@ -94,6 +95,10 @@ bool init()
 
 void kill()
 {
+  ImGui_ImplSDLRenderer2_Shutdown();
+  ImGui_ImplSDL2_Shutdown();
+  ImGui::DestroyContext();
+
   SDL_DestroyWindow(window);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyTexture(texture);
@@ -103,8 +108,19 @@ void kill()
 
 
 // must be called after init()
-uint32_t getWindowId() {
-  return SDL_GetWindowID(window);
-}
+uint32_t getWindowId() { return SDL_GetWindowID(window); }
 
+void renderIMGUI()
+{
+  ImGui::Render();
+  SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+  // SDL_SetRenderDrawColor(renderer,
+  //   (Uint8)(clear_color.x * 255),
+  //   (Uint8)(clear_color.y * 255),
+  //   (Uint8)(clear_color.z * 255),
+  //   (Uint8)(clear_color.w * 255));
+  SDL_RenderClear(renderer);
+  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+  SDL_RenderPresent(renderer);
+}
 }// namespace sdl_window

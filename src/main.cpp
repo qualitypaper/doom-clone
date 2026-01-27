@@ -118,10 +118,6 @@ static const gameloop::LineDef linedefs[] = {
   { 4, 1, gameloop::LineDefType::REGULAR, 7, -1 },
 };
 
-enum class VIEW_MODE { EDITOR_2D, GAMEPLAY_3D };
-
-VIEW_MODE mode = VIEW_MODE::GAMEPLAY_3D;
-
 int main()
 {
   // sanity checks for hardcoded values
@@ -166,6 +162,21 @@ int main()
 
     poll_sdl_events(input);
 
+    if (gameState.currentMode == gameloop::ViewMode::EDITOR_2D) {
+      // Start the Dear ImGui frame
+      ImGui_ImplSDLRenderer2_NewFrame();
+      ImGui_ImplSDL2_NewFrame();
+      ImGui::NewFrame();
+
+      bool showDemo = true;
+
+      ImGui::ShowDemoWindow(&showDemo);
+
+      sdl_window::renderIMGUI();
+      
+      continue;
+    }
+
     uint64_t now = SDL_GetPerformanceCounter();
     double_t frameTime = (double)(now - prev) / SDL_GetPerformanceFrequency();
     prev = now;
@@ -177,14 +188,7 @@ int main()
       acc -= dt;
     }
 
-    // Start the Dear ImGui frame
-    ImGui_ImplSDLRenderer2_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
-
-    ImGui::ShowDemoWindow(NULL);
-
-    // render(gameState);
+    render(gameState);
 
     // FPS tracking
     frameCount++;
@@ -217,17 +221,14 @@ void poll_sdl_events(InputState &input)
       continue;
     }
 
-    // does the processing of the user input only if the current mode is GAMEPLAY_3D
-    if (mode == VIEW_MODE::GAMEPLAY_3D) {
-      switch (event.type) {
-      case SDL_KEYDOWN:
-      case SDL_KEYUP:
-        gameloop::handleKeyInput(event, input);
-        break;
-      case SDL_MOUSEMOTION:
-        gameloop::handleMouseMovement(event, input);
-        break;
-      }
+    switch (event.type) {
+    case SDL_KEYDOWN:
+    case SDL_KEYUP:
+      gameloop::handleKeyInput(event, input);
+      break;
+    case SDL_MOUSEMOTION:
+      gameloop::handleMouseMovement(event, input);
+      break;
     }
   }
 }
