@@ -88,4 +88,5 @@ void FrameBuffer::reset() {
     this->pixels[i] = 0;
   }
 }
+
 }// namespace framebuffer

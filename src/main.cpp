@@ -2,6 +2,12 @@
 #include "framebuffer.h"
 #include "game_loop.h"
 
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h"
+
+#include <SDL.h>
+
 #include <assert.h>
 #include <iostream>
 
@@ -112,9 +118,14 @@ static const gameloop::LineDef linedefs[] = {
   { 4, 1, gameloop::LineDefType::REGULAR, 7, -1 },
 };
 
+enum class VIEW_MODE { EDITOR_2D, GAMEPLAY_3D };
+
+VIEW_MODE mode = VIEW_MODE::GAMEPLAY_3D;
+
 int main()
 {
-  assert(sectors[0].floorHeight < sectors[0].ceilingHeight);
+  // sanity checks for hardcoded values
+  for (auto &sector : sectors) { assert(sector.floorHeight < sector.ceilingHeight); }
   for (auto &ld : linedefs) {
     assert(ld.start != ld.end);
     assert(ld.frontSidedef >= 0);
@@ -133,15 +144,16 @@ int main()
 
   running = true;
   // game loop
-  const double dt = 1 / (double)config::DESIRED_FRAMERATE;
-  double acc = 0.0;
+  const double_t dt = 1 / static_cast<double>(config::DESIRED_FRAMERATE);
+  double_t acc = 0.0;
 
   uint64_t prev = SDL_GetPerformanceCounter();
 
   int16_t frameCount = 0;
-  double fpsAccumulator = 0.0;
+  double_t fpsAccumulator = 0.0;
 
   while (running) {
+    // reseting the states to defaults
     for (int i = 0; i < config::CANVAS_WIDTH; ++i) {
       ceilClipping[i] = 0;
       floorClipping[i] = config::CANVAS_HEIGHT;
@@ -155,7 +167,7 @@ int main()
     poll_sdl_events(input);
 
     uint64_t now = SDL_GetPerformanceCounter();
-    double frameTime = double(now - prev) / SDL_GetPerformanceFrequency();
+    double_t frameTime = (double)(now - prev) / SDL_GetPerformanceFrequency();
     prev = now;
     if (frameTime > 0.25) frameTime = 0.25;
     acc += frameTime;
@@ -165,7 +177,14 @@ int main()
       acc -= dt;
     }
 
-    render(gameState);
+    // Start the Dear ImGui frame
+    ImGui_ImplSDLRenderer2_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::ShowDemoWindow(NULL);
+
+    // render(gameState);
 
     // FPS tracking
     frameCount++;
@@ -187,18 +206,28 @@ void poll_sdl_events(InputState &input)
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
+    ImGui_ImplSDL2_ProcessEvent(&event);
 
-    switch (event.type) {
-    case SDL_QUIT:
+    if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
+        && event.window.windowID == sdl_window::getWindowId()) {
       running = false;
-      break;
-    case SDL_KEYDOWN:
-    case SDL_KEYUP:
-      gameloop::handleKeyInput(event, input);
-      break;
-    case SDL_MOUSEMOTION:
-      gameloop::handleMouseMovement(event, input);
-      break;
+      continue;
+    } else if (event.type == SDL_QUIT) {
+      running = false;
+      continue;
+    }
+
+    // does the processing of the user input only if the current mode is GAMEPLAY_3D
+    if (mode == VIEW_MODE::GAMEPLAY_3D) {
+      switch (event.type) {
+      case SDL_KEYDOWN:
+      case SDL_KEYUP:
+        gameloop::handleKeyInput(event, input);
+        break;
+      case SDL_MOUSEMOTION:
+        gameloop::handleMouseMovement(event, input);
+        break;
+      }
     }
   }
 }
@@ -347,25 +376,23 @@ void render(const gameloop::GameState &gameState)
         int32_t nextCeilY = config::CANVAS_HEIGHT / 2 - nextCeilZ * FOCAL_LENGTH * inv_y;
         int32_t nextFloorY = config::CANVAS_HEIGHT / 2 - nextFloorZ * FOCAL_LENGTH * inv_y;
 
-        // C. Render UPPER Wall (The "step down" from our ceiling to theirs)
-        // We only draw if the neighbor's ceiling is lower than ours (physically)
-        // or visually lower on screen.
+        // Render upper wall
         int32_t upperDrawTop = std::max(projectedCeilingZ, ceilClipping[i]);
         int32_t upperDrawBottom = std::min(nextCeilY, floorClipping[i]);// Stop at neighbor's ceiling
 
         if (upperDrawTop < upperDrawBottom) {
           fb->drawVerticalLine(i, upperDrawTop, upperDrawBottom, mapColor(0, 255, 0, 255));
-          // Important: Update clipping so nothing draws over this upper wall later
+          // Update clipping so nothing draws over this upper wall later
           ceilClipping[i] = std::max(ceilClipping[i], upperDrawBottom);
         }
 
-        // D. Render LOWER Wall (The "step up" from our floor to theirs)
+        // Render lower wall
         int32_t lowerDrawTop = std::max(nextFloorY, ceilClipping[i]);// Start at neighbor's floor
         int32_t lowerDrawBottom = std::min(projectedFloorZ, floorClipping[i]);
 
         if (lowerDrawTop < lowerDrawBottom) {
           fb->drawVerticalLine(i, lowerDrawTop, lowerDrawBottom, mapColor(0, 255, 0, 255));
-          // Important: Update clipping
+          // Update clipping
           floorClipping[i] = std::min(floorClipping[i], lowerDrawTop);
         }
       }
