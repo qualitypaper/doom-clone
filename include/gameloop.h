@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config.h"
 #include "entity.h"
 #include "sdl_window.h"
 #include <vector>
@@ -12,10 +11,8 @@
 
 namespace gameloop {
 
-void handleMouseMovement(SDL_Event &event, InputState &input);
-void handleKeyInput(SDL_Event &event, InputState &input);
 
-enum class ViewMode { GAMEPLAY_3D, EDITOR_2D };
+enum class EngineMode { GAMEPLAY_3D, EDITOR_2D };
 
 struct WorldState
 {
@@ -31,7 +28,7 @@ struct GameState
   std::vector<entity::EntityState> entityState;
   uint32_t rng_seed;
   time_t gameTime;
-  ViewMode currentMode;
+  EngineMode currentMode;
 };
 
 struct Vertex {
@@ -72,4 +69,8 @@ struct Level {
   std::vector<SideDef> sidedefs;
   std::vector<Sector> sectors;
 };
+
+void handleMouseMovement(SDL_Event &event, InputState &input);
+void handleKeyInput(SDL_Event &event, InputState &input);
+void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode);
 }// namespace gameloop

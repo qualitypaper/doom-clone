@@ -9,14 +9,11 @@
 
 #include <SDL.h>
 
+#include <SDL_events.h>
 #include <assert.h>
 #include <iostream>
 
-static int32_t lastCeilingZ[config::CANVAS_WIDTH];
-static int32_t lastFloorZ[config::CANVAS_WIDTH];
-
-void poll_sdl_events(InputState &input);
-
+void poll_sdl_events(gameloop::GameState &gameState, InputState &input);
 
 bool running;
 
@@ -40,18 +37,18 @@ static const std::vector<gameloop::Vertex> vertices = {
 // ==========================================
 static const std::vector<gameloop::Sector> sectors = {
 
-  {
-    // Sector 0
+  { // Sector 0
     .floorHeight = 0,
     .ceilingHeight = 36,
+    .specialType = 0,
     .lightLevel = 192,
-  },
-  {
-    // Sector 1 (Taller and deeper)
+    .tag = 0 },
+  { // Sector 1 (Taller and deeper)
     .floorHeight = -10,
     .ceilingHeight = 50,
+    .specialType = 0,
     .lightLevel = 128,
-  }
+    .tag = 0 }
 };
 
 // ==========================================
@@ -125,7 +122,7 @@ int main()
   renderer::Renderer *renderer = new renderer::Renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
 
   InputState input{};
-  gameloop::GameState gameState{ .currentMode = gameloop::ViewMode::EDITOR_2D };
+  gameloop::GameState gameState{ .currentMode = gameloop::EngineMode::EDITOR_2D };
 
   const gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
 
@@ -150,13 +147,9 @@ int main()
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
-    poll_sdl_events(input);
+    poll_sdl_events(gameState, input);
 
-    if (input.keys[SDL_SCANCODE_F1]) { gameState.currentMode = gameloop::ViewMode::GAMEPLAY_3D; }
-
-    if (gameState.currentMode == gameloop::ViewMode::EDITOR_2D) {
-      bool show_demo_window = true;
-      bool show_another_window = false;
+    if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
       ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
       // Start the Dear ImGui frame
@@ -213,7 +206,7 @@ int main()
   return 0;
 }
 
-void poll_sdl_events(InputState &input)
+void poll_sdl_events(gameloop::GameState &gameState, InputState &input)
 {
   SDL_Event event;
 
@@ -231,12 +224,24 @@ void poll_sdl_events(InputState &input)
 
     ImGuiIO &io = ImGui::GetIO();
 
-    // Skip game input if ImGui wants to capture, except for F1 (mode toggle)
-    if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && io.WantCaptureKeyboard) {
-      if (event.key.keysym.sym != SDLK_F1) { continue; }
+    // early handle of the mode change key
+    if (event.type == SDL_KEYDOWN) {
+      if (event.key.keysym.sym == SDLK_F1) {
+        if (gameState.currentMode == gameloop::EngineMode::GAMEPLAY_3D) {
+          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::EDITOR_2D);
+        } else {
+          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::GAMEPLAY_3D);
+        }
+
+        continue;
+      }
     }
 
-    if (event.type == SDL_MOUSEMOTION && io.WantCaptureMouse) { continue; }
+    // early skip for preventing capturing mouse and keyboard inputs, while in EDITOR_2D engine mode
+    if ((event.type == SDL_MOUSEMOTION && io.WantCaptureMouse)
+        || ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && io.WantCaptureKeyboard)) {
+      continue;
+    }
 
     switch (event.type) {
     case SDL_KEYDOWN:
