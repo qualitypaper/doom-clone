@@ -9,20 +9,21 @@
 
 namespace sdl_window {
 SDL_Window *window;
-SDL_Surface *surface;
 SDL_Renderer *renderer;
 SDL_Texture *texture;
-ImGuiIO &io = ImGui::GetIO();
 
 void updatePixels(uint32_t *pixels)
 {
   SDL_UpdateTexture(texture, NULL, pixels, config::WINDOW_WIDTH * sizeof(uint32_t));
+}
+
+void updateScreen()
+{
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, NULL, NULL);
   SDL_RenderPresent(renderer);
+  // Not needed when using renderer - SDL_RenderPresent handles this
 }
-
-void updateScreen() { SDL_UpdateWindowSurface(window); }
 
 bool init()
 {
@@ -33,8 +34,8 @@ bool init()
 
   float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
   window = SDL_CreateWindow("Doom Clone",
-    SDL_WINDOWPOS_UNDEFINED,
-    SDL_WINDOWPOS_UNDEFINED,
+    SDL_WINDOWPOS_CENTERED,
+    SDL_WINDOWPOS_CENTERED,
     mainScale * config::WINDOW_WIDTH,
     mainScale * config::WINDOW_HEIGHT,
     SDL_WINDOW_SHOWN);
@@ -44,16 +45,10 @@ bool init()
     return false;
   }
 
-  surface = SDL_GetWindowSurface(window);
-
-  if (!surface) {
-    std::cout << "SDL failed to create a window surface, Error: " << SDL_GetError() << '\n';
-    return false;
-  }
-
-  renderer = SDL_CreateSoftwareRenderer(surface);
+  renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
   if (!renderer) {
-    std::cout << "SDL failed to create a software renderer, Error: " << SDL_GetError() << '\n';
+    // Fallback to software renderer
+    std::cout << "SDL failed to create a renderer, Error: " << SDL_GetError() << '\n';
     return false;
   }
 
@@ -65,16 +60,11 @@ bool init()
     return false;
   }
 
-  // print Renderer info
-  // SDL_RendererInfo *info;
-  // SDL_GetRendererInfo(renderer, info);
-  // SDL_Log("Current SDL_Renderer: %s", info->name);
-
-  // Setup Dear ImGUI context
   IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  io = ImGui::GetIO();
-  (void)io;
+  ImGuiContext *context = ImGui::CreateContext();
+  ImGui::SetCurrentContext(context);
+
+  ImGuiIO &io = ImGui::GetIO();
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;// Enable Keyboard Controls
 
   // Setup Dear ImGui style
@@ -89,6 +79,7 @@ bool init()
   // Setup Platform/Renderer backends
   ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
   ImGui_ImplSDLRenderer2_Init(renderer);
+
 
   return true;
 }
@@ -107,18 +98,24 @@ void kill()
 }
 
 
-// must be called after init()
-uint32_t getWindowId() { return SDL_GetWindowID(window); }
+void createIMGUIFrame() {}
 
-void renderIMGUI()
+// must be called after init()
+SDL_Window *getWindow() { return window; }
+
+SDL_Renderer *getRenderer() { return renderer; }
+
+void renderIMGUI(ImGuiIO &io)
 {
+  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
   ImGui::Render();
   SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-  // SDL_SetRenderDrawColor(renderer,
-  //   (Uint8)(clear_color.x * 255),
-  //   (Uint8)(clear_color.y * 255),
-  //   (Uint8)(clear_color.z * 255),
-  //   (Uint8)(clear_color.w * 255));
+  SDL_SetRenderDrawColor(renderer,
+    (Uint8)(clear_color.x * 255),
+    (Uint8)(clear_color.y * 255),
+    (Uint8)(clear_color.z * 255),
+    (Uint8)(clear_color.w * 255));
   SDL_RenderClear(renderer);
   ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
   SDL_RenderPresent(renderer);

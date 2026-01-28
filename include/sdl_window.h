@@ -15,6 +15,7 @@ namespace sdl_window
     void kill();
     void updatePixels(uint32_t* pixels);
     void updateScreen();
-    uint32_t getWindowId();
+    SDL_Window* getWindow();
+    SDL_Renderer* getRenderer();
     void renderIMGUI();
 }

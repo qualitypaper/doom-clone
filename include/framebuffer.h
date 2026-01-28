@@ -12,31 +12,18 @@ namespace framebuffer {
 class FrameBuffer
 {
 private:
-  uint32_t *pixels;
+  int16_t width;
+  int16_t height;
 
 public:
-  FrameBuffer()
-  {
-    uint32_t n = config::WINDOW_WIDTH * config::WINDOW_HEIGHT;
-    this->pixels = new uint32_t[n];
+  uint32_t *pixels;
+  FrameBuffer(uint16_t width, uint16_t height);
+  ~FrameBuffer();
 
-    for (uint32_t i = 0; i < n; i++) { this->pixels[i] = 0xFFFFFFFF; }
+  int16_t getWidth() { return width; }
+  int16_t getHeight() { return height; }
 
-    if (sdl_window::init()) {
-      sdl_window::updatePixels(this->pixels);
-      sdl_window::updateScreen();
-    }
-  }
-  ~FrameBuffer()
-  {
-    delete[] pixels;
-    sdl_window::kill();
-  }
-
-  void drawHorizontalLine(int16_t y, int16_t x0, int16_t x1, uint32_t color);
-  void drawVerticalLine(int16_t x, int16_t y0, int16_t y1, uint32_t color);
   void update();
-  void pollEvents();
   void reset();
 };
 }// namespace framebuffer

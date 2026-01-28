@@ -11,6 +11,7 @@
 */
 
 namespace gameloop {
+
 void handleMouseMovement(SDL_Event &event, InputState &input);
 void handleKeyInput(SDL_Event &event, InputState &input);
 
@@ -22,6 +23,7 @@ struct WorldState
   int placeholder;
 };
 
+
 struct GameState
 {
   entity::Player playerState;
@@ -30,6 +32,11 @@ struct GameState
   uint32_t rng_seed;
   time_t gameTime;
   ViewMode currentMode;
+};
+
+struct Vertex {
+  int32_t x;
+  int32_t y;
 };
 
 struct SideDef
@@ -57,5 +64,12 @@ struct Sector
   int16_t specialType;
   int16_t lightLevel;
   int16_t tag;
+};
+
+struct Level {
+  std::vector<Vertex> vertices;
+  std::vector<LineDef> linedefs;
+  std::vector<SideDef> sidedefs;
+  std::vector<Sector> sectors;
 };
 }// namespace gameloop

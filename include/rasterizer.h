@@ -1,10 +1,8 @@
 #pragma once
 
-namespace engine::renderer {
+namespace rasterizer {
 
-    class Renderer {
-        public:
-            void drawWallColumn();
-            void drawSpriteColumn();
-    };
-};
+void drawSolidWall();
+void drawSpriteColumn();
+
+};// namespace rasterizer

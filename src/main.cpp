@@ -1,6 +1,7 @@
-#include "camera.h"
 #include "framebuffer.h"
-#include "game_loop.h"
+#include "gameloop.h"
+#include "renderer.h"
+#include "simulation.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -11,32 +12,18 @@
 #include <assert.h>
 #include <iostream>
 
-static int32_t floorClipping[config::CANVAS_WIDTH];
-static int32_t ceilClipping[config::CANVAS_WIDTH];
-
 static int32_t lastCeilingZ[config::CANVAS_WIDTH];
 static int32_t lastFloorZ[config::CANVAS_WIDTH];
 
 void poll_sdl_events(InputState &input);
-void update(gameloop::GameState &gameState, InputState &input, const double_t dt);
-void render(const gameloop::GameState &gameState);
-void drawSolidWall(int x, int32_t &projectedCeilingZ, int32_t &projectedFloorZ);
-void rotate(float_t x, float_t y, double_t angle, double_t &xRes, double_t &yRes);
 
-constexpr uint32_t mapColor(uint8_t r, uint8_t g, uint8_t b, uint8_t alpha)
-{
-  return (r << 24) | (g << 16) | (b << 8) | alpha;
-}
 
-constexpr uint32_t YELLOW = mapColor(255, 255, 0, 255);
-
-framebuffer::FrameBuffer *fb;
 bool running;
 
 // ==========================================
 // 1. VERTICES (World Coordinates)
 // ==========================================
-static const glm::vec2 vertices[] = {
+static const std::vector<gameloop::Vertex> vertices = {
   // Sector 0 (The Starting Room)
   { 0, 0 },// 0
   { 50, 0 },// 1
@@ -51,7 +38,7 @@ static const glm::vec2 vertices[] = {
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static const gameloop::Sector sectors[] = {
+static const std::vector<gameloop::Sector> sectors = {
 
   {
     // Sector 0
@@ -71,7 +58,7 @@ static const gameloop::Sector sectors[] = {
 // 3. SIDEDEFS (Visual sides of lines)
 // ==========================================
 // Note: You usually add textures here. For now, we just link to sectors.
-static const gameloop::SideDef sidedefs[] = {
+static const std::vector<gameloop::SideDef> sidedefs = {
   // -- Sector 0 Sides --
   { .sectorId = 0 },// 0: South wall
   { .sectorId = 0 },// 1: Portal line (facing Sector 1)
@@ -89,7 +76,7 @@ static const gameloop::SideDef sidedefs[] = {
 // 4. LINEDEFS (The Geometry)
 // ==========================================
 // -1 indicates "No Side" (Solid wall)
-static const gameloop::LineDef linedefs[] = {
+static const std::vector<gameloop::LineDef> linedefs = {
   // --- SECTOR 0 (Square) ---
   // Start, End, Type, FrontSide, BackSide
 
@@ -127,12 +114,20 @@ int main()
     assert(ld.frontSidedef >= 0);
   }
 
-  fb = new framebuffer::FrameBuffer();
+  // Initialize SDL window first
+  if (!sdl_window::init()) {
+    std::cerr << "Failed to initialize SDL window" << '\n';
+    return 1;
+  }
 
-  std::cout << "Set up window" << '\n';
+  framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer(config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
+
+  renderer::Renderer *renderer = new renderer::Renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
 
   InputState input{};
-  gameloop::GameState gameState{};
+  gameloop::GameState gameState{ .currentMode = gameloop::ViewMode::EDITOR_2D };
+
+  const gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
 
   gameState.playerState = entity::Player{
     .x = 25, .y = 25, .z = 10, .velocity = 5.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
@@ -150,30 +145,40 @@ int main()
 
   while (running) {
     // reseting the states to defaults
-    for (int i = 0; i < config::CANVAS_WIDTH; ++i) {
-      ceilClipping[i] = 0;
-      floorClipping[i] = config::CANVAS_HEIGHT;
-      lastCeilingZ[i] = 0;
-      lastFloorZ[i] = config::CANVAS_HEIGHT;
-    }
+    renderer->resetClippingArrays();
     fb->reset();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
     poll_sdl_events(input);
 
+    if (input.keys[SDL_SCANCODE_F1]) { gameState.currentMode = gameloop::ViewMode::GAMEPLAY_3D; }
+
     if (gameState.currentMode == gameloop::ViewMode::EDITOR_2D) {
+      bool show_demo_window = true;
+      bool show_another_window = false;
+      ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
       // Start the Dear ImGui frame
       ImGui_ImplSDLRenderer2_NewFrame();
       ImGui_ImplSDL2_NewFrame();
       ImGui::NewFrame();
 
-      bool showDemo = true;
 
-      ImGui::ShowDemoWindow(&showDemo);
+      // Rendering
+      ImGui::Render();
+      ImGuiIO &currentIo = ImGui::GetIO();
+      SDL_RenderSetScale(
+        sdl_window::getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
+      SDL_SetRenderDrawColor(sdl_window::getRenderer(),
+        (Uint8)(clear_color.x * 255),
+        (Uint8)(clear_color.y * 255),
+        (Uint8)(clear_color.z * 255),
+        (Uint8)(clear_color.w * 255));
+      SDL_RenderClear(sdl_window::getRenderer());
+      ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), sdl_window::getRenderer());
+      SDL_RenderPresent(sdl_window::getRenderer());
 
-      sdl_window::renderIMGUI();
-      
       continue;
     }
 
@@ -184,11 +189,11 @@ int main()
     acc += frameTime;
 
     while (acc >= dt) {
-      update(gameState, input, dt);
+      simulation::update(gameState, input, dt);
       acc -= dt;
     }
 
-    render(gameState);
+    renderer->render(gameState, level);
 
     // FPS tracking
     frameCount++;
@@ -201,6 +206,9 @@ int main()
   }
 
   if (fb) { delete fb; }
+  if (renderer) { delete renderer; }
+
+  sdl_window::kill();
 
   return 0;
 }
@@ -213,13 +221,22 @@ void poll_sdl_events(InputState &input)
     ImGui_ImplSDL2_ProcessEvent(&event);
 
     if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
-        && event.window.windowID == sdl_window::getWindowId()) {
+        && event.window.windowID == SDL_GetWindowID(sdl_window::getWindow())) {
       running = false;
       continue;
     } else if (event.type == SDL_QUIT) {
       running = false;
       continue;
     }
+
+    ImGuiIO &io = ImGui::GetIO();
+
+    // Skip game input if ImGui wants to capture, except for F1 (mode toggle)
+    if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && io.WantCaptureKeyboard) {
+      if (event.key.keysym.sym != SDLK_F1) { continue; }
+    }
+
+    if (event.type == SDL_MOUSEMOTION && io.WantCaptureMouse) { continue; }
 
     switch (event.type) {
     case SDL_KEYDOWN:
@@ -230,195 +247,5 @@ void poll_sdl_events(InputState &input)
       gameloop::handleMouseMovement(event, input);
       break;
     }
-  }
-}
-
-// updates the game state with a constant rate of @param dt
-void update(gameloop::GameState &gameState, InputState &input, const double_t dt)
-{
-
-  // mouse
-  double_t angleDiff = std::atan(config::MOUSE_SENSITIVITY * input.mouse_dx / config::PROJECTION_PLANE_DISTANCE);
-  gameState.playerState.angle += angleDiff;
-
-  float_t &x = gameState.playerState.x, &y = gameState.playerState.y;
-
-  float_t sin = std::sin(gameState.playerState.angle);
-  float_t cos = std::cos(gameState.playerState.angle);
-
-  int8_t moveSide = 0, moveForward = 0;
-
-  if (input.keys[SDL_SCANCODE_W]) moveForward += 1;
-  if (input.keys[SDL_SCANCODE_S]) moveForward -= 1;
-  if (input.keys[SDL_SCANCODE_A]) moveSide -= 1;
-  if (input.keys[SDL_SCANCODE_D]) moveSide += 1;
-
-  float_t velocity = gameState.playerState.velocity;
-
-  x += (moveSide * cos + moveForward * sin) * dt * velocity;
-  y += (moveSide * (-sin) + moveForward * cos) * dt * velocity;
-}
-
-void clipNearPlane(double_t &x1, double_t &y1, double_t &x2, double_t &y2)
-{
-  double_t t = (config::NEAR_CLIPPING - y1) / (y2 - y1);
-
-  x1 += t * (x2 - x1);
-  y1 = config::NEAR_CLIPPING;
-}
-
-void applyTransformations(const entity::Player &playerState,
-  const gameloop::LineDef &ld,
-  const gameloop::Sector &sector,
-  double_t &viewX1,
-  double_t &viewY1,
-  double_t &viewX2,
-  double_t &viewY2,
-  int16_t &floorZ,
-  int16_t &ceilingZ)
-{
-  float_t startX = vertices[ld.start].x - playerState.x;
-  float_t startY = vertices[ld.start].y - playerState.y;
-
-  float_t endX = vertices[ld.end].x - playerState.x;
-  float_t endY = vertices[ld.end].y - playerState.y;
-
-  floorZ = sector.floorHeight - playerState.z;
-  ceilingZ = sector.ceilingHeight - playerState.z;
-
-  rotate(startX, startY, playerState.angle, viewX1, viewY1);
-  rotate(endX, endY, playerState.angle, viewX2, viewY2);
-}
-
-void rotate(float_t x, float_t y, double_t angle, double_t &xRes, double_t &yRes)
-{
-
-  xRes = x * std::cos(angle) - y * std::sin(angle);
-  yRes = x * std::sin(angle) + y * std::cos(angle);
-}
-
-
-int32_t clamp(int32_t val, int32_t min, int32_t max) { return std::min(max, std::max(min, val)); }
-
-void render(const gameloop::GameState &gameState)
-{
-  static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
-  static const double_t FOCAL_LENGTH = (120 / 2.0) / TAN_HALF_FOV;
-  // const double_t FOCAL_LENGTH = 1;
-
-  for (gameloop::LineDef ld : linedefs) {
-    gameloop::SideDef sidedef = sidedefs[ld.frontSidedef];
-    gameloop::Sector sector = sectors[sidedef.sectorId];
-
-    double_t viewX1 = 0, viewY1 = 0, viewX2 = 0, viewY2 = 0;
-    int16_t floorZ = 0, ceilingZ = 0;
-
-    applyTransformations(gameState.playerState, ld, sector, viewX1, viewY1, viewX2, viewY2, floorZ, ceilingZ);
-
-    // near plane clipping
-    if (viewY1 < config::NEAR_CLIPPING && viewY2 < config::NEAR_CLIPPING)
-      continue;
-    else if (viewY1 < config::NEAR_CLIPPING) {
-      clipNearPlane(viewX1, viewY1, viewX2, viewY2);
-    } else if (viewY2 < config::NEAR_CLIPPING) {
-      clipNearPlane(viewX2, viewY2, viewX1, viewY1);
-    }
-
-    int32_t projectedStartX = config::CANVAS_WIDTH / 2 + viewX1 * FOCAL_LENGTH / (viewY1);
-    int32_t projectedEndX = config::CANVAS_WIDTH / 2 + viewX2 * FOCAL_LENGTH / (viewY2);
-
-    int32_t start, end;
-    double_t inv_y1, inv_y2;
-
-    if (projectedStartX > projectedEndX) {
-      start = projectedEndX;
-      end = projectedStartX;
-      inv_y1 = 1 / viewY2;
-      inv_y2 = 1 / viewY1;
-    } else {
-      start = projectedStartX;
-      end = projectedEndX;
-      inv_y1 = 1 / viewY1;
-      inv_y2 = 1 / viewY2;
-    }
-
-    for (int i = std::max(0, start); i < std::min(static_cast<int32_t>(config::CANVAS_WIDTH), end); i++) {
-      double_t t = double(i - start) / double(end - start);
-      double_t inv_y = lerp(inv_y1, inv_y2, t);
-
-      int32_t projectedFloorZ = config::CANVAS_HEIGHT / 2 - floorZ * FOCAL_LENGTH * inv_y;
-      int32_t projectedCeilingZ = config::CANVAS_HEIGHT / 2 - ceilingZ * FOCAL_LENGTH * inv_y;
-
-      if (projectedCeilingZ < 0) { projectedCeilingZ = 0; }
-
-      // draw floor
-      if (floorClipping[i] > projectedFloorZ) {
-        fb->drawVerticalLine(i, config::CANVAS_HEIGHT - 1, projectedFloorZ, mapColor(255, 255, 0, 255));
-        floorClipping[i] = projectedFloorZ;
-      }
-
-      if (ceilClipping[i] < projectedCeilingZ) {
-        // draw ceiling
-        fb->drawVerticalLine(i, 0, projectedCeilingZ, mapColor(255, 0, 0, 255));
-        ceilClipping[i] = projectedCeilingZ;
-      }
-
-      if (ld.backSidedef == -1) {
-        // solid wall
-        drawSolidWall(i, projectedCeilingZ, projectedFloorZ);
-      } else {
-        // portal
-        gameloop::SideDef backSidedef = sidedefs[ld.backSidedef];
-        gameloop::Sector nextSector = sectors[backSidedef.sectorId];
-
-        int16_t nextCeilZ = nextSector.ceilingHeight - gameState.playerState.z;
-        int16_t nextFloorZ = nextSector.floorHeight - gameState.playerState.z;
-
-        int32_t nextCeilY = config::CANVAS_HEIGHT / 2 - nextCeilZ * FOCAL_LENGTH * inv_y;
-        int32_t nextFloorY = config::CANVAS_HEIGHT / 2 - nextFloorZ * FOCAL_LENGTH * inv_y;
-
-        // Render upper wall
-        int32_t upperDrawTop = std::max(projectedCeilingZ, ceilClipping[i]);
-        int32_t upperDrawBottom = std::min(nextCeilY, floorClipping[i]);// Stop at neighbor's ceiling
-
-        if (upperDrawTop < upperDrawBottom) {
-          fb->drawVerticalLine(i, upperDrawTop, upperDrawBottom, mapColor(0, 255, 0, 255));
-          // Update clipping so nothing draws over this upper wall later
-          ceilClipping[i] = std::max(ceilClipping[i], upperDrawBottom);
-        }
-
-        // Render lower wall
-        int32_t lowerDrawTop = std::max(nextFloorY, ceilClipping[i]);// Start at neighbor's floor
-        int32_t lowerDrawBottom = std::min(projectedFloorZ, floorClipping[i]);
-
-        if (lowerDrawTop < lowerDrawBottom) {
-          fb->drawVerticalLine(i, lowerDrawTop, lowerDrawBottom, mapColor(0, 255, 0, 255));
-          // Update clipping
-          floorClipping[i] = std::min(floorClipping[i], lowerDrawTop);
-        }
-      }
-    }
-
-    // debug
-    fb->update();
-  }
-
-  fb->update();
-}
-
-void drawSolidWall(int x, int32_t &projectedCeilingZ, int32_t &projectedFloorZ)
-{
-
-  int32_t drawTop = std::max(projectedCeilingZ, ceilClipping[x]);
-  int32_t drawBottom = std::min(projectedFloorZ, floorClipping[x]);
-
-  if (drawTop <= drawBottom) {
-    fb->drawVerticalLine(x, drawTop, drawBottom, mapColor(0, 255, 255, 255));
-
-    ceilClipping[x] = drawTop;
-    floorClipping[x] = drawBottom;
-
-    lastCeilingZ[x] = projectedCeilingZ;
-    lastFloorZ[x] = projectedFloorZ;
   }
 }
