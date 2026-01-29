@@ -1,5 +1,7 @@
 #include "framebuffer.h"
 #include "gameloop.h"
+#include "imgui_renderer.h"
+#include "math_utils.h"
 #include "renderer.h"
 #include "simulation.h"
 
@@ -13,14 +15,16 @@
 #include <assert.h>
 #include <iostream>
 
-void poll_sdl_events(gameloop::GameState &gameState, InputState &input);
+void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
+constexpr ImVec2 toCenterCoordinates(ImVec2 vec, sdl_window::SdlWindow &sdlWindow);
+constexpr ImVec2 convertVertexIntoImVec2(gameloop::Vertex vertex);
 
 bool running;
 
 // ==========================================
 // 1. VERTICES (World Coordinates)
 // ==========================================
-static const std::vector<gameloop::Vertex> vertices = {
+static std::vector<gameloop::Vertex> vertices = {
   // Sector 0 (The Starting Room)
   { 0, 0 },// 0
   { 50, 0 },// 1
@@ -35,7 +39,7 @@ static const std::vector<gameloop::Vertex> vertices = {
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static const std::vector<gameloop::Sector> sectors = {
+static std::vector<gameloop::Sector> sectors = {
 
   { // Sector 0
     .floorHeight = 0,
@@ -55,7 +59,7 @@ static const std::vector<gameloop::Sector> sectors = {
 // 3. SIDEDEFS (Visual sides of lines)
 // ==========================================
 // Note: You usually add textures here. For now, we just link to sectors.
-static const std::vector<gameloop::SideDef> sidedefs = {
+static std::vector<gameloop::SideDef> sidedefs = {
   // -- Sector 0 Sides --
   { .sectorId = 0 },// 0: South wall
   { .sectorId = 0 },// 1: Portal line (facing Sector 1)
@@ -73,7 +77,7 @@ static const std::vector<gameloop::SideDef> sidedefs = {
 // 4. LINEDEFS (The Geometry)
 // ==========================================
 // -1 indicates "No Side" (Solid wall)
-static const std::vector<gameloop::LineDef> linedefs = {
+static std::vector<gameloop::LineDef> linedefs = {
   // --- SECTOR 0 (Square) ---
   // Start, End, Type, FrontSide, BackSide
 
@@ -111,20 +115,19 @@ int main()
     assert(ld.frontSidedef >= 0);
   }
 
-  // Initialize SDL window first
-  if (!sdl_window::init()) {
-    std::cerr << "Failed to initialize SDL window" << '\n';
-    return 1;
-  }
+  sdl_window::SdlWindow *sdlWindow = new sdl_window::SdlWindow(config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
 
-  framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer(config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
+  // setup Dear ImGui
+  imguirenderer::ImguiRenderer *imguiRenderer = new imguirenderer::ImguiRenderer(*sdlWindow);
 
+  // setup the game renderer
+  framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer(*sdlWindow);
   renderer::Renderer *renderer = new renderer::Renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
 
   InputState input{};
   gameloop::GameState gameState{ .currentMode = gameloop::EngineMode::EDITOR_2D };
 
-  const gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
+  gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
 
   gameState.playerState = entity::Player{
     .x = 25, .y = 25, .z = 10, .velocity = 5.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
@@ -147,30 +150,21 @@ int main()
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
-    poll_sdl_events(gameState, input);
+    poll_sdl_events(gameState, input, *sdlWindow);
 
     if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
-      ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+      std::vector<ImVec4> scaledLinedefs;
 
-      // Start the Dear ImGui frame
-      ImGui_ImplSDLRenderer2_NewFrame();
-      ImGui_ImplSDL2_NewFrame();
-      ImGui::NewFrame();
+      for (int i = 0; i < linedefs.size(); i++) {
+        auto &ld = linedefs[i];
 
+        ImVec2 start = toCenterCoordinates(convertVertexIntoImVec2(level.vertices[ld.start]), *sdlWindow);
+        ImVec2 end = toCenterCoordinates(convertVertexIntoImVec2(level.vertices[ld.end]), *sdlWindow);
 
-      // Rendering
-      ImGui::Render();
-      ImGuiIO &currentIo = ImGui::GetIO();
-      SDL_RenderSetScale(
-        sdl_window::getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
-      SDL_SetRenderDrawColor(sdl_window::getRenderer(),
-        (Uint8)(clear_color.x * 255),
-        (Uint8)(clear_color.y * 255),
-        (Uint8)(clear_color.z * 255),
-        (Uint8)(clear_color.w * 255));
-      SDL_RenderClear(sdl_window::getRenderer());
-      ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), sdl_window::getRenderer());
-      SDL_RenderPresent(sdl_window::getRenderer());
+        scaledLinedefs.push_back(ImVec4(start.x, start.y, end.x, end.y));
+      }
+
+      imguiRenderer->render(level, scaledLinedefs);
 
       continue;
     }
@@ -200,13 +194,21 @@ int main()
 
   if (fb) { delete fb; }
   if (renderer) { delete renderer; }
-
-  sdl_window::kill();
+  if (sdlWindow) { delete sdlWindow; }
+  if (imguiRenderer) { delete imguiRenderer; }
 
   return 0;
 }
 
-void poll_sdl_events(gameloop::GameState &gameState, InputState &input)
+constexpr ImVec2 toCenterCoordinates(ImVec2 vec, sdl_window::SdlWindow &sdlWindow)
+{
+  return ImVec2(std::max(0.0f, std::min(static_cast<float>(sdlWindow.width), sdlWindow.width / 2 + vec.x)),
+    std::max(0.0f, std::min(static_cast<float>(sdlWindow.height), sdlWindow.height / 2 - vec.y)));
+}
+
+constexpr ImVec2 convertVertexIntoImVec2(gameloop::Vertex vertex) { return ImVec2(vertex.y, vertex.x); }
+
+void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window)
 {
   SDL_Event event;
 
@@ -214,7 +216,7 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input)
     ImGui_ImplSDL2_ProcessEvent(&event);
 
     if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
-        && event.window.windowID == SDL_GetWindowID(sdl_window::getWindow())) {
+        && event.window.windowID == SDL_GetWindowID(window.getWindow())) {
       running = false;
       continue;
     } else if (event.type == SDL_QUIT) {
@@ -227,6 +229,7 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input)
     // early handle of the mode change key
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_F1) {
+        std::cout << "Changing mode\n";
         if (gameState.currentMode == gameloop::EngineMode::GAMEPLAY_3D) {
           gameloop::setEngineMode(gameState, input, gameloop::EngineMode::EDITOR_2D);
         } else {
@@ -238,8 +241,8 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input)
     }
 
     // early skip for preventing capturing mouse and keyboard inputs, while in EDITOR_2D engine mode
-    if ((event.type == SDL_MOUSEMOTION && io.WantCaptureMouse)
-        || ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && io.WantCaptureKeyboard)) {
+    if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D
+        && ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP))) {
       continue;
     }
 

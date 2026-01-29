@@ -54,10 +54,10 @@ void Renderer::drawColumn(int16_t x, int16_t y0, int16_t y1, uint32_t color)
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
-  uint32_t pitch = this->fb->getWidth();
+  uint32_t pitch = this->fb->width;
 
   transformedY0 = std::max(0, transformedY0);
-  transformedY1 = std::min(this->fb->getHeight() - 1, transformedY1);
+  transformedY1 = std::min(this->fb->height - 1, transformedY1);
 
   for (uint32_t i = 0; i < config::SCALE_X + 1; i++) {
     uint32_t *ptr = this->fb->pixels + (transformedY0)*pitch + (scaledX + i);

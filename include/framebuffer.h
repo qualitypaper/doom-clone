@@ -12,16 +12,17 @@ namespace framebuffer {
 class FrameBuffer
 {
 private:
+
+  sdl_window::SdlWindow &sdlWindow;
+
+public:
   int16_t width;
   int16_t height;
 
-public:
   uint32_t *pixels;
-  FrameBuffer(uint16_t width, uint16_t height);
-  ~FrameBuffer();
 
-  int16_t getWidth() { return width; }
-  int16_t getHeight() { return height; }
+  FrameBuffer(sdl_window::SdlWindow &sdlWindow);
+  ~FrameBuffer();
 
   void update();
   void reset();

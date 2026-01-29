@@ -31,7 +31,8 @@ struct GameState
   EngineMode currentMode;
 };
 
-struct Vertex {
+struct Vertex
+{
   int32_t x;
   int32_t y;
 };
@@ -63,7 +64,8 @@ struct Sector
   int16_t tag;
 };
 
-struct Level {
+struct Level
+{
   std::vector<Vertex> vertices;
   std::vector<LineDef> linedefs;
   std::vector<SideDef> sidedefs;
