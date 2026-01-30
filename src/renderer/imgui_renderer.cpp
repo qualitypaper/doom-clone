@@ -150,12 +150,19 @@ void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &sc
     ImGui::Begin(windowTitle.c_str());
 
     ImGui::Text("Start vertex: ");
-    ImGui::SliderInt("X: ", &start->x, 0.0f, sdlWindow.width);
-    ImGui::SliderInt("Y: ", &start->y, 0.0f, sdlWindow.height);
+    ImGui::SliderInt(": Start X", &start->x, 0.0f, sdlWindow.width);
+    ImGui::SliderInt(": Start Y", &start->y, 0.0f, sdlWindow.height);
 
     ImGui::Text("End vertex: ");
-    ImGui::SliderInt("End X: ", &end->x, 0.0f, sdlWindow.width);
-    ImGui::SliderInt("End Y: ", &end->y, 0.0f, sdlWindow.height);
+    ImGui::SliderInt(":End X", &end->x, 0.0f, sdlWindow.width);
+    ImGui::SliderInt(":End Y", &end->y, 0.0f, sdlWindow.height);
+
+    const char *items[level.sidedefs.size()];
+
+    for (int i = 0; i < level.sidedefs.size(); i++) { items[i] = (const char *)(i + '0'); }
+
+    // createSelect("Front Sidedef: ", items, ld.frontSidedef);
+    // createSelect("Back Sidedef: ", items, ld.backSidedef);
 
     ImGui::End();
   }
@@ -163,9 +170,18 @@ void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &sc
   endFrame();
 }
 
-void ImguiRenderer::drawHUD()
+void ImguiRenderer::createSelect(const char *label, const char *items[], int16_t &currentItem)
 {
-  // 1. Set the window position and size to match the full screen
+  if (ImGui::BeginCombo("Texture Selector", items[currentItem])) {
+    for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
+      bool is_selected = (currentItem == n);
+      if (ImGui::Selectable(items[n], is_selected)) { currentItem = n; }
+
+      // Set the initial focus when opening the combo (scrolling to selection)
+      if (is_selected) { ImGui::SetItemDefaultFocus(); }
+    }
+    ImGui::EndCombo();
+  }
 }
 
 constexpr ImVec2 ImguiRenderer::scale(ImVec2 vec, float_t scaleFactor)

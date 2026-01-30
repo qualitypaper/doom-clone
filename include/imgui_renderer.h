@@ -1,7 +1,7 @@
 #pragma once
 
-#include "sdl_window.h"
 #include "gameloop.h"
+#include "sdl_window.h"
 
 #include <vector>
 
@@ -23,7 +23,7 @@ private:
 
   void startFrame();
   void endFrame();
-  void drawHUD();
+  void createSelect(const char *label, const char *items[], int16_t &currentItem);
 
   constexpr ImVec2 scale(ImVec2 vec, float_t scaleFactor);
   float_t getDistanceToSegmentSq(ImVec2 start, ImVec2 end, ImVec2 origin);

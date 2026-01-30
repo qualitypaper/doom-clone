@@ -48,7 +48,7 @@ static std::vector<gameloop::Sector> sectors = {
     .lightLevel = 192,
     .tag = 0 },
   { // Sector 1 (Taller and deeper)
-    .floorHeight = -10,
+    .floorHeight = 0,
     .ceilingHeight = 50,
     .specialType = 0,
     .lightLevel = 128,
@@ -130,7 +130,7 @@ int main()
   gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
 
   gameState.playerState = entity::Player{
-    .x = 25, .y = 25, .z = 10, .velocity = 5.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
+    .x = 25, .y = 25, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
   running = true;

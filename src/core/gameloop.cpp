@@ -28,7 +28,7 @@ void setEngineMode(GameState &state, InputState &input, EngineMode newMode)
 
   if (newMode == EngineMode::GAMEPLAY_3D) {
     // disable absolute mouse
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    // SDL_SetRelativeMouseaaaaaMode(SDL_TRUE);
   } else {
     // in order to use mouse cursor
     SDL_SetRelativeMouseMode(SDL_FALSE);
