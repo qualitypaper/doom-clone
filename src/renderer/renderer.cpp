@@ -197,9 +197,9 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
 
           if (upperWallTop < upperWallBottom) {
             this->drawColumn(i, upperWallTop, upperWallBottom, mapColor(0, 255, 0, 255));
-            ceilingClipping[i] = upperWallTop;
-          } else {
             ceilingClipping[i] = upperWallBottom;
+          } else {
+            ceilingClipping[i] = upperWallTop;
           }
         }
 

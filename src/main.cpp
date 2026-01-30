@@ -49,7 +49,7 @@ static std::vector<gameloop::Sector> sectors = {
     .tag = 0 },
   { // Sector 1 (Taller and deeper)
     .floorHeight = 0,
-    .ceilingHeight = 50,
+    .ceilingHeight = 20,
     .specialType = 0,
     .lightLevel = 128,
     .tag = 0 }
