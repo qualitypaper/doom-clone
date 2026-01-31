@@ -1,19 +1,22 @@
 #include "framebuffer.h"
 #include "gameloop.h"
 #include "imgui_renderer.h"
-#include "math_utils.h"
 #include "renderer.h"
 #include "simulation.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
 
 #include <SDL.h>
 
 #include <SDL_events.h>
 #include <assert.h>
 #include <iostream>
+
+namespace {
+    
+        
+}
 
 void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
 constexpr ImVec2 toCenterCoordinates(ImVec2 vec, sdl_window::SdlWindow &sdlWindow);
@@ -155,7 +158,7 @@ int main()
     if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
       std::vector<ImVec4> scaledLinedefs;
 
-      for (int i = 0; i < linedefs.size(); i++) {
+      for (uint16_t i = 0; i < linedefs.size(); i++) {
         auto &ld = linedefs[i];
 
         ImVec2 start = toCenterCoordinates(convertVertexIntoImVec2(level.vertices[ld.start]), *sdlWindow);
@@ -224,16 +227,14 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_wind
       continue;
     }
 
-    ImGuiIO &io = ImGui::GetIO();
-
     // early handle of the mode change key
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_F1) {
         std::cout << "Changing mode\n";
         if (gameState.currentMode == gameloop::EngineMode::GAMEPLAY_3D) {
-          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::EDITOR_2D);
+          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::EDITOR_2D, window);
         } else {
-          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::GAMEPLAY_3D);
+          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::GAMEPLAY_3D, window);
         }
 
         continue;

@@ -5,7 +5,9 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 
-#include <iostream>
+#include <queue>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace imguirenderer {
@@ -62,12 +64,7 @@ void ImguiRenderer::endFrame()
 
 void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &scaledLinedefs)
 {
-  static float_t thickness = 2.0f;
-  static ImU32 defaultColor = IM_COL32(255, 255, 255, 255);
-  static ImU32 selectedColor = IM_COL32(0, 0, 255, 255);
-  static ImU32 hoverColor = IM_COL32(255, 200, 0, 255);
-
-  static float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
+  static float_t lineHoveringThreshold = 25.0f;
 
   // Start the Dear ImGui frame
   startFrame();
@@ -87,34 +84,55 @@ void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &sc
 
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
-  ImDrawList *drawList = ImGui::GetWindowDrawList();
-  ImVec2 origin = ImGui::GetCursorScreenPos();
   ImVec2 mousePos = ImGui::GetMousePos();
 
-  static int selectedIndex = -1;
-  float_t smallestDistance = 999999.0f;
-  int hoverIndex = -1;
+  int16_t hoverIndex = -1;
+  static int16_t selectedIndex = -1;
 
-  for (int i = 0; i < scaledLinedefs.size(); i++) {
-    auto start = ImVec2(scaledLinedefs[i].x, scaledLinedefs[i].y);
-    auto end = ImVec2(scaledLinedefs[i].z, scaledLinedefs[i].w);
+  static std::unordered_map<float_t, int> distanceMap;
+  static std::unordered_map<uint16_t, uint16_t> sectorCount;
 
-    if (mousePos.x < 0 || mousePos.y < 0 || mousePos.x > sdlWindow.width || mousePos.y > sdlWindow.height) {
+  sectorCount.clear();
+  distanceMap.clear();
 
-      drawList->AddLine(start, end, IM_COL32(255, 255, 255, 255), thickness);
-      continue;
-    }
+  std::priority_queue<float_t, std::vector<float_t>, std::greater<float_t>> minHeap;
+
+  for (uint16_t i = 0; i < scaledLinedefs.size(); i++) {
+    ImVec2 start(scaledLinedefs[i].x, scaledLinedefs[i].y);
+    ImVec2 end(scaledLinedefs[i].z, scaledLinedefs[i].w);
+
+    if (mousePos.x < 0 || mousePos.y < 0 || mousePos.x > sdlWindow.width || mousePos.y > sdlWindow.height) { continue; }
 
     float_t distance = getDistanceToSegmentSq(start, end, mousePos);
-    bool isHovered = distance < 25.0f;
-
-    if (isHovered && distance < smallestDistance) {
-      hoverIndex = i;
-      smallestDistance = distance;
-    }
+    minHeap.push(distance);
+    distanceMap.insert({ distance, i });
   }
 
-  for (int i = 0; i < scaledLinedefs.size(); i++) {
+  if (minHeap.size() > 0 && minHeap.top() < lineHoveringThreshold) { hoverIndex = distanceMap.at(minHeap.top()); }
+
+  drawMapOutlines(scaledLinedefs, level, selectedIndex, hoverIndex);
+  drawSelectedLinePopup(selectedIndex, level);
+
+  ImGui::End();
+
+  endFrame();
+}
+
+void ImguiRenderer::drawMapOutlines(const std::vector<ImVec4> &scaledLinedefs,
+  gameloop::Level &level,
+  int16_t &selectedIndex,
+  int16_t hoverIndex)
+{
+  static ImU32 defaultColor = IM_COL32(255, 255, 255, 255);
+  static ImU32 selectedColor = IM_COL32(0, 0, 255, 255);
+  static ImU32 hoverColor = IM_COL32(255, 200, 0, 255);
+  static float_t thickness = 2.0f;
+
+  ImGuiIO &io = ImGui::GetIO();
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+
+  // draw outlines
+  for (uint16_t i = 0; i < scaledLinedefs.size(); i++) {
     auto start = ImVec2(scaledLinedefs[i].x, scaledLinedefs[i].y);
     auto end = ImVec2(scaledLinedefs[i].z, scaledLinedefs[i].w);
 
@@ -133,49 +151,60 @@ void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &sc
     } else {
       // draw default line (white)
       color = defaultColor;
-    }
 
+      if (level.linedefs[i].backSidedef != -1) {
+        // tint a bit the color of the portal linedef
+        color -= 0x32323200;
+      }
+    }
     drawList->AddLine(start, end, color, thickness);
   }
-
-  ImGui::End();
-
-  if (selectedIndex != -1) {
-    auto &ld = level.linedefs[selectedIndex];
-    gameloop::Vertex *start = &level.vertices[ld.start];
-    gameloop::Vertex *end = &level.vertices[ld.end];
-
-    // render popup of linedef parameters
-    std::string windowTitle = "Linedef params " + std::to_string(selectedIndex) + "###LinedefParams";
-    ImGui::Begin(windowTitle.c_str());
-
-    ImGui::Text("Start vertex: ");
-    ImGui::SliderInt(": Start X", &start->x, 0.0f, sdlWindow.width);
-    ImGui::SliderInt(": Start Y", &start->y, 0.0f, sdlWindow.height);
-
-    ImGui::Text("End vertex: ");
-    ImGui::SliderInt(":End X", &end->x, 0.0f, sdlWindow.width);
-    ImGui::SliderInt(":End Y", &end->y, 0.0f, sdlWindow.height);
-
-    const char *items[level.sidedefs.size()];
-
-    for (int i = 0; i < level.sidedefs.size(); i++) { items[i] = (const char *)(i + '0'); }
-
-    // createSelect("Front Sidedef: ", items, ld.frontSidedef);
-    // createSelect("Back Sidedef: ", items, ld.backSidedef);
-
-    ImGui::End();
-  }
-
-  endFrame();
 }
 
-void ImguiRenderer::createSelect(const char *label, const char *items[], int16_t &currentItem)
+void ImguiRenderer::drawSelectedLinePopup(int16_t selectedIndex, gameloop::Level &level)
 {
-  if (ImGui::BeginCombo("Texture Selector", items[currentItem])) {
-    for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
-      bool is_selected = (currentItem == n);
-      if (ImGui::Selectable(items[n], is_selected)) { currentItem = n; }
+  if (selectedIndex == -1) return;
+
+  auto &ld = level.linedefs[selectedIndex];
+  gameloop::Vertex *start = &level.vertices[ld.start];
+  gameloop::Vertex *end = &level.vertices[ld.end];
+
+  // render popup of linedef parameters
+  std::string windowTitle = "Linedef params " + std::to_string(selectedIndex) + "###LinedefParams";
+  ImGui::Begin(windowTitle.c_str());
+
+  ImGui::SetNextItemWidth(80);
+  ImGui::InputInt(": Start X", &start->x);
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(80);
+  ImGui::InputInt(": Start Y", &start->y);
+
+  ImGui::NewLine();
+
+  ImGui::SetNextItemWidth(80);
+  ImGui::InputInt("End X: ", &end->x);
+  ImGui::SameLine();
+  ImGui::SetNextItemWidth(80);
+  ImGui::InputInt("End Y: ", &end->y);
+
+  ImGui::NewLine();
+
+  createSelect("Front Sidedef: ", level.sidedefs, ld.frontSidedef);
+  createSelect("Back Sidedef: ", level.sidedefs, ld.backSidedef);
+
+  ImGui::End();
+}
+
+void ImguiRenderer::createSelect(const char *label,
+  const std::vector<gameloop::SideDef> &sidedefs,
+  int16_t &currentItem)
+{
+  if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
+    for (uint16_t i = 0; i < sidedefs.size(); i++) {
+      bool is_selected = (currentItem == i);
+      std::string optionLabel = std::to_string(i);
+
+      if (ImGui::Selectable(optionLabel.c_str(), is_selected)) { currentItem = i; }
 
       // Set the initial focus when opening the combo (scrolling to selection)
       if (is_selected) { ImGui::SetItemDefaultFocus(); }

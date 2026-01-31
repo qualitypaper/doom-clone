@@ -24,7 +24,7 @@ void FrameBuffer::update()
 
 void FrameBuffer::reset()
 {
-  for (int i = 0; i < sizeof(this->pixels); i++) { this->pixels[i] = 0; }
+    memset(this->pixels, 0, width * height * sizeof(uint32_t));
 }
 
 }// namespace framebuffer

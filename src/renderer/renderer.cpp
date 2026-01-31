@@ -1,9 +1,10 @@
 #include "renderer.h"
 #include "framebuffer.h"
 #include "gameloop.h"
-#include "rasterizer.h"
 
 namespace renderer {
+static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
+static double_t FOCAL_LENGTH;
 
 static constexpr uint32_t mapColor(uint8_t r, uint8_t g, uint8_t b, uint8_t alpha)
 {
@@ -15,6 +16,8 @@ Renderer::Renderer(framebuffer::FrameBuffer *fb, uint16_t canvasWidth, uint16_t 
 {
   ceilingClipping.resize(canvasWidth);
   floorClipping.resize(canvasWidth);
+
+  FOCAL_LENGTH = (canvasWidth / 2.0) / TAN_HALF_FOV;
 }
 
 void Renderer::resetClippingArrays()
@@ -109,8 +112,6 @@ void applyTransformations(const entity::Player &playerState,
 
 void Renderer::render(const gameloop::GameState &gameState, const gameloop::Level &level)
 {
-  static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
-  static const double_t FOCAL_LENGTH = (canvasWidth / 2.0) / TAN_HALF_FOV;
 
   for (gameloop::LineDef ld : level.linedefs) {
     gameloop::SideDef sidedef = level.sidedefs[ld.frontSidedef];
@@ -139,8 +140,8 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
       clipNearPlane(viewX2, viewY2, viewX1, viewY1);
     }
 
-    int32_t projectedStartX = canvasWidth / 2 + viewX1 * FOCAL_LENGTH / viewY1;
-    int32_t projectedEndX = canvasWidth / 2 + viewX2 * FOCAL_LENGTH / viewY2;
+    int32_t projectedStartX = projectX(viewX1, 1 / viewY1);
+    int32_t projectedEndX = projectX(viewX2, 1 / viewY2);
 
     int32_t start, end;
     double_t inv_y1, inv_y2;
@@ -157,21 +158,20 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
       inv_y2 = 1 / viewY2;
     }
 
-    for (int i = std::max(0, start); i < std::min(static_cast<int32_t>(canvasWidth), end); i++) {
-      double_t t = double(i - start) / double(end - start);
+    for (int32_t i = std::max(0, start); i < std::min(static_cast<int32_t>(canvasWidth), end); i++) {
+      double_t t = static_cast<double>(i - start) / (end - start);
       double_t inv_y = lerp(inv_y1, inv_y2, t);
 
       // represent ceiling and floor in screen coordinates
-      int32_t projectedFloorY = canvasHeight / 2 - floorZ * FOCAL_LENGTH * inv_y;
-      int32_t projectedCeilingY = canvasHeight / 2 - ceilingZ * FOCAL_LENGTH * inv_y;
+      int32_t projectedFloorY = projectZ(floorZ, inv_y);
+      int32_t projectedCeilingY = projectZ(ceilingZ, inv_y);
 
       if (projectedCeilingY < 0) { projectedCeilingY = 0; }
 
+      drawFloor(i, projectedFloorY);
+      drawCeiling(i, projectedCeilingY);
+
       if (ld.backSidedef == -1) {
-
-        drawFloor(i, projectedFloorY);
-        drawCeiling(i, projectedCeilingY);
-
         // solid wall
         this->drawSolidWall(i, projectedCeilingY, projectedFloorY);
       } else {
@@ -179,47 +179,61 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
         gameloop::SideDef backSidedef = level.sidedefs[ld.backSidedef];
         gameloop::Sector nextSector = level.sectors[backSidedef.sectorId];
 
-        drawCeiling(i, projectedCeilingY);
-        drawFloor(i, projectedFloorY);
-
         int16_t nextCeilZ = nextSector.ceilingHeight - gameState.playerState.z;
         int16_t nextFloorZ = nextSector.floorHeight - gameState.playerState.z;
 
         // screen Y coordinates
-        int32_t nextCeilY = canvasHeight / 2 - nextCeilZ * FOCAL_LENGTH * inv_y;
-        int32_t nextFloorY = canvasHeight / 2 - nextFloorZ * FOCAL_LENGTH * inv_y;
+        int32_t nextCeilY = projectZ(nextCeilZ, inv_y);
+        int32_t nextFloorY = projectZ(nextFloorZ, inv_y);
 
-        // Render upper wall only if the neighbour ceiling is lower
-        if (nextCeilY > projectedCeilingY) {
-
-          int32_t upperWallTop = std::max(projectedCeilingY, ceilingClipping[i]);
-          int32_t upperWallBottom = std::min(nextCeilY, floorClipping[i]);
-
-          if (upperWallTop < upperWallBottom) {
-            this->drawColumn(i, upperWallTop, upperWallBottom, mapColor(0, 255, 0, 255));
-            ceilingClipping[i] = upperWallBottom;
-          } else {
-            ceilingClipping[i] = upperWallTop;
-          }
-        }
-
-        // Render lower wall only when the neighbor floor is higher
-        if (nextFloorY < projectedFloorY) {
-          int32_t lowerWallBottom = std::max(nextFloorY, ceilingClipping[i]);// Start at neighbor's floor
-          int32_t lowerWallTop = std::min(projectedFloorY, floorClipping[i]);
-
-          if (lowerWallBottom < lowerWallTop) {
-            this->drawColumn(i, lowerWallBottom, lowerWallTop, mapColor(0, 255, 0, 255));
-            floorClipping[i] = lowerWallBottom;
-          } else {
-            floorClipping[i] = lowerWallTop;
-          }
+        if (ld.type == gameloop::LineDefType::REGULAR) {
+          drawDefaultPortal(i, projectedFloorY, projectedCeilingY, nextFloorY, nextCeilY);
+        } else if (ld.type == gameloop::LineDefType::DOOR) {
+          // TODO: create a drawing function for door portal
         }
       }
     }
   }
 
   fb->update();
+}
+
+int32_t Renderer::projectZ(int32_t z, double_t inv_y) { return canvasHeight / 2 - z * FOCAL_LENGTH * inv_y; }
+
+int32_t Renderer::projectX(int32_t x, double_t inv_y) { return canvasWidth / 2 + x * FOCAL_LENGTH * inv_y; }
+
+void Renderer::drawDefaultPortal(int32_t x,
+  int32_t projectedFloorY,
+  int32_t projectedCeilingY,
+  int32_t nextFloorY,
+  int32_t nextCeilY)
+{
+  // Render upper wall only if the neighbour ceiling is lower
+  if (nextCeilY > projectedCeilingY) {
+
+    int32_t upperWallTop = std::max(projectedCeilingY, ceilingClipping[x]);
+    int32_t upperWallBottom = std::min(nextCeilY, floorClipping[x]);
+
+    if (upperWallTop < upperWallBottom) {
+      this->drawColumn(x, upperWallTop, upperWallBottom, mapColor(0, 255, 0, 255));
+      ceilingClipping[x] = upperWallBottom;
+    } else {
+      ceilingClipping[x] = upperWallTop;
+    }
+  }
+
+  // Render lower wall only when the neighbor floor is higher
+  if (nextFloorY < projectedFloorY) {
+    int32_t lowerWallBottom = std::max(nextFloorY, ceilingClipping[x]);// Start at neighbor's floor
+    int32_t lowerWallTop = std::min(projectedFloorY, floorClipping[x]);
+
+    if (lowerWallBottom < lowerWallTop) {
+      this->drawColumn(x, lowerWallBottom, lowerWallTop, mapColor(0, 255, 0, 255));
+      floorClipping[x] = lowerWallBottom;
+    } else {
+      floorClipping[x] = lowerWallTop;
+    }
+  }
 }
 
 void Renderer::drawCeiling(int32_t x, int32_t projectedCeilingY)

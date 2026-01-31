@@ -39,8 +39,6 @@ struct Vertex
 
 struct SideDef
 {
-  int16_t xOffset;
-  int16_t yOffset;
   int16_t sectorId;
 };
 
@@ -74,5 +72,5 @@ struct Level
 
 void handleMouseMovement(SDL_Event &event, InputState &input);
 void handleKeyInput(SDL_Event &event, InputState &input);
-void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode);
+void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode, sdl_window::SdlWindow &sdlWindow);
 }// namespace gameloop

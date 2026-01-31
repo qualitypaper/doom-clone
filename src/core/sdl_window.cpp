@@ -52,9 +52,6 @@ SdlWindow::~SdlWindow()
   SDL_Quit();
 }
 
-
-void createIMGUIFrame() {}
-
 // must be called after init()
 SDL_Window *SdlWindow::getWindow() { return window; }
 

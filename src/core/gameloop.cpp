@@ -1,6 +1,9 @@
 #include "gameloop.h"
+#include "config.h"
+#include "sdl_window.h"
 #include <SDL_mouse.h>
 #include <SDL_stdinc.h>
+#include <SDL_video.h>
 
 struct InputState;
 
@@ -19,7 +22,7 @@ void handleKeyInput(SDL_Event &event, InputState &input)
   input.keys[scancode] = pressed;
 }
 
-void setEngineMode(GameState &state, InputState &input, EngineMode newMode)
+void setEngineMode(GameState &state, InputState &input, EngineMode newMode, sdl_window::SdlWindow &sdlWindow)
 {
   // nothing to change
   if (state.currentMode == newMode) return;
@@ -28,10 +31,12 @@ void setEngineMode(GameState &state, InputState &input, EngineMode newMode)
 
   if (newMode == EngineMode::GAMEPLAY_3D) {
     // disable absolute mouse
-    // SDL_SetRelativeMouseaaaaaMode(SDL_TRUE);
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetWindowSize(sdlWindow.getWindow(), config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
   } else {
     // in order to use mouse cursor
     SDL_SetRelativeMouseMode(SDL_FALSE);
+    SDL_SetWindowSize(sdlWindow.getWindow(), config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
 
     // wiping clean the state, in order to prevent unexpected key and mouse inputs
     memset(input.keys, false, sizeof(input.keys));
