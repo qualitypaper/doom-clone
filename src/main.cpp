@@ -1,3 +1,4 @@
+#include "config.h"
 #include "framebuffer.h"
 #include "gameloop.h"
 #include "imgui_renderer.h"
@@ -13,10 +14,7 @@
 #include <assert.h>
 #include <iostream>
 
-namespace {
-    
-        
-}
+namespace {}
 
 void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
 constexpr ImVec2 toCenterCoordinates(ImVec2 vec, sdl_window::SdlWindow &sdlWindow);
@@ -118,7 +116,20 @@ int main()
     assert(ld.frontSidedef >= 0);
   }
 
-  sdl_window::SdlWindow *sdlWindow = new sdl_window::SdlWindow(config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
+  // setup inputs and states
+  InputState input{};
+  gameloop::GameState gameState{ .currentMode = gameloop::EngineMode::EDITOR_2D };
+
+  gameState.playerState = entity::Player{
+    .x = 25, .y = 25, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
+  };
+
+  gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
+
+  // setup sdl window
+  sdl_window::SdlWindow *sdlWindow = new sdl_window::SdlWindow(
+    gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
+    gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT);
 
   // setup Dear ImGui
   imguirenderer::ImguiRenderer *imguiRenderer = new imguirenderer::ImguiRenderer(*sdlWindow);
@@ -126,15 +137,6 @@ int main()
   // setup the game renderer
   framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer(*sdlWindow);
   renderer::Renderer *renderer = new renderer::Renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
-
-  InputState input{};
-  gameloop::GameState gameState{ .currentMode = gameloop::EngineMode::EDITOR_2D };
-
-  gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
-
-  gameState.playerState = entity::Player{
-    .x = 25, .y = 25, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
-  };
 
   running = true;
   // game loop
