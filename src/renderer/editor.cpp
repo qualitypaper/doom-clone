@@ -6,6 +6,7 @@
 
 namespace editor {
 
+
 AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
 {
   this->maxX = std::max(start.x, end.x);
@@ -64,7 +65,7 @@ void Editor::addToSector(gameloop::Level &level, uint16_t i, gameloop::LineDef &
 
 Editor::Editor(gameloop::Level &level) : level(level)
 {
-  this->editorSectors.reserve(level.sectors.size());
+  this->editorSectors.resize(level.sectors.size());
 
   for (uint16_t i = 0; i < level.linedefs.size(); i++) {
     auto &ld = level.linedefs[i];
@@ -80,24 +81,24 @@ Editor::Editor(gameloop::Level &level) : level(level)
 
 void Editor::addSector(const AABB &bounds, const std::vector<int16_t> &linedefsIndices)
 {
-  this->editorSectors.push_back({ bounds, linedefsIndices });
+  this->editorSectors.emplace_back(bounds, linedefsIndices);
 }
 
 void Editor::addLineDef(int16_t sectorIndex, const gameloop::LineDef &linedef)
 {
-  level.linedefs.push_back(linedef);
+  level.linedefs.emplace_back(linedef);
   if (sectorIndex == -1) return;
 
   auto &sec = this->editorSectors[sectorIndex];
 
-  sec.linedefsIndices.push_back(level.linedefs.size() - 1);
+  sec.linedefsIndices.emplace_back(level.linedefs.size() - 1);
   this->updateAABB(sectorIndex);
 }
 
 void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
 {
-  level.vertices.push_back(start);
-  level.vertices.push_back(end);
+  level.vertices.emplace_back(start);
+  level.vertices.emplace_back(end);
 
   gameloop::LineDef ld{ .start = static_cast<int16_t>(level.vertices.size() - 2),
     .end = static_cast<int16_t>(level.vertices.size() - 1),
@@ -105,7 +106,7 @@ void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
     .frontSidedef = -1,
     .backSidedef = -1 };
 
-  level.linedefs.push_back(ld);
+  level.linedefs.emplace_back(ld);
 }
 
 void Editor::addVertex(int16_t sectorIndex, const gameloop::Vertex &vertex)
@@ -114,15 +115,39 @@ void Editor::addVertex(int16_t sectorIndex, const gameloop::Vertex &vertex)
 
   if (sectorIndex == -1) return;
 
-  float_t d1 = 0, d2 = 0;
-  gameloop::Vertex v1, v2;
+  float_t dMin1 = std::numeric_limits<float_t>::max(), dMin2 = std::numeric_limits<float_t>::max();
+  int16_t firstVertexIdx, secondVertexIdx;
 
   // find nearest two vertices with which to connect a vertex
   for (int16_t ldIndex : this->editorSectors[sectorIndex].linedefsIndices) {
     auto &ld = level.linedefs[ldIndex];
 
+    auto &start = level.vertices[ld.start];
+    auto &end = level.vertices[ld.end];
 
-    if () {}
+    float_t d1 = math_utils::getDistanceSq(start, vertex);
+    float_t d2 = math_utils::getDistanceSq(end, vertex);
+
+    if (d1 < dMin1) {
+      dMin2 = dMin1;
+      dMin1 = d1; 
+      secondVertexIdx = firstVertexIdx;
+      firstVertexIdx = ld.start;
+    } else if (d1 < dMin2) {
+      dMin2 = d1;
+      secondVertexIdx = ld.start;
+    }
+
+    if (d2 < dMin1) {
+      dMin2 = dMin1;
+      dMin1 = d2; 
+      secondVertexIdx = firstVertexIdx;
+      firstVertexIdx = ld.end;
+    } else if (d2 < dMin2) {
+      dMin2 = d2;
+      secondVertexIdx = ld.end;
+    }
   }
+}
 
 }// namespace editor

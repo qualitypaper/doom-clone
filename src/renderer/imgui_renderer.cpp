@@ -12,7 +12,8 @@
 
 namespace imguirenderer {
 
-ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow) : sdlWindow(sdlWindow)
+ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &level)
+  : m_sdlWindow(sdlWindow), m_level(level)
 {
   float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
@@ -35,6 +36,8 @@ ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow) : sdlWindow(sdlWi
   // Setup Platform/Renderer backends
   ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
+
+  this->m_editor = std::make_unique<editor::Editor>(level);
 }
 
 ImguiRenderer::~ImguiRenderer()
@@ -55,16 +58,17 @@ void ImguiRenderer::endFrame()
 {
   ImGui::Render();
   ImGuiIO &currentIo = ImGui::GetIO();
-  SDL_RenderSetScale(sdlWindow.getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
+  SDL_RenderSetScale(
+    m_sdlWindow.getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
 
-  SDL_RenderClear(sdlWindow.getRenderer());
-  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), sdlWindow.getRenderer());
-  SDL_RenderPresent(sdlWindow.getRenderer());
+  SDL_RenderClear(m_sdlWindow.getRenderer());
+  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_sdlWindow.getRenderer());
+  SDL_RenderPresent(m_sdlWindow.getRenderer());
 }
 
-void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &scaledLinedefs)
+void ImguiRenderer::render(const std::vector<ImVec2> &scaledVertices)
 {
-  static float_t lineHoveringThreshold = 25.0f;
+  static float_t s_lineHoveringThreshold = 25.0f;
 
   // Start the Dear ImGui frame
   startFrame();
@@ -87,87 +91,120 @@ void ImguiRenderer::render(gameloop::Level &level, const std::vector<ImVec4> &sc
   ImVec2 mousePos = ImGui::GetMousePos();
 
   int16_t hoverIndex = -1;
-  static int16_t selectedIndex = -1;
+  static int16_t s_selectedIndex = -1;
+  static bool s_rmbClicked = false;
+  static ImVec2 s_rmbClickedMousePos;
 
-  static std::unordered_map<float_t, int> distanceMap;
-  static std::unordered_map<uint16_t, uint16_t> sectorCount;
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    s_rmbClicked = !s_rmbClicked;
+    s_rmbClickedMousePos = mousePos;
+  }
 
-  sectorCount.clear();
-  distanceMap.clear();
+  static std::unordered_map<float_t, int> s_distanceMap;
+  static std::unordered_map<uint16_t, uint16_t> s_sectorCount;
+
+  s_sectorCount.clear();
+  s_distanceMap.clear();
 
   std::priority_queue<float_t, std::vector<float_t>, std::greater<float_t>> minHeap;
 
-  for (uint16_t i = 0; i < scaledLinedefs.size(); i++) {
-    ImVec2 start(scaledLinedefs[i].x, scaledLinedefs[i].y);
-    ImVec2 end(scaledLinedefs[i].z, scaledLinedefs[i].w);
+  for (uint16_t i = 0; i < m_level.linedefs.size(); i++) {
+    ImVec2 start = scaledVertices[m_level.linedefs[i].start];
+    ImVec2 end = scaledVertices[m_level.linedefs[i].end];
 
-    if (mousePos.x < 0 || mousePos.y < 0 || mousePos.x > sdlWindow.width || mousePos.y > sdlWindow.height) { continue; }
+    if (mousePos.x < 0 || mousePos.y < 0 || mousePos.x > m_sdlWindow.width || mousePos.y > m_sdlWindow.height) {
+      continue;
+    }
 
     float_t distance = getDistanceToSegmentSq(start, end, mousePos);
-    minHeap.push(distance);
-    distanceMap.insert({ distance, i });
+    minHeap.emplace(distance);
+    s_distanceMap.emplace(distance, i);
   }
 
-  if (minHeap.size() > 0 && minHeap.top() < lineHoveringThreshold) { hoverIndex = distanceMap.at(minHeap.top()); }
+  if (minHeap.size() > 0 && minHeap.top() < s_lineHoveringThreshold) { hoverIndex = s_distanceMap.at(minHeap.top()); }
 
-  drawMapOutlines(scaledLinedefs, level, selectedIndex, hoverIndex);
-  drawSelectedLinePopup(selectedIndex, level);
+  if (s_rmbClicked) {
+    // suggest creating a new line/vertex
+    showVertexRLineCreation(s_rmbClickedMousePos);
+  }
+  drawMapOutlines(scaledVertices, s_selectedIndex, hoverIndex);
+  drawSelectedLinePopup(s_selectedIndex);
 
   ImGui::End();
 
   endFrame();
 }
 
-void ImguiRenderer::drawMapOutlines(const std::vector<ImVec4> &scaledLinedefs,
-  gameloop::Level &level,
+void ImguiRenderer::drawMapOutlines(const std::vector<ImVec2> &scaledVertices,
   int16_t &selectedIndex,
   int16_t hoverIndex)
 {
-  static ImU32 defaultColor = IM_COL32(255, 255, 255, 255);
-  static ImU32 selectedColor = IM_COL32(0, 0, 255, 255);
-  static ImU32 hoverColor = IM_COL32(255, 200, 0, 255);
-  static float_t thickness = 2.0f;
+  static ImU32 s_defaultColor = IM_COL32(255, 255, 255, 255);
+  static ImU32 s_selectedColor = IM_COL32(0, 0, 255, 255);
+  static ImU32 s_hoverColor = IM_COL32(255, 200, 0, 255);
+  static float_t s_thickness = 2.0f;
 
   ImGuiIO &io = ImGui::GetIO();
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
+  // draw vertices
+  for (uint16_t i = 0; i < scaledVertices.size(); i++) {
+    drawList->AddCircleFilled(scaledVertices[i], 5.0f, s_defaultColor);
+  }
+
   // draw outlines
-  for (uint16_t i = 0; i < scaledLinedefs.size(); i++) {
-    auto start = ImVec2(scaledLinedefs[i].x, scaledLinedefs[i].y);
-    auto end = ImVec2(scaledLinedefs[i].z, scaledLinedefs[i].w);
+  for (uint16_t i = 0; i < m_level.linedefs.size(); i++) {
+    auto start = scaledVertices[m_level.linedefs[i].start];
+    auto end = scaledVertices[m_level.linedefs[i].end];
 
     ImU32 color;
     bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
     if (selectedIndex == i && lmbClicked) {
       // resetting the selection
       selectedIndex = -1;
-      color = defaultColor;
+      color = s_defaultColor;
     } else if (selectedIndex == i || (i == hoverIndex && lmbClicked)) {
       selectedIndex = i;
       // draw active line (blue)
-      color = selectedColor;
+      color = s_selectedColor;
     } else if (i == hoverIndex) {
-      color = hoverColor;
+      color = s_hoverColor;
     } else {
       // draw default line (white)
-      color = defaultColor;
+      color = s_defaultColor;
 
-      if (level.linedefs[i].backSidedef != -1) {
+      if (m_level.linedefs[i].backSidedef != -1) {
         // tint a bit the color of the portal linedef
         color -= 0x32323200;
       }
     }
-    drawList->AddLine(start, end, color, thickness);
+    drawList->AddLine(start, end, color, s_thickness);
   }
 }
 
-void ImguiRenderer::drawSelectedLinePopup(int16_t selectedIndex, gameloop::Level &level)
+void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos)
+{
+  ImGui::Begin("Vertex/Line creation popup");
+  bool vertexCreation = ImGui::Button("Create Vertex");
+  bool lineCreation = ImGui::Button("Create line");
+
+  if (vertexCreation) {
+    gameloop::Vertex v = math_utils::toCenterCoordinates(
+      math_utils::convertImVec2IntoVertex(mousePos), m_sdlWindow.width, m_sdlWindow.height);
+
+    m_editor.get()->addVertex(-1, {v.y, v.x});
+  }
+
+  ImGui::End();
+}
+
+void ImguiRenderer::drawSelectedLinePopup(int16_t selectedIndex)
 {
   if (selectedIndex == -1) return;
 
-  auto &ld = level.linedefs[selectedIndex];
-  gameloop::Vertex *start = &level.vertices[ld.start];
-  gameloop::Vertex *end = &level.vertices[ld.end];
+  auto &ld = m_level.linedefs[selectedIndex];
+  gameloop::Vertex *start = &m_level.vertices[ld.start];
+  gameloop::Vertex *end = &m_level.vertices[ld.end];
 
   // render popup of linedef parameters
   std::string windowTitle = "Linedef params " + std::to_string(selectedIndex) + "###LinedefParams";
@@ -189,8 +226,8 @@ void ImguiRenderer::drawSelectedLinePopup(int16_t selectedIndex, gameloop::Level
 
   ImGui::NewLine();
 
-  createSelect("Front Sidedef: ", level.sidedefs, ld.frontSidedef);
-  createSelect("Back Sidedef: ", level.sidedefs, ld.backSidedef);
+  createSelect("Front Sidedef: ", m_level.sidedefs, ld.frontSidedef);
+  createSelect("Back Sidedef: ", m_level.sidedefs, ld.backSidedef);
 
   ImGui::End();
 }

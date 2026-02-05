@@ -8,6 +8,7 @@
 namespace editor {
 struct AABB
 {
+  AABB() = default;
   AABB(gameloop::Vertex start, gameloop::Vertex end);
   int16_t maxX, maxY;
   int16_t minX, minY;

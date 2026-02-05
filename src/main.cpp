@@ -2,6 +2,7 @@
 #include "framebuffer.h"
 #include "gameloop.h"
 #include "imgui_renderer.h"
+#include "math_utils.h"
 #include "renderer.h"
 #include "simulation.h"
 
@@ -132,7 +133,7 @@ int main()
     gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT);
 
   // setup Dear ImGui
-  imguirenderer::ImguiRenderer *imguiRenderer = new imguirenderer::ImguiRenderer(*sdlWindow);
+  imguirenderer::ImguiRenderer *imguiRenderer = new imguirenderer::ImguiRenderer(*sdlWindow, level);
 
   // setup the game renderer
   framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer(*sdlWindow);
@@ -158,18 +159,15 @@ int main()
     poll_sdl_events(gameState, input, *sdlWindow);
 
     if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
-      std::vector<ImVec4> scaledLinedefs;
+      std::vector<ImVec2> scaledVertices;
+      scaledVertices.reserve(level.vertices.size());
 
-      for (uint16_t i = 0; i < linedefs.size(); i++) {
-        auto &ld = linedefs[i];
-
-        ImVec2 start = toCenterCoordinates(convertVertexIntoImVec2(level.vertices[ld.start]), *sdlWindow);
-        ImVec2 end = toCenterCoordinates(convertVertexIntoImVec2(level.vertices[ld.end]), *sdlWindow);
-
-        scaledLinedefs.push_back(ImVec4(start.x, start.y, end.x, end.y));
+      for (uint16_t i = 0; i < level.vertices.size(); i++) {
+        scaledVertices.emplace_back(math_utils::fromCenterCoordinates(
+          math_utils::convertVertexIntoImVec2(level.vertices[i]), sdlWindow->width, sdlWindow->height));
       }
 
-      imguiRenderer->render(level, scaledLinedefs);
+      imguiRenderer->render(scaledVertices);
 
       continue;
     }
@@ -204,14 +202,6 @@ int main()
 
   return 0;
 }
-
-constexpr ImVec2 toCenterCoordinates(ImVec2 vec, sdl_window::SdlWindow &sdlWindow)
-{
-  return ImVec2(std::max(0.0f, std::min(static_cast<float>(sdlWindow.width), sdlWindow.width / 2 + vec.x)),
-    std::max(0.0f, std::min(static_cast<float>(sdlWindow.height), sdlWindow.height / 2 - vec.y)));
-}
-
-constexpr ImVec2 convertVertexIntoImVec2(gameloop::Vertex vertex) { return ImVec2(vertex.y, vertex.x); }
 
 void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window)
 {
