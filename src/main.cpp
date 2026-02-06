@@ -1,4 +1,5 @@
 #include "config.h"
+#include "editor.h"
 #include "framebuffer.h"
 #include "gameloop.h"
 #include "imgui_renderer.h"
@@ -128,16 +129,17 @@ int main()
   gameloop::Level level{ vertices, linedefs, sidedefs, sectors };
 
   // setup sdl window
-  sdl_window::SdlWindow *sdlWindow = new sdl_window::SdlWindow(
+  sdl_window::SdlWindow sdlWindow(
     gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
     gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT);
 
   // setup Dear ImGui
-  imguirenderer::ImguiRenderer *imguiRenderer = new imguirenderer::ImguiRenderer(*sdlWindow, level);
+  imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, level);
 
   // setup the game renderer
-  framebuffer::FrameBuffer *fb = new framebuffer::FrameBuffer(*sdlWindow);
-  renderer::Renderer *renderer = new renderer::Renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
+  framebuffer::FrameBuffer fb(sdlWindow);
+  renderer::Renderer renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
+  editor::Editor editor(level, sdlWindow.width, sdlWindow.height);
 
   running = true;
   // game loop
@@ -151,24 +153,15 @@ int main()
 
   while (running) {
     // reseting the states to defaults
-    renderer->resetClippingArrays();
-    fb->reset();
+    renderer.resetClippingArrays();
+    fb.reset();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
-    poll_sdl_events(gameState, input, *sdlWindow);
+    poll_sdl_events(gameState, input, sdlWindow);
 
     if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
-      std::vector<ImVec2> scaledVertices;
-      scaledVertices.reserve(level.vertices.size());
-
-      for (uint16_t i = 0; i < level.vertices.size(); i++) {
-        scaledVertices.emplace_back(math_utils::fromCenterCoordinates(
-          math_utils::convertVertexIntoImVec2(level.vertices[i]), sdlWindow->width, sdlWindow->height));
-      }
-
-      imguiRenderer->render(scaledVertices);
-
+      imguiRenderer.render();
       continue;
     }
 
@@ -183,7 +176,7 @@ int main()
       acc -= dt;
     }
 
-    renderer->render(gameState, level);
+    renderer.render(gameState, level);
 
     // FPS tracking
     frameCount++;
@@ -195,10 +188,6 @@ int main()
     }
   }
 
-  if (fb) { delete fb; }
-  if (renderer) { delete renderer; }
-  if (sdlWindow) { delete sdlWindow; }
-  if (imguiRenderer) { delete imguiRenderer; }
 
   return 0;
 }

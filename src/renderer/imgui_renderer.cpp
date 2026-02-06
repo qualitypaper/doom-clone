@@ -1,19 +1,17 @@
 #include "imgui_renderer.h"
+#include "editor.h"
 #include "math_utils.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 
-#include <queue>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace imguirenderer {
 
-ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &level)
-  : m_sdlWindow(sdlWindow), m_level(level)
+ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &level) : m_sdlWindow(sdlWindow)
 {
   float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
@@ -37,7 +35,7 @@ ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &
   ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
 
-  this->m_editor = std::make_unique<editor::Editor>(level);
+  this->m_editor = std::make_unique<editor::Editor>(level, sdlWindow.width, sdlWindow.height);
 }
 
 ImguiRenderer::~ImguiRenderer()
@@ -66,9 +64,8 @@ void ImguiRenderer::endFrame()
   SDL_RenderPresent(m_sdlWindow.getRenderer());
 }
 
-void ImguiRenderer::render(const std::vector<ImVec2> &scaledVertices)
+void ImguiRenderer::render()
 {
-  static float_t s_lineHoveringThreshold = 25.0f;
 
   // Start the Dear ImGui frame
   startFrame();
@@ -90,8 +87,6 @@ void ImguiRenderer::render(const std::vector<ImVec2> &scaledVertices)
   // so (x, y) will be now (y, x)
   ImVec2 mousePos = ImGui::GetMousePos();
 
-  int16_t hoverIndex = -1;
-  static int16_t s_selectedIndex = -1;
   static bool s_rmbClicked = false;
   static ImVec2 s_rmbClickedMousePos;
 
@@ -100,111 +95,100 @@ void ImguiRenderer::render(const std::vector<ImVec2> &scaledVertices)
     s_rmbClickedMousePos = mousePos;
   }
 
-  static std::unordered_map<float_t, int> s_distanceMap;
-  static std::unordered_map<uint16_t, uint16_t> s_sectorCount;
+  // suggest creating a new line/vertex
+  if (s_rmbClicked) { showVertexRLineCreation(s_rmbClickedMousePos, s_rmbClicked); }
 
-  s_sectorCount.clear();
-  s_distanceMap.clear();
-
-  std::priority_queue<float_t, std::vector<float_t>, std::greater<float_t>> minHeap;
-
-  for (uint16_t i = 0; i < m_level.linedefs.size(); i++) {
-    ImVec2 start = scaledVertices[m_level.linedefs[i].start];
-    ImVec2 end = scaledVertices[m_level.linedefs[i].end];
-
-    if (mousePos.x < 0 || mousePos.y < 0 || mousePos.x > m_sdlWindow.width || mousePos.y > m_sdlWindow.height) {
-      continue;
-    }
-
-    float_t distance = getDistanceToSegmentSq(start, end, mousePos);
-    minHeap.emplace(distance);
-    s_distanceMap.emplace(distance, i);
-  }
-
-  if (minHeap.size() > 0 && minHeap.top() < s_lineHoveringThreshold) { hoverIndex = s_distanceMap.at(minHeap.top()); }
-
-  if (s_rmbClicked) {
-    // suggest creating a new line/vertex
-    showVertexRLineCreation(s_rmbClickedMousePos);
-  }
-  drawMapOutlines(scaledVertices, s_selectedIndex, hoverIndex);
-  drawSelectedLinePopup(s_selectedIndex);
+  drawMapOutlines();
 
   ImGui::End();
 
   endFrame();
 }
 
-void ImguiRenderer::drawMapOutlines(const std::vector<ImVec2> &scaledVertices,
-  int16_t &selectedIndex,
-  int16_t hoverIndex)
+void ImguiRenderer::drawMapOutlines()
 {
   static ImU32 s_defaultColor = IM_COL32(255, 255, 255, 255);
   static ImU32 s_selectedColor = IM_COL32(0, 0, 255, 255);
   static ImU32 s_hoverColor = IM_COL32(255, 200, 0, 255);
   static float_t s_thickness = 2.0f;
+  static float_t s_vertexRadius = 4.0f;
 
-  ImGuiIO &io = ImGui::GetIO();
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
-  // draw vertices
-  for (uint16_t i = 0; i < scaledVertices.size(); i++) {
-    drawList->AddCircleFilled(scaledVertices[i], 5.0f, s_defaultColor);
-  }
+  static auto toImVec2 = [&](const editor::EditorVertex *v) -> ImVec2 {
+    if (!v) return ImVec2(0.0f, 0.0f);
+    return ImVec2(v->x, v->y);
+  };
 
   // draw outlines
-  for (uint16_t i = 0; i < m_level.linedefs.size(); i++) {
-    auto start = scaledVertices[m_level.linedefs[i].start];
-    auto end = scaledVertices[m_level.linedefs[i].end];
+  for (auto &ld : m_editor->state->level->linedefs) {
+    ImVec2 start = toImVec2(m_editor->state->findVertex(ld.start));
+    ImVec2 end = toImVec2(m_editor->state->findVertex(ld.end));
+    ImU32 color = s_defaultColor;
 
-    ImU32 color;
-    bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
-    if (selectedIndex == i && lmbClicked) {
-      // resetting the selection
-      selectedIndex = -1;
-      color = s_defaultColor;
-    } else if (selectedIndex == i || (i == hoverIndex && lmbClicked)) {
-      selectedIndex = i;
-      // draw active line (blue)
+    if (ld.selected) {
       color = s_selectedColor;
-    } else if (i == hoverIndex) {
+    } else if (ld.hovered) {
       color = s_hoverColor;
     } else {
-      // draw default line (white)
       color = s_defaultColor;
-
-      if (m_level.linedefs[i].backSidedef != -1) {
-        // tint a bit the color of the portal linedef
-        color -= 0x32323200;
-      }
     }
+
+    // tint a bit the color of the portal linedef
+    if (ld.backSidedef != 0) { color -= 0x32323200; }
+
     drawList->AddLine(start, end, color, s_thickness);
+  }
+
+  // draw vertices
+  for (auto &v : m_editor->state->level->vertices) {
+    ImVec2 pos = toImVec2(&v);
+    ImU32 color;
+
+    if (v.selected) {
+      color = s_selectedColor;
+    } else if (v.hovered) {
+      color = s_hoverColor;
+    } else {
+      color = s_defaultColor;
+    }
+
+    drawList->AddCircleFilled(pos, s_vertexRadius, color);
   }
 }
 
-void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos)
+void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen)
 {
+  ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
   bool vertexCreation = ImGui::Button("Create Vertex");
-  bool lineCreation = ImGui::Button("Create line");
+  bool connectedVertexCreation = ImGui::Button("Create Connected Vertex");
+  bool lineCreation = ImGui::Button("Create Line");
 
   if (vertexCreation) {
     gameloop::Vertex v = math_utils::toCenterCoordinates(
       math_utils::convertImVec2IntoVertex(mousePos), m_sdlWindow.width, m_sdlWindow.height);
 
-    m_editor.get()->addVertex(-1, {v.y, v.x});
+    m_editor.get()->addVertex(-1, v);
+    isOpen = false;
+  } else if (connectedVertexCreation) {
+    // TODO:
+  } else if (lineCreation) {
+    // TODO:
   }
 
   ImGui::End();
 }
 
-void ImguiRenderer::drawSelectedLinePopup(int16_t selectedIndex)
+void ImguiRenderer::drawSelectedLinePopup(uint32_t selectedIndex)
 {
-  if (selectedIndex == -1) return;
+  if (selectedIndex == 0) return;
 
-  auto &ld = m_level.linedefs[selectedIndex];
-  gameloop::Vertex *start = &m_level.vertices[ld.start];
-  gameloop::Vertex *end = &m_level.vertices[ld.end];
+  auto ld = m_editor->state->findLinedef(selectedIndex);
+  if (!ld) return;
+
+  auto start = m_editor->state->findVertex(ld->start);
+  auto end = m_editor->state->findVertex(ld->end);
 
   // render popup of linedef parameters
   std::string windowTitle = "Linedef params " + std::to_string(selectedIndex) + "###LinedefParams";
@@ -226,17 +210,65 @@ void ImguiRenderer::drawSelectedLinePopup(int16_t selectedIndex)
 
   ImGui::NewLine();
 
-  createSelect("Front Sidedef: ", m_level.sidedefs, ld.frontSidedef);
-  createSelect("Back Sidedef: ", m_level.sidedefs, ld.backSidedef);
+  createSelect("Front Sidedef: ", m_editor->state->level->sidedefs, ld->frontSidedef);
+  createSelect("Back Sidedef: ", m_editor->state->level->sidedefs, ld->backSidedef, true);
+
+  ImGui::End();
+}
+
+void ImguiRenderer::drawSelectedVertexPopup(uint32_t selectedIndex)
+{
+  if (selectedIndex == 0) return;
+  auto vertex = m_editor->state->findVertex(selectedIndex);
+  if (!vertex) return;
+
+  std::string windowTitle = "Vertex params: " + std::to_string(selectedIndex) + "###VertexParams";
+  ImGui::Begin(windowTitle.c_str());
+
+  bool isDeleted = ImGui::Button("Delete");
+
+  if (isDeleted) {
+    // Remove all linedefs that reference this vertex (iterate backwards to avoid index issues)
+    for (int32_t i = static_cast<int32_t>(m_editor->state->level->linedefs.size()) - 1; i >= 0; i--) {
+      if (m_editor->state->level->linedefs[i].start == selectedIndex
+          || m_editor->state->level->linedefs[i].end == selectedIndex) {
+        m_editor->state->level->linedefs[i] = m_editor->state->level->linedefs.back();
+        m_editor->state->level->linedefs.pop_back();
+      }
+    }
+
+    // Get the index of the vertex that will be moved (the last one)
+    // uint32_t lastVertexId = m_editor->state->level->vertices.back().id;
+
+    // Update all linedef references from lastVertexIndex to selectedIndex (if different)
+    // if (selectedIndex != lastVertexId) {
+    //   for (auto &linedef : m_editor->state->level->linedefs) {
+    //     if (linedef.start == lastVertexId) { linedef.start = selectedIndex; }
+    //     if (linedef.end == lastVertexId) { linedef.end = selectedIndex; }
+    //   }
+    // }
+
+    // Remove the vertex using swap-and-pop
+    *vertex = m_editor->state->level->vertices.back();
+    m_editor->state->level->vertices.pop_back();
+  }
 
   ImGui::End();
 }
 
 void ImguiRenderer::createSelect(const char *label,
   const std::vector<gameloop::SideDef> &sidedefs,
-  int16_t &currentItem)
+  uint32_t &currentItem,
+  bool hasReset)
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
+    if (hasReset) {
+      bool isReset = currentItem == 0;
+
+      const char *resetLabel = "-1";
+      if (ImGui::Selectable(resetLabel, isReset)) { currentItem = 0; }
+    }
+
     for (uint16_t i = 0; i < sidedefs.size(); i++) {
       bool is_selected = (currentItem == i);
       std::string optionLabel = std::to_string(i);
@@ -253,31 +285,6 @@ void ImguiRenderer::createSelect(const char *label,
 constexpr ImVec2 ImguiRenderer::scale(ImVec2 vec, float_t scaleFactor)
 {
   return { scaleFactor * vec.x, scaleFactor * vec.y };
-}
-
-// @param origin is the base point from which the distance will be calculated
-float_t ImguiRenderer::getDistanceToSegmentSq(ImVec2 start, ImVec2 end, ImVec2 origin)
-{
-  ImVec2 startToOrigin(origin.x - start.x, origin.y - start.y);
-  ImVec2 startToEnd(end.x - start.x, end.y - start.y);
-
-  float_t startToEndLength = math_utils::getDistanceSq(start, end);
-
-  // Via simple dot product rule: originToStart * cos(alpha) = <originToStart, startToEnd>/startToEndLength
-  // which will be exactly the projection
-  float_t projectedOriginToStartDistance = math_utils::dotProduct(startToOrigin, startToEnd) / startToEndLength;
-
-  float_t clampedProjectionDistance = std::fmax(0, std::fmin(1, projectedOriginToStartDistance));
-
-  // point which is orthogonal to the origin
-  ImVec2 orthogonalPoint(
-    start.x + startToEnd.x * clampedProjectionDistance, start.y + startToEnd.y * clampedProjectionDistance);
-
-  // calculing distance from origin to the orthogonal point
-  float_t dx = orthogonalPoint.x - origin.x;
-  float_t dy = orthogonalPoint.y - origin.y;
-
-  return dx * dx + dy * dy;
 }
 
 

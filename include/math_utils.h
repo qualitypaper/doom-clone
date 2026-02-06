@@ -1,5 +1,6 @@
 #pragma once
 
+#include "editor.h"
 #include "gameloop.h"
 #include "imgui.h"
 
@@ -31,7 +32,6 @@ constexpr float getDistanceSq(float x1, float y1, float x2, float y2)
   return x * x + y * y;
 }
 constexpr float getDistanceSq(ImVec2 a, ImVec2 b) { return getDistanceSq(a.x, a.y, b.x, b.y); }
-
 constexpr float getDistanceSq(gameloop::Vertex v1, gameloop::Vertex v2)
 {
   return getDistanceSq(v1.x, v1.y, v2.x, v2.y);

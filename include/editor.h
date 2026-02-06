@@ -1,11 +1,14 @@
 #pragma once
 
+#include "gameloop.h"
+#include "imgui.h"
+
 #include <cstdint>
+#include <memory>
 #include <vector>
 
-#include "gameloop.h"
-
 namespace editor {
+
 struct AABB
 {
   AABB() = default;
@@ -16,26 +19,133 @@ struct AABB
   bool contains(int16_t x, int16_t y) { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
+struct EditorLineDef
+{
+  EditorLineDef(uint32_t _id,
+    uint32_t _start,
+    uint32_t _end,
+    gameloop::LineDefType _type,
+    uint32_t _frontSidedef,
+    uint32_t _backSidedef)
+    : id(_id), start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
+  {}
+  uint32_t id;
+  uint32_t start;
+  uint32_t end;
+  gameloop::LineDefType type;
+  uint32_t frontSidedef;
+  uint32_t backSidedef;
+  bool selected = false;
+  bool hovered = false;
+};
+
+struct EditorVertex
+{
+  EditorVertex(uint32_t _id, int32_t _x, int32_t _y) : id(_id), x(_x), y(_y) {}
+
+  uint32_t id;
+  int32_t x, y;
+  bool selected = false;
+  bool hovered = false;
+
+  constexpr ImVec2 toImVec2() const { return ImVec2(x, y); }
+};
+
 struct EditorSector
 {
-  AABB boundingBox;
-  std::vector<int16_t> linedefsIndices;
+  uint32_t id;
+  int16_t floorHeight;
+  int16_t ceilingHeight;
+  int16_t specialType;
+  int16_t lightLevel;
+  int16_t tag;
+  AABB bounding_box;
+  std::vector<uint32_t> linedefIds;
+  bool selected = false;
+  bool hovered = false;
 };
+
+struct EditorLevel
+{
+  EditorLevel(std::vector<EditorVertex> _vertices,
+    std::vector<EditorLineDef> _lines,
+    std::vector<EditorSector> _sectors,
+    std::vector<gameloop::SideDef> &_sidedefs)
+    : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)), sidedefs(_sidedefs)
+  {}
+
+  std::vector<EditorVertex> vertices;
+  std::vector<EditorLineDef> linedefs;
+  std::vector<EditorSector> sectors;
+  std::vector<gameloop::SideDef> &sidedefs;
+};
+
+struct EditorState
+{
+  EditorState(std::unique_ptr<EditorLevel> _level) : level(std::move(_level)) {}
+  EditorState(gameloop::Level &_level, uint16_t width, uint16_t height);
+
+  // information about the linedefs/sidedefs/vertices
+  std::unique_ptr<EditorLevel> level;
+  uint32_t nextId = 1;
+
+  // dragging logic
+  bool isDragging = false;
+  ImVec2 draggingOffset = { 0, 0 };
+
+  bool isCreatingLine = false;
+  uint32_t lineStartVertexId = 0;
+
+  std::vector<uint32_t> selection;
+
+  ImVec2 canvasOrigin = { 0.0, 0.0 };
+  ImVec2 canvasScroll = { 0.0, 0.0 };
+  float canvasZoom = 1.0f;
+
+  uint32_t getNextId() { return nextId++; }
+
+  EditorVertex *findVertex(uint32_t id)
+  {
+    for (auto &v : level.get()->vertices) {
+      if (v.id == id) return &v;
+    }
+
+    return nullptr;
+  }
+
+  EditorSector *findSector(uint32_t id)
+  {
+    for (auto &s : level.get()->sectors) {
+      if (s.id == id) return &s;
+    }
+
+    return nullptr;
+  }
+
+  EditorLineDef *findLinedef(uint32_t id)
+  {
+    for (auto &ld : level.get()->linedefs) {
+      if (ld.id == id) return &ld;
+    }
+
+    return nullptr;
+  }
+};
+
 
 class Editor
 {
 private:
-  std::vector<EditorSector> editorSectors;
-  gameloop::Level &level;
-
-  void addToSector(gameloop::Level &level, uint16_t i, gameloop::LineDef &linedef, gameloop::SideDef &sidedef);
-  void updateAABB(int16_t sectorIndex);
+  void addToSector(uint16_t i, gameloop::LineDef &linedef, gameloop::SideDef &sidedef);
+  void updateAABB(uint32_t sectorID);
 
 public:
-  Editor(gameloop::Level &level);
-  void addSector(const AABB &bounds, const std::vector<int16_t> &linedefsIndices);
+  std::unique_ptr<editor::EditorState> state;
+  Editor(gameloop::Level &level, uint16_t width, uint16_t height);
+
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
-  void addLineDef(int16_t sectorIndex, const gameloop::LineDef &lineDef);
-  void addVertex(int16_t sectorIndex, const gameloop::Vertex &vertex);
+  void addLineDef(uint32_t sectorId, gameloop::LineDef &lineDef);
+  void addVertex(uint32_t sectorId, gameloop::Vertex &vertex);
 };
+
 }// namespace editor

@@ -11,7 +11,7 @@ static constexpr uint32_t mapColor(uint8_t r, uint8_t g, uint8_t b, uint8_t alph
   return (r << 24) | (g << 16) | (b << 8) | alpha;
 }
 
-Renderer::Renderer(framebuffer::FrameBuffer *fb, uint16_t canvasWidth, uint16_t canvasHeight)
+Renderer::Renderer(framebuffer::FrameBuffer &fb, uint16_t canvasWidth, uint16_t canvasHeight)
   : fb(fb), canvasWidth(canvasWidth), canvasHeight(canvasHeight)
 {
   ceilingClipping.resize(canvasWidth);
@@ -55,13 +55,13 @@ void Renderer::drawColumn(int16_t x, int16_t y0, int16_t y1, uint32_t color)
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
-  uint32_t pitch = this->fb->width;
+  uint32_t pitch = this->fb.width;
 
   transformedY0 = std::max(0, transformedY0);
-  transformedY1 = std::min(this->fb->height - 1, transformedY1);
+  transformedY1 = std::min(this->fb.height - 1, transformedY1);
 
   for (uint32_t i = 0; i < config::SCALE_X + 1; i++) {
-    uint32_t *ptr = this->fb->pixels + (transformedY0)*pitch + (scaledX + i);
+    uint32_t *ptr = this->fb.pixels + (transformedY0)*pitch + (scaledX + i);
 
     for (int32_t y = transformedY0; y <= transformedY1; y++) {
       *(uint32_t *)ptr = color;
@@ -195,7 +195,7 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
     }
   }
 
-  fb->update();
+  fb.update();
 }
 
 int32_t Renderer::projectZ(int32_t z, double_t inv_y) { return canvasHeight / 2 - z * FOCAL_LENGTH * inv_y; }

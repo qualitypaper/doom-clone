@@ -14,7 +14,7 @@ namespace renderer {
 class Renderer
 {
 public:
-  Renderer(framebuffer::FrameBuffer *fb, uint16_t canvasWidth, uint16_t canvasHeight);
+  Renderer(framebuffer::FrameBuffer &fb, uint16_t canvasWidth, uint16_t canvasHeight);
   void render(const gameloop::GameState &gameState, const gameloop::Level &level);
   void resetClippingArrays();
 
@@ -35,8 +35,8 @@ private:
   std::vector<int32_t> floorClipping;
   std::vector<int32_t> ceilingClipping;
 
-  framebuffer::FrameBuffer *fb;
-  
+  framebuffer::FrameBuffer &fb;
+
   uint16_t canvasWidth;
   uint16_t canvasHeight;
 };
