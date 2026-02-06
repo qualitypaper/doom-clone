@@ -1,6 +1,7 @@
 #pragma once
 
 #include "editor.h"
+#include "editor_input_handler.h"
 #include "gameloop.h"
 #include "sdl_window.h"
 
@@ -22,12 +23,13 @@ public:
 private:
   sdl_window::SdlWindow &m_sdlWindow;
   std::unique_ptr<editor::Editor> m_editor;
-
+  std::unique_ptr<editor::EditorInputHandler> m_editorInputHandler;
+  
   void startFrame();
   void endFrame();
   void createSelect(const char *label,
     const std::vector<gameloop::SideDef> &sidedefs,
-    uint32_t &currentItem,
+    int16_t &currentItem,
     bool hasReset = false);
   void drawSelectedLinePopup(uint32_t selectedId);
   void drawSelectedVertexPopup(uint32_t selectedId);

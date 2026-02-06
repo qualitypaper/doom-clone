@@ -5,9 +5,18 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
+// forward declarations
+namespace commands {
+struct CommandHistory;
+}
+
 namespace editor {
+
+// forward declaractions
+struct EditorInputHandler;
 
 struct AABB
 {
@@ -19,7 +28,17 @@ struct AABB
   bool contains(int16_t x, int16_t y) { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
-struct EditorLineDef
+struct EditorObject
+{
+  EditorObject(uint32_t _id) : id(_id) {}
+  virtual ~EditorObject() = default;
+
+  uint32_t id;
+  bool selected = false;
+  bool hovered = false;
+};
+
+struct EditorLineDef : EditorObject
 {
   EditorLineDef(uint32_t _id,
     uint32_t _start,
@@ -27,33 +46,28 @@ struct EditorLineDef
     gameloop::LineDefType _type,
     uint32_t _frontSidedef,
     uint32_t _backSidedef)
-    : id(_id), start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
+    : EditorObject(_id), start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
   {}
-  uint32_t id;
   uint32_t start;
   uint32_t end;
   gameloop::LineDefType type;
-  uint32_t frontSidedef;
-  uint32_t backSidedef;
-  bool selected = false;
-  bool hovered = false;
+  int16_t frontSidedef;
+  int16_t backSidedef;
 };
 
-struct EditorVertex
+struct EditorVertex : EditorObject
 {
-  EditorVertex(uint32_t _id, int32_t _x, int32_t _y) : id(_id), x(_x), y(_y) {}
+  EditorVertex(uint32_t _id, int32_t _x, int32_t _y) : EditorObject(_id), x(_x), y(_y) {}
 
-  uint32_t id;
   int32_t x, y;
-  bool selected = false;
-  bool hovered = false;
 
   constexpr ImVec2 toImVec2() const { return ImVec2(x, y); }
 };
 
-struct EditorSector
+struct EditorSector : EditorObject
 {
-  uint32_t id;
+  EditorSector(uint32_t _id) : EditorObject(_id) {}
+
   int16_t floorHeight;
   int16_t ceilingHeight;
   int16_t specialType;
@@ -61,8 +75,6 @@ struct EditorSector
   int16_t tag;
   AABB bounding_box;
   std::vector<uint32_t> linedefIds;
-  bool selected = false;
-  bool hovered = false;
 };
 
 struct EditorLevel
@@ -87,6 +99,7 @@ struct EditorState
 
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
+  std::unordered_map<uint32_t, EditorObject&> objects;
   uint32_t nextId = 1;
 
   // dragging logic
@@ -95,6 +108,9 @@ struct EditorState
 
   bool isCreatingLine = false;
   uint32_t lineStartVertexId = 0;
+
+  bool renderOptionsWindow = false;
+  ImVec2 optionsWindowPos = { 0, 0 };
 
   std::vector<uint32_t> selection;
 
@@ -130,6 +146,14 @@ struct EditorState
 
     return nullptr;
   }
+
+  EditorObject* findObject(uint32_t id)
+  {
+    auto it = objects.find(id);
+    if (it != objects.end()) return &it->second;
+
+    return nullptr;
+  }
 };
 
 
@@ -138,11 +162,15 @@ class Editor
 private:
   void addToSector(uint16_t i, gameloop::LineDef &linedef, gameloop::SideDef &sidedef);
   void updateAABB(uint32_t sectorID);
+  std::unique_ptr<editor::EditorInputHandler> inputHandler;
+  std::unique_ptr<commands::CommandHistory> history;
 
 public:
   std::unique_ptr<editor::EditorState> state;
+
   Editor(gameloop::Level &level, uint16_t width, uint16_t height);
 
+  void processInput();
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
   void addLineDef(uint32_t sectorId, gameloop::LineDef &lineDef);
   void addVertex(uint32_t sectorId, gameloop::Vertex &vertex);

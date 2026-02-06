@@ -18,7 +18,7 @@ struct AddVertexCommand : Command
 
   AddVertexCommand(editor::EditorVertex _vertex) : vertex(_vertex) {}
 
-  void execute(editor::EditorState &state) { state.level->vertices.push_back(vertex); }
+  void execute(editor::EditorState &state) { state.level->vertices.emplace_back(vertex); }
 
   void undo(editor::EditorState &state) { state.level->vertices.pop_back(); }
 };

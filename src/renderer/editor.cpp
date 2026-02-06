@@ -1,4 +1,7 @@
 #include "editor.h"
+
+#include "commands.h"
+#include "editor_input_handler.h"
 #include "gameloop.h"
 #include "math_utils.h"
 
@@ -36,14 +39,19 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
     uint32_t id = getNextId();
 
     auto convertedImvec2 = math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
-    editorVertices.emplace_back(id, convertedImvec2.x, convertedImvec2.y);
+    auto &editorVertex = editorVertices.emplace_back(id, convertedImvec2.x, convertedImvec2.y);
     vertexIdMap[i] = id;
+
+    this->objects.emplace(id, editorVertex);
   }
 
   // process linedefs
   for (auto &ld : _level.linedefs) {
-    editorLinedefs.emplace_back(
-      getNextId(), vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
+    uint32_t id = getNextId();
+    auto &editorLinedef = editorLinedefs.emplace_back(
+      id, vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
+
+    this->objects.emplace(id, editorLinedef);
   }
 
   // TODO: process sectors
@@ -86,7 +94,14 @@ void Editor::updateAABB(uint32_t sectorID)
   }
 }
 
-Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height) { this->state = std::make_unique<EditorState>(_level, _width, _height); }
+Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
+{
+  this->state = std::make_unique<EditorState>(_level, _width, _height);
+  this->inputHandler = std::make_unique<EditorInputHandler>();
+  this->history = std::make_unique<commands::CommandHistory>();
+}
+
+void Editor::processInput() { this->inputHandler->processInput(*this->state, *this->history); }
 
 void Editor::addLineDef(uint32_t sectorId, gameloop::LineDef &linedef)
 {
@@ -117,7 +132,9 @@ void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
 
 void Editor::addVertex(uint32_t sectorId, gameloop::Vertex &vertex)
 {
-  state->level->vertices.emplace_back(state->getNextId(), vertex.x, vertex.y);
+  history->execute(std::unique_ptr<commands::AddVertexCommand>(
+                     new commands::AddVertexCommand({ state->getNextId(), vertex.x, vertex.y })),
+    *state);
 
   if (sectorId == 0) return;
 

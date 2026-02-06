@@ -1,11 +1,13 @@
 #include "imgui_renderer.h"
 #include "editor.h"
+#include "editor_input_handler.h"
 #include "math_utils.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -36,6 +38,7 @@ ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
 
   this->m_editor = std::make_unique<editor::Editor>(level, sdlWindow.width, sdlWindow.height);
+  this->m_editorInputHandler = std::make_unique<editor::EditorInputHandler>();
 }
 
 ImguiRenderer::~ImguiRenderer()
@@ -85,20 +88,22 @@ void ImguiRenderer::render()
 
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
-  ImVec2 mousePos = ImGui::GetMousePos();
-
-  static bool s_rmbClicked = false;
-  static ImVec2 s_rmbClickedMousePos;
-
-  if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-    s_rmbClicked = !s_rmbClicked;
-    s_rmbClickedMousePos = mousePos;
-  }
+  m_editor->processInput();
 
   // suggest creating a new line/vertex
-  if (s_rmbClicked) { showVertexRLineCreation(s_rmbClickedMousePos, s_rmbClicked); }
+  if (m_editor->state->renderOptionsWindow) {
+    showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
+  }
 
   drawMapOutlines();
+
+  for (auto &id : m_editor->state->selection) {
+    if (m_editor->state->findVertex(id)) {
+      drawSelectedVertexPopup(id);
+    } else if (m_editor->state->findLinedef(id)) {
+      drawSelectedLinePopup(id);
+    }
+  }
 
   ImGui::End();
 
@@ -135,7 +140,7 @@ void ImguiRenderer::drawMapOutlines()
     }
 
     // tint a bit the color of the portal linedef
-    if (ld.backSidedef != 0) { color -= 0x32323200; }
+    if (ld.backSidedef != -1) { color -= 0x32323200; }
 
     drawList->AddLine(start, end, color, s_thickness);
   }
@@ -258,15 +263,15 @@ void ImguiRenderer::drawSelectedVertexPopup(uint32_t selectedIndex)
 
 void ImguiRenderer::createSelect(const char *label,
   const std::vector<gameloop::SideDef> &sidedefs,
-  uint32_t &currentItem,
+  int16_t &currentItem,
   bool hasReset)
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
     if (hasReset) {
-      bool isReset = currentItem == 0;
+      bool isReset = currentItem == -1;
 
       const char *resetLabel = "-1";
-      if (ImGui::Selectable(resetLabel, isReset)) { currentItem = 0; }
+      if (ImGui::Selectable(resetLabel, isReset)) { currentItem = -1; }
     }
 
     for (uint16_t i = 0; i < sidedefs.size(); i++) {

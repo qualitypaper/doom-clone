@@ -3,7 +3,6 @@
 #include "framebuffer.h"
 #include "gameloop.h"
 #include "imgui_renderer.h"
-#include "math_utils.h"
 #include "renderer.h"
 #include "simulation.h"
 

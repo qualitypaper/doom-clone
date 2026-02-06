@@ -1,9 +1,12 @@
 #include "editor_input_handler.h"
 #include "commands.h"
+#include "imgui.h"
 #include "math_utils.h"
 
+#include <algorithm>
 #include <queue>
 #include <unordered_map>
+#include <iostream>
 
 namespace editor {
 
@@ -13,7 +16,8 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
 
   ImGuiIO &io = ImGui::GetIO();
 
-  ImVec2 mousePos = io.MousePos;
+  ImVec2 mousePos = ImGui::GetMousePos();
+  bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
 
   if (!io.WantCaptureKeyboard) {
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
@@ -23,6 +27,11 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
         history.undo(state);
       }
     }
+  }
+
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+    state.renderOptionsWindow = !state.renderOptionsWindow;
+    state.optionsWindowPos = mousePos;
   }
 
   static std::unordered_map<float_t, uint32_t> s_distanceMap;
@@ -36,6 +45,9 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
 
   // fill the array of distances with distances to the vertices
   for (auto &vertex : state.level->vertices) {
+    // reset to the initial state
+    vertex.hovered = false;
+
     float_t nodeDis = math_utils::getDistanceSq(ImVec2(vertex.x, vertex.y), mousePos);
 
     minHeap.emplace(nodeDis);
@@ -44,6 +56,9 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
 
   // finding the nearest nodes/lines which can be hovered/selected
   for (auto &ld : state.level->linedefs) {
+    // reset to the initial state
+    ld.hovered = false;
+
     auto start = state.findVertex(ld.start);
     auto end = state.findVertex(ld.end);
 
@@ -56,23 +71,49 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     s_distanceMap.emplace(distance, ld.id);
   }
 
-  if (minHeap.size() > 0 && minHeap.top() < s_lineHoveringThreshold) {
-      auto id = s_distanceMap.at(minHeap.top());
-      
-      auto vertex = state.findVertex(id);
-      if (vertex) {
-          vertex->hovered = true;
-          return;
+  static auto updateSelection = [&](uint32_t id, bool selected) {
+    if (io.KeyCtrl && !io.WantCaptureKeyboard) {
+      if (selected) {
+        state.selection.emplace_back(id);
+      } else {
+        state.selection.erase(
+          std::remove_if(
+            state.selection.begin(), state.selection.end(), [id](auto &selectedId) { return selectedId == id; }),
+          state.selection.end());
       }
+      return;
+    }
 
-      auto line = state.findLinedef(id);
-      if (line) {
-          line->hovered = true;
-          return;
+    for (uint32_t id : state.selection) {
+      auto object = state.findObject(id);
+
+      if (object) object->selected = false;
+    }
+    state.selection.clear();
+    std::cout << "Selection cleared: " << '\n';
+    if (selected) { state.selection.emplace_back(id); }
+  };
+
+  if (minHeap.size() > 0 && minHeap.top() < s_lineHoveringThreshold) {
+    auto id = s_distanceMap.at(minHeap.top());
+
+    if (auto vertex = state.findVertex(id)) {
+      vertex->hovered = true;
+
+      if (lmbClicked) {
+        vertex->selected = !vertex->selected;
+        updateSelection(id, vertex->selected);
       }
+    } else if (auto line = state.findLinedef(id)) {
+      line->hovered = true;
+
+      if (lmbClicked) {
+        line->selected = !line->selected;
+        updateSelection(id, line->selected);
+      }
+    }
   }
 }
-
 
 // @param origin is the base point from which the distance will be calculated
 float_t EditorInputHandler::getDistanceToSegmentSq(ImVec2 start, ImVec2 end, ImVec2 origin)
