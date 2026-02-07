@@ -20,7 +20,7 @@ AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
   this->minY = std::min(start.y, end.y);
 }
 
-EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height)
+EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -97,17 +97,17 @@ void Editor::updateAABB(uint32_t sectorID)
 Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
 {
   this->state = std::make_unique<EditorState>(_level, _width, _height);
-  this->inputHandler = std::make_unique<EditorInputHandler>();
-  this->history = std::make_unique<commands::CommandHistory>();
+  this->m_inputHandler = std::make_unique<EditorInputHandler>();
+  this->m_history = std::make_unique<commands::CommandHistory>();
 }
 
-void Editor::processInput() { this->inputHandler->processInput(*this->state, *this->history); }
+void Editor::processInput() { this->m_inputHandler->processInput(*this->state, *this->m_history); }
 
-void Editor::addLineDef(uint32_t sectorId, gameloop::LineDef &linedef)
+void Editor::addLineDef(int32_t sectorId, gameloop::LineDef &linedef)
 {
   // state.get()->level.get()->linedefs.emplace_back(state->getNextId(), linedef);
 
-  if (sectorId == 0) return;
+  if (sectorId == -1) return;
 
   auto sector = state.get()->findSector(sectorId);
   if (!sector) return;
@@ -130,13 +130,16 @@ void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
   // level.linedefs.emplace_back(ld);
 }
 
-void Editor::addVertex(uint32_t sectorId, gameloop::Vertex &vertex)
+void Editor::addVertex(int32_t sectorId, gameloop::Vertex &vertex)
 {
-  history->execute(std::unique_ptr<commands::AddVertexCommand>(
-                     new commands::AddVertexCommand({ state->getNextId(), vertex.x, vertex.y })),
+  ImVec2 converted =
+    math_utils::fromCenterCoordinates({(float) vertex.x, (float) vertex.y}, state->width, state->height);
+
+  m_history->execute(std::unique_ptr<commands::AddVertexCommand>(new commands::AddVertexCommand(
+                       { state->getNextId(), static_cast<int16_t>(converted.x), static_cast<int16_t>(converted.y) })),
     *state);
 
-  if (sectorId == 0) return;
+  if (sectorId == -1) return;
 
   float_t dMin1 = std::numeric_limits<float_t>::max(), dMin2 = std::numeric_limits<float_t>::max();
   int16_t firstVertexIdx, secondVertexIdx;

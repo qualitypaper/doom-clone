@@ -97,9 +97,11 @@ struct EditorState
   EditorState(std::unique_ptr<EditorLevel> _level) : level(std::move(_level)) {}
   EditorState(gameloop::Level &_level, uint16_t width, uint16_t height);
 
+  uint16_t width, height;
+
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
-  std::unordered_map<uint32_t, EditorObject&> objects;
+  std::unordered_map<uint32_t, EditorObject &> objects;
   uint32_t nextId = 1;
 
   // dragging logic
@@ -147,7 +149,7 @@ struct EditorState
     return nullptr;
   }
 
-  EditorObject* findObject(uint32_t id)
+  EditorObject *findObject(uint32_t id)
   {
     auto it = objects.find(id);
     if (it != objects.end()) return &it->second;
@@ -160,20 +162,23 @@ struct EditorState
 class Editor
 {
 private:
+  std::unique_ptr<editor::EditorInputHandler> m_inputHandler;
+  std::unique_ptr<commands::CommandHistory> m_history;
+
+private:
   void addToSector(uint16_t i, gameloop::LineDef &linedef, gameloop::SideDef &sidedef);
   void updateAABB(uint32_t sectorID);
-  std::unique_ptr<editor::EditorInputHandler> inputHandler;
-  std::unique_ptr<commands::CommandHistory> history;
 
 public:
   std::unique_ptr<editor::EditorState> state;
 
-  Editor(gameloop::Level &level, uint16_t width, uint16_t height);
+public:
+  Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height);
 
   void processInput();
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
-  void addLineDef(uint32_t sectorId, gameloop::LineDef &lineDef);
-  void addVertex(uint32_t sectorId, gameloop::Vertex &vertex);
+  void addLineDef(int32_t sectorId, gameloop::LineDef &lineDef);
+  void addVertex(int32_t sectorId, gameloop::Vertex &vertex);
 };
 
 }// namespace editor

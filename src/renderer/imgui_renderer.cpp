@@ -242,17 +242,6 @@ void ImguiRenderer::drawSelectedVertexPopup(uint32_t selectedIndex)
       }
     }
 
-    // Get the index of the vertex that will be moved (the last one)
-    // uint32_t lastVertexId = m_editor->state->level->vertices.back().id;
-
-    // Update all linedef references from lastVertexIndex to selectedIndex (if different)
-    // if (selectedIndex != lastVertexId) {
-    //   for (auto &linedef : m_editor->state->level->linedefs) {
-    //     if (linedef.start == lastVertexId) { linedef.start = selectedIndex; }
-    //     if (linedef.end == lastVertexId) { linedef.end = selectedIndex; }
-    //   }
-    // }
-
     // Remove the vertex using swap-and-pop
     *vertex = m_editor->state->level->vertices.back();
     m_editor->state->level->vertices.pop_back();
