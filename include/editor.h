@@ -5,7 +5,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <unordered_map>
 #include <vector>
 
 // forward declarations
@@ -28,25 +27,47 @@ struct AABB
   bool contains(int16_t x, int16_t y) { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
+enum class EditorObjectType { LINEDEF, VERTEX, SECTOR };
+
+// Encoded object id: top 2 bits store type, remaining bits store index
+constexpr uint32_t kObjectTypeShift = 30;
+constexpr uint32_t kObjectIndexMask = (1u << kObjectTypeShift) - 1u;
+
+constexpr uint32_t makeObjectId(EditorObjectType type, uint32_t index)
+{
+  return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask);
+}
+
+constexpr EditorObjectType getObjectType(uint32_t objectId)
+{
+  return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u);
+}
+
+constexpr uint32_t getObjectIndex(uint32_t objectId) { return objectId & kObjectIndexMask; }
+
 struct EditorObject
 {
-  EditorObject(uint32_t _id) : id(_id) {}
+  EditorObject(EditorObjectType _type) : type(_type) {}
   virtual ~EditorObject() = default;
 
-  uint32_t id;
+  EditorObjectType type;
   bool selected = false;
   bool hovered = false;
 };
 
 struct EditorLineDef : EditorObject
 {
-  EditorLineDef(uint32_t _id,
-    uint32_t _start,
+  EditorLineDef(const gameloop::LineDef &_linedef)
+    : EditorObject(EditorObjectType::LINEDEF), start(_linedef.start), end(_linedef.end), type(_linedef.type),
+      frontSidedef(_linedef.frontSidedef), backSidedef(_linedef.backSidedef)
+  {}
+  EditorLineDef(uint32_t _start,
     uint32_t _end,
     gameloop::LineDefType _type,
     uint32_t _frontSidedef,
     uint32_t _backSidedef)
-    : EditorObject(_id), start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
+    : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSidedef(_frontSidedef),
+      backSidedef(_backSidedef)
   {}
   uint32_t start;
   uint32_t end;
@@ -57,16 +78,40 @@ struct EditorLineDef : EditorObject
 
 struct EditorVertex : EditorObject
 {
-  EditorVertex(uint32_t _id, int32_t _x, int32_t _y) : EditorObject(_id), x(_x), y(_y) {}
+  EditorVertex(int32_t _x, int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
 
   int32_t x, y;
 
+  constexpr EditorVertex &operator+=(const EditorVertex &other)
+  {
+    x += other.x;
+    y += other.y;
+    return *this;
+  }
+
+  constexpr EditorVertex &operator+=(const ImVec2 &offset)
+  {
+    x += static_cast<int32_t>(offset.x);
+    y += static_cast<int32_t>(offset.y);
+
+    return *this;
+  }
   constexpr ImVec2 toImVec2() const { return ImVec2(x, y); }
 };
+constexpr EditorVertex &operator+(EditorVertex &lhs, const EditorVertex &rhs) noexcept
+{
+  lhs += rhs;
+  return lhs;
+}
+constexpr EditorVertex &operator+(EditorVertex &lhs, const ImVec2 &rhs) noexcept
+{
+  lhs += rhs;
+  return lhs;
+}
 
 struct EditorSector : EditorObject
 {
-  EditorSector(uint32_t _id) : EditorObject(_id) {}
+  EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
 
   int16_t floorHeight;
   int16_t ceilingHeight;
@@ -101,12 +146,11 @@ struct EditorState
 
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
-  std::unordered_map<uint32_t, EditorObject &> objects;
-  uint32_t nextId = 1;
 
   // dragging logic
   bool isDragging = false;
   ImVec2 draggingOffset = { 0, 0 };
+  ImVec2 draggingStart = { 0, 0 };
 
   bool isCreatingLine = false;
   uint32_t lineStartVertexId = 0;
@@ -120,39 +164,45 @@ struct EditorState
   ImVec2 canvasScroll = { 0.0, 0.0 };
   float canvasZoom = 1.0f;
 
-  uint32_t getNextId() { return nextId++; }
-
-  EditorVertex *findVertex(uint32_t id)
+  EditorVertex &findVertex(uint32_t id)
   {
-    for (auto &v : level.get()->vertices) {
-      if (v.id == id) return &v;
-    }
+    if (id >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the vertices array."); }
 
-    return nullptr;
+    return level->vertices[id];
   }
 
-  EditorSector *findSector(uint32_t id)
+  EditorSector &findSector(uint32_t id)
   {
-    for (auto &s : level.get()->sectors) {
-      if (s.id == id) return &s;
-    }
+    if (id >= level->sectors.size()) { throw std::runtime_error("Index is bigger than the sectors array."); }
 
-    return nullptr;
+    return level->sectors[id];
   }
 
-  EditorLineDef *findLinedef(uint32_t id)
+  EditorLineDef &findLinedef(uint32_t id)
   {
-    for (auto &ld : level.get()->linedefs) {
-      if (ld.id == id) return &ld;
-    }
+    if (id >= level->linedefs.size()) { throw std::runtime_error("Index is bigger than the linedefs array."); }
 
-    return nullptr;
+    return level->linedefs[id];
   }
 
-  EditorObject *findObject(uint32_t id)
+  EditorObject *findObject(uint32_t objectId)
   {
-    auto it = objects.find(id);
-    if (it != objects.end()) return &it->second;
+    auto type = getObjectType(objectId);
+    auto index = getObjectIndex(objectId);
+
+    switch (type) {
+    case EditorObjectType::VERTEX:
+      if (index < level->vertices.size()) return &level->vertices[index];
+      break;
+    case EditorObjectType::LINEDEF:
+      if (index < level->linedefs.size()) return &level->linedefs[index];
+      break;
+    case EditorObjectType::SECTOR:
+      if (index < level->sectors.size()) return &level->sectors[index];
+      break;
+    default:
+      break;
+    }
 
     return nullptr;
   }
@@ -178,7 +228,7 @@ public:
   void processInput();
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
   void addLineDef(int32_t sectorId, gameloop::LineDef &lineDef);
-  void addVertex(int32_t sectorId, gameloop::Vertex &vertex);
+  void addVertex(int32_t sectorId, int16_t x, int16_t y);
 };
 
 }// namespace editor

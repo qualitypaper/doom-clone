@@ -36,22 +36,16 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
   // process vertices
   for (uint16_t i = 0; i < _level.vertices.size(); ++i) {
     auto &v = _level.vertices[i];
-    uint32_t id = getNextId();
 
     auto convertedImvec2 = math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
-    auto &editorVertex = editorVertices.emplace_back(id, convertedImvec2.x, convertedImvec2.y);
-    vertexIdMap[i] = id;
-
-    this->objects.emplace(id, editorVertex);
+    auto &editorVertex = editorVertices.emplace_back(convertedImvec2.x, convertedImvec2.y);
+    vertexIdMap[i] = editorVertices.size() - 1;
   }
 
   // process linedefs
   for (auto &ld : _level.linedefs) {
-    uint32_t id = getNextId();
-    auto &editorLinedef = editorLinedefs.emplace_back(
-      id, vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
-
-    this->objects.emplace(id, editorLinedef);
+    auto &editorLinedef =
+      editorLinedefs.emplace_back(vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
   }
 
   // TODO: process sectors
@@ -62,35 +56,33 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
 
 void Editor::updateAABB(uint32_t sectorID)
 {
-  EditorSector *sec = this->state.get()->findSector(sectorID);
+  EditorSector &sec = this->state.get()->findSector(sectorID);
 
   // set values to max/min double values, so the first vertex overrides them
-  sec->bounding_box.minX = std::numeric_limits<int16_t>::max();
-  sec->bounding_box.minY = std::numeric_limits<int16_t>::max();
-  sec->bounding_box.maxX = std::numeric_limits<int16_t>::lowest();
-  sec->bounding_box.maxY = std::numeric_limits<int16_t>::lowest();
+  sec.bounding_box.minX = std::numeric_limits<int16_t>::max();
+  sec.bounding_box.minY = std::numeric_limits<int16_t>::max();
+  sec.bounding_box.maxX = std::numeric_limits<int16_t>::lowest();
+  sec.bounding_box.maxY = std::numeric_limits<int16_t>::lowest();
 
-  for (int16_t ldId : sec->linedefIds) {
+  for (int16_t ldId : sec.linedefIds) {
     const auto &ld = state.get()->findLinedef(ldId);
-    if (!ld) continue;
 
-    const auto &start = state.get()->findVertex(ld->start);
-    const auto &end = state.get()->findVertex(ld->end);
-    if (!start || !end) continue;
+    const auto &start = state.get()->findVertex(ld.start);
+    const auto &end = state.get()->findVertex(ld.end);
 
     // check start
-    if (start->x < sec->bounding_box.minX) sec->bounding_box.minX = start->x;
-    if (start->x > sec->bounding_box.maxX) sec->bounding_box.maxX = start->x;
+    if (start.x < sec.bounding_box.minX) sec.bounding_box.minX = start.x;
+    if (start.x > sec.bounding_box.maxX) sec.bounding_box.maxX = start.x;
 
-    if (start->y < sec->bounding_box.minY) sec->bounding_box.minY = start->y;
-    if (start->y > sec->bounding_box.maxY) sec->bounding_box.maxY = start->y;
+    if (start.y < sec.bounding_box.minY) sec.bounding_box.minY = start.y;
+    if (start.y > sec.bounding_box.maxY) sec.bounding_box.maxY = start.y;
 
     // check end
-    if (end->x < sec->bounding_box.minX) sec->bounding_box.minX = end->x;
-    if (end->x > sec->bounding_box.maxX) sec->bounding_box.maxX = end->x;
+    if (end.x < sec.bounding_box.minX) sec.bounding_box.minX = end.x;
+    if (end.x > sec.bounding_box.maxX) sec.bounding_box.maxX = end.x;
 
-    if (end->y < sec->bounding_box.minY) sec->bounding_box.minY = end->y;
-    if (end->y > sec->bounding_box.maxY) sec->bounding_box.maxY = end->y;
+    if (end.y < sec.bounding_box.minY) sec.bounding_box.minY = end.y;
+    if (end.y > sec.bounding_box.maxY) sec.bounding_box.maxY = end.y;
   }
 }
 
@@ -105,14 +97,13 @@ void Editor::processInput() { this->m_inputHandler->processInput(*this->state, *
 
 void Editor::addLineDef(int32_t sectorId, gameloop::LineDef &linedef)
 {
-  // state.get()->level.get()->linedefs.emplace_back(state->getNextId(), linedef);
+  state.get()->level.get()->linedefs.emplace_back(linedef);
 
   if (sectorId == -1) return;
 
   auto sector = state.get()->findSector(sectorId);
-  if (!sector) return;
 
-  sector->linedefIds.emplace_back(state->nextId - 1);
+  sector.linedefIds.emplace_back();
   this->updateAABB(sectorId);
 }
 
@@ -130,14 +121,9 @@ void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
   // level.linedefs.emplace_back(ld);
 }
 
-void Editor::addVertex(int32_t sectorId, gameloop::Vertex &vertex)
+void Editor::addVertex(int32_t sectorId, int16_t x, int16_t y)
 {
-  ImVec2 converted =
-    math_utils::fromCenterCoordinates({(float) vertex.x, (float) vertex.y}, state->width, state->height);
-
-  m_history->execute(std::unique_ptr<commands::AddVertexCommand>(new commands::AddVertexCommand(
-                       { state->getNextId(), static_cast<int16_t>(converted.x), static_cast<int16_t>(converted.y) })),
-    *state);
+  m_history->execute(std::unique_ptr<commands::AddVertexCommand>(new commands::AddVertexCommand({ x, y })), *state);
 
   if (sectorId == -1) return;
 
@@ -145,37 +131,35 @@ void Editor::addVertex(int32_t sectorId, gameloop::Vertex &vertex)
   int16_t firstVertexIdx, secondVertexIdx;
 
   // find nearest two vertices with which to connect a vertex
-  auto sector = state->findSector(sectorId);
-  if (!sector) return;
+  auto &sector = state->findSector(sectorId);
 
-  for (int16_t ldIndex : sector->linedefIds) {
-    auto ld = state->findLinedef(ldIndex);
-    if (!ld) continue;
+  for (int16_t ldIndex : sector.linedefIds) {
+    auto &ld = state->findLinedef(ldIndex);
 
-    auto start = state->findVertex(ld->start);
-    auto end = state->findVertex(ld->end);
+    auto &start = state->findVertex(ld.start);
+    auto &end = state->findVertex(ld.end);
 
-    float_t d1 = math_utils::getDistanceSq(start->x, start->y, vertex.x, vertex.y);
-    float_t d2 = math_utils::getDistanceSq(end->x, end->y, vertex.x, vertex.y);
+    float_t d1 = math_utils::getDistanceSq(start.x, start.y, x, y);
+    float_t d2 = math_utils::getDistanceSq(end.x, end.y, x, y);
 
     if (d1 < dMin1) {
       dMin2 = dMin1;
       dMin1 = d1;
       secondVertexIdx = firstVertexIdx;
-      firstVertexIdx = ld->start;
+      firstVertexIdx = ld.start;
     } else if (d1 < dMin2) {
       dMin2 = d1;
-      secondVertexIdx = ld->start;
+      secondVertexIdx = ld.start;
     }
 
     if (d2 < dMin1) {
       dMin2 = dMin1;
       dMin1 = d2;
       secondVertexIdx = firstVertexIdx;
-      firstVertexIdx = ld->end;
+      firstVertexIdx = ld.end;
     } else if (d2 < dMin2) {
       dMin2 = d2;
-      secondVertexIdx = ld->end;
+      secondVertexIdx = ld.end;
     }
   }
 }
