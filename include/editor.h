@@ -3,6 +3,7 @@
 #include "gameloop.h"
 #include "imgui.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -10,11 +11,13 @@
 // forward declarations
 namespace commands {
 struct CommandHistory;
-}
+struct Command;
+}// namespace commands
 
 namespace editor {
 
 // forward declaractions
+struct EditorState;
 struct EditorInputHandler;
 
 struct AABB
@@ -81,6 +84,9 @@ struct EditorVertex : EditorObject
   EditorVertex(int32_t _x, int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
 
   int32_t x, y;
+  std::vector<uint32_t> connectedLineDefs;
+
+  bool isAnyConnectedLineDefSelected(const EditorState &state) const;
 
   constexpr EditorVertex &operator+=(const EditorVertex &other)
   {
@@ -164,21 +170,21 @@ struct EditorState
   ImVec2 canvasScroll = { 0.0, 0.0 };
   float canvasZoom = 1.0f;
 
-  EditorVertex &findVertex(uint32_t id)
+  EditorVertex &findVertex(uint32_t id) const
   {
     if (id >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the vertices array."); }
 
     return level->vertices[id];
   }
 
-  EditorSector &findSector(uint32_t id)
+  EditorSector &findSector(uint32_t id) const
   {
     if (id >= level->sectors.size()) { throw std::runtime_error("Index is bigger than the sectors array."); }
 
     return level->sectors[id];
   }
 
-  EditorLineDef &findLinedef(uint32_t id)
+  EditorLineDef &findLinedef(uint32_t id) const
   {
     if (id >= level->linedefs.size()) { throw std::runtime_error("Index is bigger than the linedefs array."); }
 
@@ -208,7 +214,6 @@ struct EditorState
   }
 };
 
-
 class Editor
 {
 private:
@@ -226,6 +231,7 @@ public:
   Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height);
 
   void processInput();
+  void executeCommand(std::unique_ptr<commands::Command> cmd);
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
   void addLineDef(int32_t sectorId, gameloop::LineDef &lineDef);
   void addVertex(int32_t sectorId, int16_t x, int16_t y);

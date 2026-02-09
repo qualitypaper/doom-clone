@@ -45,6 +45,8 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
         state.draggingOffset = { 0, 0 };
         state.draggingStart = mousePos;
       }
+
+
     } else {
       // flush the dragging state when the mouse button is released
 
@@ -59,10 +61,8 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
           case EditorObjectType::VERTEX: {
             auto &vertex = state.findVertex(index);
             auto cmd = std::make_unique<commands::MoveVertexCommand>(index,
-              vertex.x,
-              vertex.y,
-              vertex.x + static_cast<int16_t>(state.draggingOffset.x),
-              vertex.y + static_cast<int16_t>(state.draggingOffset.y));
+              vertex,
+              editor::EditorVertex(vertex.x + state.draggingOffset.x, vertex.y + state.draggingOffset.y));
             history.execute(std::move(cmd), state);
             break;
           }
@@ -78,10 +78,10 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
             break;
           }
         }
-
-        state.isDragging = false;
-        state.draggingOffset = { 0, 0 };
       }
+      state.isDragging = false;
+      state.draggingOffset = { 0, 0 };
+      state.draggingStart = { 0, 0 };
     }
   }
 
@@ -121,6 +121,15 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     }
   }
 
+  static auto resetSelection = [&state]() {
+    for (uint32_t id : state.selection) {
+      auto object = state.findObject(id);
+
+      if (object) object->selected = false;
+    }
+    state.selection.clear();
+  };
+
   static auto updateSelection = [&](uint32_t id, bool selected) {
     if (io.KeyCtrl && !io.WantCaptureKeyboard) {
       if (selected) {
@@ -133,14 +142,8 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
       }
       return;
     }
+    resetSelection();
 
-    for (uint32_t id : state.selection) {
-      auto object = state.findObject(id);
-
-      if (object) object->selected = false;
-    }
-    state.selection.clear();
-    std::cout << "Selection cleared: " << '\n';
     if (selected) { state.selection.emplace_back(id); }
   };
 
@@ -170,6 +173,9 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
         updateSelection(objectId, line.selected);
       }
     }
+  } else {
+    // if clicking nothing, reset the selection
+    if (lmbClicked) { resetSelection(); }
   }
 }
 

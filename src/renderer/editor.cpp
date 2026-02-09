@@ -20,6 +20,13 @@ AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
   this->minY = std::min(start.y, end.y);
 }
 
+bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
+{
+  return std::any_of(connectedLineDefs.begin(), connectedLineDefs.end(), [&](auto ldIndex) {
+    return state.findLinedef(ldIndex).selected;
+  });
+}
+
 EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
 {
   std::vector<EditorVertex> editorVertices;
@@ -38,14 +45,15 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
     auto &v = _level.vertices[i];
 
     auto convertedImvec2 = math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
-    auto &editorVertex = editorVertices.emplace_back(convertedImvec2.x, convertedImvec2.y);
+    editorVertices.emplace_back(convertedImvec2.x, convertedImvec2.y);
     vertexIdMap[i] = editorVertices.size() - 1;
   }
 
   // process linedefs
   for (auto &ld : _level.linedefs) {
-    auto &editorLinedef =
-      editorLinedefs.emplace_back(vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
+    editorLinedefs.emplace_back(vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
+    editorVertices[vertexIdMap[ld.start]].connectedLineDefs.emplace_back(editorLinedefs.size() - 1);
+    editorVertices[vertexIdMap[ld.end]].connectedLineDefs.emplace_back(editorLinedefs.size() - 1);
   }
 
   // TODO: process sectors
@@ -163,5 +171,7 @@ void Editor::addVertex(int32_t sectorId, int16_t x, int16_t y)
     }
   }
 }
+
+void Editor::executeCommand(std::unique_ptr<commands::Command> cmd) { m_history->execute(std::move(cmd), *state); }
 
 }// namespace editor

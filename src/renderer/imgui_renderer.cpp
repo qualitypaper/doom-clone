@@ -1,12 +1,12 @@
 #include "imgui_renderer.h"
 #include "editor.h"
 #include "editor_input_handler.h"
-#include "math_utils.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -128,8 +128,12 @@ void ImguiRenderer::drawMapOutlines()
     auto startVertex = m_editor->state->findVertex(ld.start);
     auto endVertex = m_editor->state->findVertex(ld.end);
 
-    // selected linedefs are rendered seperately
-    if (startVertex.selected || endVertex.selected) { continue; }
+    // selected linedefs are processed separately
+    if (startVertex.selected || endVertex.selected || ld.selected
+        || startVertex.isAnyConnectedLineDefSelected(*m_editor->state)
+        || endVertex.isAnyConnectedLineDefSelected(*m_editor->state)) {
+      continue;
+    }
 
     ImVec2 start = startVertex.toImVec2();
     ImVec2 end = endVertex.toImVec2();
@@ -150,8 +154,8 @@ void ImguiRenderer::drawMapOutlines()
 
   // draw vertices
   for (auto &v : m_editor->state->level->vertices) {
-    // selected vertices are rendered seperately
-    if (v.selected) continue;
+    // selected vertices are processed separately
+    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) continue;
 
     ImU32 color;
 
@@ -181,6 +185,54 @@ void ImguiRenderer::drawMapOutlines()
       ImVec2 endDragged(end.x + m_editor->state->draggingOffset.x, end.y + m_editor->state->draggingOffset.y);
 
       drawList->AddLine(startDragged, endDragged, s_selectedColor, s_thickness);
+
+      // find all the linedefs connected to end/start and draw them to this line
+      for (auto &otherLdIndex : start.connectedLineDefs) {
+        auto &otherLd = m_editor->state->level->linedefs[otherLdIndex];
+        if (otherLd.selected) continue;
+
+        auto otherStart = m_editor->state->findVertex(otherLd.start);
+        auto otherEnd = m_editor->state->findVertex(otherLd.end);
+
+        ImVec2 otherStartDragged(
+          otherStart.x + m_editor->state->draggingOffset.x, otherStart.y + m_editor->state->draggingOffset.y);
+        ImVec2 otherEndDragged(
+          otherEnd.x + m_editor->state->draggingOffset.x, otherEnd.y + m_editor->state->draggingOffset.y);
+
+        if (otherLd.start == ld.start) {
+          drawList->AddLine(startDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
+        } else if (otherLd.end == ld.start) {
+          drawList->AddLine(startDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
+        } else if (otherLd.start == ld.end) {
+          drawList->AddLine(endDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
+        } else if (otherLd.end == ld.end) {
+          drawList->AddLine(endDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
+        }
+      }
+
+      for (auto &otherLdIndex : end.connectedLineDefs) {
+        auto &otherLd = m_editor->state->level->linedefs[otherLdIndex];
+        if (otherLd.selected) continue;
+
+        auto otherStart = m_editor->state->findVertex(otherLd.start);
+        auto otherEnd = m_editor->state->findVertex(otherLd.end);
+
+        ImVec2 otherStartDragged(
+          otherStart.x + m_editor->state->draggingOffset.x, otherStart.y + m_editor->state->draggingOffset.y);
+        ImVec2 otherEndDragged(
+          otherEnd.x + m_editor->state->draggingOffset.x, otherEnd.y + m_editor->state->draggingOffset.y);
+
+        if (otherLd.start == ld.start) {
+          drawList->AddLine(startDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
+        } else if (otherLd.end == ld.start) {
+          drawList->AddLine(startDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
+        } else if (otherLd.start == ld.end) {
+          drawList->AddLine(endDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
+        } else if (otherLd.end == ld.end) {
+          drawList->AddLine(endDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
+        }
+      }
+
       break;
     }
     case editor::EditorObjectType::VERTEX: {
@@ -190,6 +242,19 @@ void ImguiRenderer::drawMapOutlines()
       ImVec2 dragged(v.x + m_editor->state->draggingOffset.x, v.y + m_editor->state->draggingOffset.y);
 
       drawList->AddCircleFilled(dragged, s_vertexRadius, s_selectedColor);
+
+      // draw every linedef connected to this vertex
+
+      for (auto &ld : m_editor->state->level->linedefs) {
+        if (ld.selected)
+          continue;
+        else if (ld.start == index || ld.end == index) {
+          auto otherVertexIndex = (ld.start == index) ? ld.end : ld.start;
+          auto &otherVertex = m_editor->state->findVertex(otherVertexIndex);
+
+          drawList->AddLine(dragged, otherVertex.toImVec2(), s_selectedColor, s_thickness);
+        }
+      }
       break;
     }
     default:
@@ -198,6 +263,42 @@ void ImguiRenderer::drawMapOutlines()
     }
   }
 }
+
+// void ImguiRenderer::updateAfterDragging()
+// {
+//   for (uint32_t id : m_editor->state->selection) {
+//     auto object = m_editor->state->findObject(id);
+
+//     uint32_t index = editor::getObjectIndex(id);
+//     editor::EditorObjectType type = editor::getObjectType(id);
+
+//     if (object) {
+//       switch (type) {
+//       case editor::EditorObjectType::VERTEX: {
+//         auto &vertex = m_editor->state->findVertex(index);
+//         auto cmd = std::make_unique<commands::MoveVertexCommand>(index,
+//           vertex,
+//           editor::EditorVertex(
+//             vertex.x + m_editor->state->draggingOffset.x, vertex.y + m_editor->state->draggingOffset.y));
+
+//         m_editor->executeCommand(std::move(cmd));
+//         break;
+//       }
+//       case editor::EditorObjectType::LINEDEF: {
+//         auto &line = m_editor->state->findLinedef(index);
+//         auto &start = m_editor->state->findVertex(line.start), &end = m_editor->state->findVertex(line.end);
+//         auto cmd = std::make_unique<commands::MoveLineDefCommand>(
+//           index, start, end, start + m_editor->state->draggingOffset, end + m_editor->state->draggingOffset);
+
+//         m_editor->executeCommand(std::move(cmd));
+//         break;
+//       }
+//       default:
+//         break;
+//       }
+//     }
+//   }
+// }
 
 void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen)
 {
@@ -266,7 +367,7 @@ void ImguiRenderer::drawSelectedVertexPopup(uint32_t objectId)
   if (isDeleted) {
     // Remove all linedefs that reference this vertex (iterate backwards to avoid index issues)
     for (int32_t i = static_cast<int32_t>(m_editor->state->level->linedefs.size()) - 1; i >= 0; i--) {
-        if (m_editor->state->level->linedefs[i].start == index || m_editor->state->level->linedefs[i].end == index) {
+      if (m_editor->state->level->linedefs[i].start == index || m_editor->state->level->linedefs[i].end == index) {
         m_editor->state->level->linedefs[i] = m_editor->state->level->linedefs.back();
         m_editor->state->level->linedefs.pop_back();
       }
