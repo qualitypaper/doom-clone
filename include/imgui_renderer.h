@@ -24,7 +24,7 @@ private:
   sdl_window::SdlWindow &m_sdlWindow;
   std::unique_ptr<editor::Editor> m_editor;
   std::unique_ptr<editor::EditorInputHandler> m_editorInputHandler;
-  
+
   void startFrame();
   void endFrame();
   void createSelect(const char *label,
@@ -34,6 +34,15 @@ private:
   void drawSelectedLinePopup(uint32_t selectedId);
   void drawSelectedVertexPopup(uint32_t selectedId);
   void drawMapOutlines();
+  void drawSelection(ImDrawList *drawList, float_t s_vertexRadius, float_t s_thickness);
+  void drawConnedLinedefs(editor::EditorVertex &end,
+    editor::EditorLineDef &ld,
+    ImVec2 &startDragged,
+    ImVec2 &endDragged,
+    ImDrawList *drawList,
+    float_t thickness);
+  void drawVertex(ImDrawList *drawList, ImVec2 &vertex, float_t vertexRadius, ImU32 color);
+  void drawLine(ImDrawList *drawList, ImVec2 &start, editor::EditorVertex &end, ImU32 color, float_t thickness);
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen);
 
   constexpr ImVec2 scale(ImVec2 vec, float_t scaleFactor);

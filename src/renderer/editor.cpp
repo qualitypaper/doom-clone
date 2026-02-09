@@ -5,6 +5,7 @@
 #include "gameloop.h"
 #include "math_utils.h"
 
+#include "algorithm"
 #include <limits>
 #include <memory>
 #include <unordered_map>
@@ -22,8 +23,8 @@ AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
 {
-  return std::any_of(connectedLineDefs.begin(), connectedLineDefs.end(), [&](auto ldIndex) {
-    return state.findLinedef(ldIndex).selected;
+  return std::any_of(connectedLineDefs.begin(), connectedLineDefs.end(), [&](auto ldObjectId) {
+    return state.findLinedef(getObjectIndex(ldObjectId)).selected;
   });
 }
 
@@ -52,14 +53,50 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
   // process linedefs
   for (auto &ld : _level.linedefs) {
     editorLinedefs.emplace_back(vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
-    editorVertices[vertexIdMap[ld.start]].connectedLineDefs.emplace_back(editorLinedefs.size() - 1);
-    editorVertices[vertexIdMap[ld.end]].connectedLineDefs.emplace_back(editorLinedefs.size() - 1);
+    editorVertices[vertexIdMap[ld.start]].connectedLineDefs.emplace_back(
+      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
+    editorVertices[vertexIdMap[ld.end]].connectedLineDefs.emplace_back(
+      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
   }
 
   // TODO: process sectors
 
   this->level = std::make_unique<EditorLevel>(
     std::move(editorVertices), std::move(editorLinedefs), std::move(editorSectors), _level.sidedefs);
+}
+
+void EditorState::reset()
+{
+  for (auto &vertex : level->vertices) {
+    vertex.selected = false;
+    vertex.hovered = false;
+  }
+
+  for (auto &linedef : level->linedefs) {
+    linedef.selected = false;
+    linedef.hovered = false;
+  }
+
+  for (auto &sector : level->sectors) {
+    sector.selected = false;
+    sector.hovered = false;
+  }
+
+  selection.clear();
+
+  isDragging = false;
+  draggingOffset = { 0, 0 };
+  draggingStart = { 0, 0 };
+
+  isCreatingLine = false;
+  lineStartVertexId = 0;
+
+  renderOptionsWindow = false;
+  optionsWindowPos = { 0, 0 };
+
+  canvasOrigin = { 0.0f, 0.0f };
+  canvasScroll = { 0.0f, 0.0f };
+  canvasZoom = 1.0f;
 }
 
 void Editor::updateAABB(uint32_t sectorID)

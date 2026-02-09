@@ -3,7 +3,8 @@
 #include "gameloop.h"
 #include "imgui.h"
 
-#include <algorithm>
+#include <iostream>
+#include <stacktrace>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -84,7 +85,7 @@ struct EditorVertex : EditorObject
   EditorVertex(int32_t _x, int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
 
   int32_t x, y;
-  std::vector<uint32_t> connectedLineDefs;
+  std::vector<uint32_t> connectedLineDefs; // Linedef object IDs (EditorObjectType::LINEDEF).
 
   bool isAnyConnectedLineDefSelected(const EditorState &state) const;
 
@@ -147,6 +148,7 @@ struct EditorState
 {
   EditorState(std::unique_ptr<EditorLevel> _level) : level(std::move(_level)) {}
   EditorState(gameloop::Level &_level, uint16_t width, uint16_t height);
+  void reset();
 
   uint16_t width, height;
 
@@ -172,7 +174,9 @@ struct EditorState
 
   EditorVertex &findVertex(uint32_t id) const
   {
-    if (id >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the vertices array."); }
+    if (id >= level->vertices.size()) {
+        throw std::runtime_error("Index is bigger than the vertices array. Index: " + std::to_string(id));
+    }
 
     return level->vertices[id];
   }

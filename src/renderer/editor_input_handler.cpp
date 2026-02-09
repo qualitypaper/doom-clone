@@ -1,9 +1,11 @@
 #include "editor_input_handler.h"
 #include "commands.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "math_utils.h"
 
 #include <algorithm>
+#include <ctime>
 #include <iostream>
 #include <limits>
 
@@ -17,12 +19,20 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
   ImGuiIO &io = ImGui::GetIO();
 
   if (!io.WantCaptureKeyboard) {
+    // reset the state when pressing escape
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) { state.reset(); }
+
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
       if (io.KeyShift) {
         history.redo(state);
       } else {
         history.undo(state);
       }
+    }
+
+
+    if (io.KeyCtrl && !io.WantCaptureMouse && io.MouseWheel != 0) {
+      state.canvasZoom = std::clamp(state.canvasZoom * (io.MouseWheel > 0 ? 1.1f : 0.9f), 0.5f, 3.0f);
     }
   }
 
@@ -37,48 +47,28 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
       state.optionsWindowPos = mousePos;
     }
 
-    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
       if (state.isDragging) {
         state.draggingOffset = { mousePos.x - state.draggingStart.x, mousePos.y - state.draggingStart.y };
       } else {
-        state.isDragging = true;
-        state.draggingOffset = { 0, 0 };
-        state.draggingStart = mousePos;
-      }
 
+        if (state.selection.empty()) {
+          // start creating a line if clicking on empty space
+          state.isCreatingLine = true;
+          
+        } else {
+          // state dragging
 
-    } else {
-      // flush the dragging state when the mouse button is released
-
-      for (uint32_t id : state.selection) {
-        auto object = state.findObject(id);
-
-        uint32_t index = editor::getObjectIndex(id);
-        EditorObjectType type = editor::getObjectType(id);
-
-        if (object) {
-          switch (type) {
-          case EditorObjectType::VERTEX: {
-            auto &vertex = state.findVertex(index);
-            auto cmd = std::make_unique<commands::MoveVertexCommand>(index,
-              vertex,
-              editor::EditorVertex(vertex.x + state.draggingOffset.x, vertex.y + state.draggingOffset.y));
-            history.execute(std::move(cmd), state);
-            break;
-          }
-          case EditorObjectType::LINEDEF: {
-            auto &line = state.findLinedef(index);
-            auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
-            auto cmd = std::make_unique<commands::MoveLineDefCommand>(
-              index, start, end, start + state.draggingOffset, end + state.draggingOffset);
-            history.execute(std::move(cmd), state);
-            break;
-          }
-          default:
-            break;
-          }
+          state.isDragging = true;
+          state.draggingOffset = { 0, 0 };
+          state.draggingStart = mousePos;
         }
       }
+
+    } else {
+      // flush and reset the dragging state when the mouse button is released
+      flushDragging(state, history);
+
       state.isDragging = false;
       state.draggingOffset = { 0, 0 };
       state.draggingStart = { 0, 0 };
@@ -96,7 +86,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     // reset to the initial state
     vertex.hovered = false;
 
-    float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos);
+    float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - 4.0f;
 
     if (nodeDis < bestVertexDist) {
       bestVertexDist = nodeDis;
@@ -104,7 +94,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     }
   }
 
-  // finding the nearest nodes/lines which can be hovered/selected
+  // finding the nearest lines which can be hovered/selected
   for (size_t i = 0; i < state.level->linedefs.size(); i++) {
     auto &ld = state.findLinedef(i);
     // reset to the initial state
@@ -121,33 +111,6 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     }
   }
 
-  static auto resetSelection = [&state]() {
-    for (uint32_t id : state.selection) {
-      auto object = state.findObject(id);
-
-      if (object) object->selected = false;
-    }
-    state.selection.clear();
-  };
-
-  static auto updateSelection = [&](uint32_t id, bool selected) {
-    if (io.KeyCtrl && !io.WantCaptureKeyboard) {
-      if (selected) {
-        state.selection.emplace_back(id);
-      } else {
-        state.selection.erase(
-          std::remove_if(
-            state.selection.begin(), state.selection.end(), [id](auto &selectedId) { return selectedId == id; }),
-          state.selection.end());
-      }
-      return;
-    }
-    resetSelection();
-
-    if (selected) { state.selection.emplace_back(id); }
-  };
-
-
   bool hasVertex = bestVertexDist < s_vertexHoveringThresholdSq;
   bool hasLine = bestLineDist < s_lineHoveringThresholdSq;
 
@@ -161,7 +124,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
       if (lmbClicked) {
         vertex.selected = !vertex.selected;
         auto objectId = makeObjectId(EditorObjectType::VERTEX, bestVertexId);
-        updateSelection(objectId, vertex.selected);
+        updateSelection(objectId, vertex.selected, state);
       }
     } else {
       auto &line = state.findLinedef(bestLineId);
@@ -170,12 +133,74 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
       if (lmbClicked) {
         line.selected = !line.selected;
         auto objectId = makeObjectId(EditorObjectType::LINEDEF, bestLineId);
-        updateSelection(objectId, line.selected);
+        updateSelection(objectId, line.selected, state);
       }
     }
   } else {
     // if clicking nothing, reset the selection
-    if (lmbClicked) { resetSelection(); }
+    if (lmbClicked) { resetSelection(state); }
+  }
+}
+
+void EditorInputHandler::updateSelection(uint32_t id, bool selected, EditorState &state)
+{
+  ImGuiIO &io = ImGui::GetIO();
+
+  if (io.KeyCtrl && !io.WantCaptureKeyboard) {
+    if (selected) {
+      state.selection.emplace_back(id);
+    } else {
+      state.selection.erase(
+        std::remove_if(
+          state.selection.begin(), state.selection.end(), [id](auto &selectedId) { return selectedId == id; }),
+        state.selection.end());
+    }
+    return;
+  }
+  resetSelection(state);
+
+  if (selected) { state.selection.emplace_back(id); }
+}
+
+void EditorInputHandler::resetSelection(EditorState &state)
+{
+  for (uint32_t id : state.selection) {
+    auto object = state.findObject(id);
+
+    if (object) object->selected = false;
+  }
+  state.selection.clear();
+}
+
+void EditorInputHandler::flushDragging(editor::EditorState &state, commands::CommandHistory &history)
+{
+  for (uint32_t id : state.selection) {
+    auto object = state.findObject(id);
+
+    uint32_t index = editor::getObjectIndex(id);
+    EditorObjectType type = editor::getObjectType(id);
+
+    if (object) {
+      switch (type) {
+      case EditorObjectType::VERTEX: {
+        auto &vertex = state.findVertex(index);
+        auto cmd = std::make_unique<commands::MoveVertexCommand>(
+          index, vertex, editor::EditorVertex(vertex.x + state.draggingOffset.x, vertex.y + state.draggingOffset.y));
+        history.execute(std::move(cmd), state);
+        break;
+      }
+      case EditorObjectType::LINEDEF: {
+        auto &line = state.findLinedef(index);
+        auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
+        auto cmd = std::make_unique<commands::MoveLineDefCommand>(
+          index, start, end, start + state.draggingOffset, end + state.draggingOffset);
+        history.execute(std::move(cmd), state);
+        break;
+      }
+      default:
+        break;
+      }
+    }
   }
 }
 
