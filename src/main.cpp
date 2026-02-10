@@ -10,16 +10,12 @@
 #include "imgui_impl_sdl2.h"
 
 #include <SDL.h>
-
 #include <SDL_events.h>
-#include <assert.h>
+
+#include <cassert>
 #include <iostream>
 
-namespace {}
-
 void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
-constexpr ImVec2 toCenterCoordinates(ImVec2 vec, sdl_window::SdlWindow &sdlWindow);
-constexpr ImVec2 convertVertexIntoImVec2(gameloop::Vertex vertex);
 
 bool running;
 

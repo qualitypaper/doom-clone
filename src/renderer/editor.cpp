@@ -23,9 +23,87 @@ AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
 {
-  return std::any_of(connectedLineDefs.begin(), connectedLineDefs.end(), [&](auto ldObjectId) {
-    return state.findLinedef(getObjectIndex(ldObjectId)).selected;
-  });
+  return std::ranges::any_of(
+    connectedLineDefs, [&](auto ldObjectId) { return state.findLinedef(getObjectIndex(ldObjectId)).selected; });
+}
+
+void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
+{
+  const uint32_t lastLdIndex = static_cast<uint32_t>(state.level->linedefs.size() - 1);
+  auto &ld = state.level->linedefs[ldId];
+  auto &lastLd = state.level->linedefs.back();
+  auto &vStart = state.findVertex(ld.start);
+  auto &vEnd = state.findVertex(ld.end);
+  auto &lastLdStart = state.findVertex(lastLd.start);
+  auto &lastLdEnd = state.findVertex(lastLd.end);
+
+  if (ldId != lastLdIndex) {
+    // Update indices in connected vertices
+    for (auto &ldObjectId : lastLdStart.connectedLineDefs) {
+      if (getObjectIndex(ldObjectId) == lastLdIndex) {
+        ldObjectId = makeObjectId(EditorObjectType::LINEDEF, ldId);
+        break;
+      }
+    }
+    for (auto &ldObjectId : lastLdEnd.connectedLineDefs) {
+      if (getObjectIndex(ldObjectId) == lastLdIndex) {
+        ldObjectId = makeObjectId(EditorObjectType::LINEDEF, ldId);
+        break;
+      }
+    }
+
+    ld = lastLd;
+  }
+  std::erase_if(
+    vStart.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+  std::erase_if(
+    vEnd.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+
+  state.level->linedefs.pop_back();
+}
+
+void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
+{
+  auto &vertex = state.level->vertices[vertexId];
+  // Remove all linedefs that reference this vertex (iterate backwards to avoid index issues)
+  for (int i = static_cast<int>(vertex.connectedLineDefs.size()) - 1; i >= 0; i--) {
+    uint32_t ldId = editor::getObjectIndex(vertex.connectedLineDefs[i]);
+    auto &ld = state.level->linedefs[ldId];
+
+    if (ld.start == vertexId) {
+      auto &vEnd = state.findVertex(ld.end);
+
+      std::erase_if(
+        vEnd.connectedLineDefs, [&ldId](const auto &ldObjectId) { return editor::getObjectIndex(ldObjectId) == ldId; });
+    } else if (ld.end == vertexId) {
+      auto &vStart = state.findVertex(ld.start);
+
+      std::erase_if(vStart.connectedLineDefs,
+        [&ldId](const auto &ldObjectId) { return editor::getObjectIndex(ldObjectId) == ldId; });
+    }
+
+    EditorLineDef::remove(state, ldId);
+  }
+
+  // Remove the vertex using swap-and-pop
+  const uint32_t lastVertexIndex = static_cast<uint32_t>(state.level->vertices.size() - 1);
+
+  if (vertexId != lastVertexIndex) {
+    const auto &lastVertex = state.level->vertices.back();
+
+    for (const uint32_t ldObjectId : lastVertex.connectedLineDefs) {
+      const auto ldIndex = editor::getObjectIndex(ldObjectId);
+      auto &ld = state.findLinedef(ldIndex);
+
+      if (ld.start == lastVertexIndex) ld.start = vertexId;
+      if (ld.end == lastVertexIndex) ld.end = vertexId;
+    }
+
+    vertex = lastVertex;
+  }
+
+  state.selection.clear();
+  state.level->vertices.pop_back();
 }
 
 EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)

@@ -3,10 +3,10 @@
 #include "gameloop.h"
 #include "imgui.h"
 
-#include <iostream>
-#include <stacktrace>
 #include <cstdint>
+#include <iostream>
 #include <memory>
+#include <stacktrace>
 #include <vector>
 
 // forward declarations
@@ -38,14 +38,10 @@ constexpr uint32_t kObjectTypeShift = 30;
 constexpr uint32_t kObjectIndexMask = (1u << kObjectTypeShift) - 1u;
 
 constexpr uint32_t makeObjectId(EditorObjectType type, uint32_t index)
-{
-  return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask);
-}
+{ return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask); }
 
 constexpr EditorObjectType getObjectType(uint32_t objectId)
-{
-  return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u);
-}
+{ return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u); }
 
 constexpr uint32_t getObjectIndex(uint32_t objectId) { return objectId & kObjectIndexMask; }
 
@@ -76,8 +72,10 @@ struct EditorLineDef : EditorObject
   uint32_t start;
   uint32_t end;
   gameloop::LineDefType type;
-  int16_t frontSidedef;
-  int16_t backSidedef;
+  int32_t frontSidedef;
+  int32_t backSidedef;
+
+  static void remove(const EditorState &state, uint32_t ldId);
 };
 
 struct EditorVertex : EditorObject
@@ -85,7 +83,7 @@ struct EditorVertex : EditorObject
   EditorVertex(int32_t _x, int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
 
   int32_t x, y;
-  std::vector<uint32_t> connectedLineDefs; // Linedef object IDs (EditorObjectType::LINEDEF).
+  std::vector<uint32_t> connectedLineDefs;// Linedef object IDs (EditorObjectType::LINEDEF).
 
   bool isAnyConnectedLineDefSelected(const EditorState &state) const;
 
@@ -104,6 +102,7 @@ struct EditorVertex : EditorObject
     return *this;
   }
   constexpr ImVec2 toImVec2() const { return ImVec2(x, y); }
+  static void remove(EditorState &state, uint32_t vertexId);
 };
 constexpr EditorVertex &operator+(EditorVertex &lhs, const EditorVertex &rhs) noexcept
 {
@@ -175,7 +174,7 @@ struct EditorState
   EditorVertex &findVertex(uint32_t id) const
   {
     if (id >= level->vertices.size()) {
-        throw std::runtime_error("Index is bigger than the vertices array. Index: " + std::to_string(id));
+      throw std::runtime_error("Index is bigger than the vertices array. Index: " + std::to_string(id));
     }
 
     return level->vertices[id];

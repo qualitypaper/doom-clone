@@ -13,9 +13,13 @@
 
 namespace imguirenderer {
 
+static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
+static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
+static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
+
 ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &level) : m_sdlWindow(sdlWindow)
 {
-  float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
+  const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
   IMGUI_CHECKVERSION();
   ImGuiContext *context = ImGui::CreateContext();
@@ -55,10 +59,10 @@ void ImguiRenderer::startFrame()
   ImGui::NewFrame();
 }
 
-void ImguiRenderer::endFrame()
+void ImguiRenderer::endFrame() const
 {
   ImGui::Render();
-  ImGuiIO &currentIo = ImGui::GetIO();
+  const ImGuiIO &currentIo = ImGui::GetIO();
   SDL_RenderSetScale(
     m_sdlWindow.getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
 
@@ -67,19 +71,19 @@ void ImguiRenderer::endFrame()
   SDL_RenderPresent(m_sdlWindow.getRenderer());
 }
 
-void ImguiRenderer::render()
+void ImguiRenderer::render() const
 {
 
   // Start the Dear ImGui frame
   startFrame();
 
-  ImGuiIO &io = ImGui::GetIO();
+  const ImGuiIO &io = ImGui::GetIO();
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(io.DisplaySize);
 
   // 2. Set flags to make it invisible and non-interactive
-  ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoBackground
-                           | ImGuiWindowFlags_NoBringToFrontOnFocus;
+  constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
+                                     | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus;
 
   ImGui::Begin("HUDOverlay", nullptr, flags);
 
@@ -97,8 +101,8 @@ void ImguiRenderer::render()
 
   drawMapOutlines();
 
-  for (auto &objectId : m_editor->state->selection) {
-    auto object = m_editor->state->findObject(objectId);
+  for (const auto &objectId : m_editor->state->selection) {
+    const auto object = m_editor->state->findObject(objectId);
     if (!object) continue;
 
     if (object->type == editor::EditorObjectType::VERTEX) {
@@ -113,18 +117,42 @@ void ImguiRenderer::render()
   endFrame();
 }
 
-void ImguiRenderer::drawMapOutlines()
+void ImguiRenderer::drawConnectedLineDefs(const editor::EditorLineDef &ld,
+  const std::vector<uint32_t> &connectedLineDefs,
+  const ImVec2 startDragged,
+  const ImVec2 endDragged,
+  ImDrawList *drawList,
+  const float_t thickness) const
 {
-  static ImU32 s_defaultColor = IM_COL32(255, 255, 255, 255);
-  static ImU32 s_selectedColor = IM_COL32(0, 0, 255, 255);
-  static ImU32 s_hoverColor = IM_COL32(255, 200, 0, 255);
-  float_t s_thickness = 2.0f * m_editor->state->canvasZoom;
-  float_t s_vertexRadius = 4.0f * m_editor->state->canvasZoom;
+  for (auto &otherLdObjectId : connectedLineDefs) {
+    const auto otherLdIndex = editor::getObjectIndex(otherLdObjectId);
+    const auto &otherLd = m_editor->state->level->linedefs[otherLdIndex];
+    if (otherLd.selected) continue;
+
+    auto otherStart = m_editor->state->findVertex(otherLd.start);
+    auto otherEnd = m_editor->state->findVertex(otherLd.end);
+
+    if (otherLd.start == ld.start) {
+      drawList->AddLine(startDragged, otherEnd.toImVec2(), g_defaultColor, thickness);
+    } else if (otherLd.end == ld.start) {
+      drawList->AddLine(startDragged, otherStart.toImVec2(), g_defaultColor, thickness);
+    } else if (otherLd.start == ld.end) {
+      drawList->AddLine(endDragged, otherEnd.toImVec2(), g_defaultColor, thickness);
+    } else if (otherLd.end == ld.end) {
+      drawList->AddLine(endDragged, otherStart.toImVec2(), g_defaultColor, thickness);
+    }
+  }
+}
+
+void ImguiRenderer::drawMapOutlines() const
+{
+  const float_t thickness = 2.0f * m_editor->state->canvasZoom;
+  const float_t vertexRadius = 4.0f * m_editor->state->canvasZoom;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
   // draw outlines
-  for (auto &ld : m_editor->state->level->linedefs) {
+  for (const auto &ld : m_editor->state->level->linedefs) {
     auto startVertex = m_editor->state->findVertex(ld.start);
     auto endVertex = m_editor->state->findVertex(ld.end);
 
@@ -141,15 +169,15 @@ void ImguiRenderer::drawMapOutlines()
     ImU32 color;
 
     if (ld.hovered) {
-      color = s_hoverColor;
+      color = g_hoverColor;
     } else {
-      color = s_defaultColor;
+      color = g_defaultColor;
     }
 
     // tint a bit the color of the portal linedef
     if (ld.backSidedef != -1) { color -= 0x32323200; }
 
-    drawList->AddLine(start, end, color, s_thickness);
+    drawList->AddLine(start, end, color, thickness);
   }
 
   // draw vertices
@@ -160,23 +188,22 @@ void ImguiRenderer::drawMapOutlines()
     ImU32 color;
 
     if (v.hovered) {
-      color = s_hoverColor;
+      color = g_hoverColor;
     } else {
-      color = s_defaultColor;
+      color = g_defaultColor;
     }
 
-    drawList->AddCircleFilled(v.toImVec2(), s_vertexRadius, color);
+    drawList->AddCircleFilled(v.toImVec2(), vertexRadius, color);
   }
 
   // draw selected vertices/linedefs
-  for (uint32_t objectId : m_editor->state->selection) {
-    // O(1) lookup for an object
-    auto object = m_editor->state->findObject(objectId);
+  for (const uint32_t objectId : m_editor->state->selection) {
+    const auto object = m_editor->state->findObject(objectId);
     if (!object) continue;
 
     switch (object->type) {
     case editor::EditorObjectType::LINEDEF: {
-      auto index = editor::getObjectIndex(objectId);
+      const auto index = editor::getObjectIndex(objectId);
       auto &ld = m_editor->state->findLinedef(index);
       auto start = m_editor->state->findVertex(ld.start);
       auto end = m_editor->state->findVertex(ld.end);
@@ -184,118 +211,43 @@ void ImguiRenderer::drawMapOutlines()
       ImVec2 startDragged(start.x + m_editor->state->draggingOffset.x, start.y + m_editor->state->draggingOffset.y);
       ImVec2 endDragged(end.x + m_editor->state->draggingOffset.x, end.y + m_editor->state->draggingOffset.y);
 
-      drawList->AddLine(startDragged, endDragged, s_selectedColor, s_thickness);
+      drawList->AddLine(startDragged, endDragged, g_selectedColor, thickness);
 
-      drawList->AddCircleFilled(startDragged, s_vertexRadius, s_defaultColor);
-      drawList->AddCircleFilled(endDragged, s_vertexRadius, s_defaultColor);
+      drawList->AddCircleFilled(startDragged, vertexRadius, g_defaultColor);
+      drawList->AddCircleFilled(endDragged, vertexRadius, g_defaultColor);
 
       // find all the linedefs connected to end/start and draw them to this line
-      for (auto &otherLdObjectId : start.connectedLineDefs) {
-        auto otherLdIndex = editor::getObjectIndex(otherLdObjectId);
-        auto &otherLd = m_editor->state->level->linedefs[otherLdIndex];
-        if (otherLd.selected) continue;
-
-        auto otherStart = m_editor->state->findVertex(otherLd.start);
-        auto otherEnd = m_editor->state->findVertex(otherLd.end);
-
-        if (otherLd.start == ld.start) {
-          drawList->AddLine(startDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
-        } else if (otherLd.end == ld.start) {
-          drawList->AddLine(startDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
-        } else if (otherLd.start == ld.end) {
-          drawList->AddLine(endDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
-        } else if (otherLd.end == ld.end) {
-          drawList->AddLine(endDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
-        }
-      }
-
-      for (auto &otherLdObjectId : end.connectedLineDefs) {
-        auto otherLdIndex = editor::getObjectIndex(otherLdObjectId);
-        auto &otherLd = m_editor->state->level->linedefs[otherLdIndex];
-        if (otherLd.selected) continue;
-
-        auto otherStart = m_editor->state->findVertex(otherLd.start);
-        auto otherEnd = m_editor->state->findVertex(otherLd.end);
-
-        if (otherLd.start == ld.start) {
-          drawList->AddLine(startDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
-        } else if (otherLd.end == ld.start) {
-          drawList->AddLine(startDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
-        } else if (otherLd.start == ld.end) {
-          drawList->AddLine(endDragged, otherEnd.toImVec2(), s_defaultColor, s_thickness);
-        } else if (otherLd.end == ld.end) {
-          drawList->AddLine(endDragged, otherStart.toImVec2(), s_defaultColor, s_thickness);
-        }
-      }
+      drawConnectedLineDefs(ld, start.connectedLineDefs, startDragged, endDragged, drawList, thickness);
+      drawConnectedLineDefs(ld, end.connectedLineDefs, startDragged, endDragged, drawList, thickness);
 
       break;
     }
     case editor::EditorObjectType::VERTEX: {
-      auto index = editor::getObjectIndex(objectId);
-      auto &v = m_editor->state->findVertex(index);
+      const auto index = editor::getObjectIndex(objectId);
+      const auto &v = m_editor->state->findVertex(index);
 
       ImVec2 dragged(v.x + m_editor->state->draggingOffset.x, v.y + m_editor->state->draggingOffset.y);
 
-      drawList->AddCircleFilled(dragged, s_vertexRadius, s_selectedColor);
+      drawList->AddCircleFilled(dragged, vertexRadius, g_selectedColor);
 
       // draw every linedef connected to this vertex
-
       for (auto &ld : m_editor->state->level->linedefs) {
-        if (ld.selected)
-          continue;
-        else if (ld.start == index || ld.end == index) {
-          auto otherVertexIndex = (ld.start == index) ? ld.end : ld.start;
+        if (ld.start == index || ld.end == index) {
+          const auto otherVertexIndex = ld.start == index ? ld.end : ld.start;
           auto &otherVertex = m_editor->state->findVertex(otherVertexIndex);
 
-          drawList->AddLine(dragged, otherVertex.toImVec2(), s_selectedColor, s_thickness);
+          drawList->AddLine(dragged, otherVertex.toImVec2(), g_selectedColor, thickness);
         }
       }
       break;
     }
     default:
       throw std::runtime_error("Selected an unexpected/unknown type.");
-      break;
     }
   }
 }
 
-// void ImguiRenderer::updateAfterDragging()
-// {
-//   for (uint32_t id : m_editor->state->selection) {
-//     auto object = m_editor->state->findObject(id);
-
-//     uint32_t index = editor::getObjectIndex(id);
-//     editor::EditorObjectType type = editor::getObjectType(id);
-
-//     if (object) {
-//       switch (type) {
-//       case editor::EditorObjectType::VERTEX: {
-//         auto &vertex = m_editor->state->findVertex(index);
-//         auto cmd = std::make_unique<commands::MoveVertexCommand>(index,
-//           vertex,
-//           editor::EditorVertex(
-//             vertex.x + m_editor->state->draggingOffset.x, vertex.y + m_editor->state->draggingOffset.y));
-
-//         m_editor->executeCommand(std::move(cmd));
-//         break;
-//       }
-//       case editor::EditorObjectType::LINEDEF: {
-//         auto &line = m_editor->state->findLinedef(index);
-//         auto &start = m_editor->state->findVertex(line.start), &end = m_editor->state->findVertex(line.end);
-//         auto cmd = std::make_unique<commands::MoveLineDefCommand>(
-//           index, start, end, start + m_editor->state->draggingOffset, end + m_editor->state->draggingOffset);
-
-//         m_editor->executeCommand(std::move(cmd));
-//         break;
-//       }
-//       default:
-//         break;
-//       }
-//     }
-//   }
-// }
-
-void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen)
+void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const
 {
   ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
@@ -315,7 +267,7 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
   ImGui::End();
 }
 
-void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId)
+void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId) const
 {
   auto index = editor::getObjectIndex(objectId);
   auto &ld = m_editor->state->findLinedef(index);
@@ -346,106 +298,32 @@ void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId)
   createSelect("Front Sidedef: ", m_editor->state->level->sidedefs, ld.frontSidedef);
   createSelect("Back Sidedef: ", m_editor->state->level->sidedefs, ld.backSidedef, true);
 
+  if (ImGui::Button("Delete")) {
+    editor::EditorLineDef::remove(*m_editor->state, index);
+    m_editor->state->selection.clear();
+  }
+
   ImGui::End();
 }
 
-void ImguiRenderer::drawSelectedVertexPopup(uint32_t objectId)
+void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 {
-  auto index = editor::getObjectIndex(objectId);
-  auto &vertex = m_editor->state->findVertex(index);
+  const uint32_t index = editor::getObjectIndex(selectedId);
 
-  std::string windowTitle = "Vertex params: " + std::to_string(index) + "###VertexParams";
+  const std::string windowTitle = "Vertex params: " + std::to_string(index) + "###VertexParams";
   ImGui::Begin(windowTitle.c_str());
 
-  bool isDeleted = ImGui::Button("Delete");
+  if (ImGui::Button("Delete")) { editor::EditorVertex::remove(*m_editor->state, index); }
 
-  if (isDeleted) {
-    auto &selection = m_editor->state->selection;
-    auto removeSelectionId = [&](uint32_t id) {
-      selection.erase(
-        std::remove_if(selection.begin(), selection.end(), [&](uint32_t selectedId) { return selectedId == id; }),
-        selection.end());
-    };
-    auto replaceSelectionId = [&](uint32_t fromId, uint32_t toId) {
-      for (auto &selectedId : selection) {
-        if (selectedId == fromId) selectedId = toId;
-      }
-    };
+  for (auto &ldObjectId : m_editor->state->findVertex(index).connectedLineDefs) {
+    const auto ldIndex = editor::getObjectIndex(ldObjectId);
+    const auto &ld = m_editor->state->findLinedef(ldIndex);
 
-    // Remove all linedefs that reference this vertex (iterate backwards to avoid index issues)
-    for (int i = (int)vertex.connectedLineDefs.size() - 1; i >= 0; i--) {
-      if (i < 0) break;
-
-      uint32_t ldId = editor::getObjectIndex(vertex.connectedLineDefs[i]);
-      auto &ld = m_editor->state->level->linedefs[ldId];
-
-      if (ld.start == index) {
-        auto &vEnd = m_editor->state->findVertex(ld.end);
-
-        vEnd.connectedLineDefs.erase(
-          std::remove_if(vEnd.connectedLineDefs.begin(),
-            vEnd.connectedLineDefs.end(),
-            [&ldId](const auto &ldObjectId) { return editor::getObjectIndex(ldObjectId) == ldId; }),
-          vEnd.connectedLineDefs.end());
-      } else if (ld.end == index) {
-        auto &vStart = m_editor->state->findVertex(ld.start);
-
-        vStart.connectedLineDefs.erase(
-          std::remove_if(vStart.connectedLineDefs.begin(),
-            vStart.connectedLineDefs.end(),
-            [&ldId](const auto &ldObjectId) { return editor::getObjectIndex(ldObjectId) == ldId; }),
-          vStart.connectedLineDefs.end());
-      }
-
-      uint32_t lastLdIndex = static_cast<uint32_t>(m_editor->state->level->linedefs.size() - 1);
-      
-      if (ldId != lastLdIndex) {
-        // Update connected vertices to point to the new linedef position
-        auto &lastLd = m_editor->state->level->linedefs.back();
-        auto &vStart = m_editor->state->findVertex(lastLd.start);
-        auto &vEnd = m_editor->state->findVertex(lastLd.end);
-
-        // Update indices in connected vertices
-        for (auto &ldObjectId : vStart.connectedLineDefs) {
-          if (editor::getObjectIndex(ldObjectId) == lastLdIndex) {
-            ldObjectId = editor::makeObjectId(editor::EditorObjectType::LINEDEF, ldId);
-            break;
-          }
-        }
-        for (auto &ldObjectId : vEnd.connectedLineDefs) {
-          if (editor::getObjectIndex(ldObjectId) == lastLdIndex) {
-            ldObjectId = editor::makeObjectId(editor::EditorObjectType::LINEDEF, ldId);
-            break;
-          }
-        }
-
-        ld = lastLd;
-      }
-
-      m_editor->state->level->linedefs.pop_back();
+    std::string ldLabel = "Connected LineDef: " + std::to_string(ldIndex) + "###ConnectedLineDef" + std::to_string(ldIndex);
+    if (ImGui::Button(ldLabel.c_str())) {
+      m_editor->state->selection.clear();
+      m_editor->state->selection.emplace_back(ldObjectId);
     }
-
-    // Remove the vertex using swap-and-pop
-    uint32_t lastVertexIndex = static_cast<uint32_t>(m_editor->state->level->vertices.size() - 1);
-    removeSelectionId(editor::makeObjectId(editor::EditorObjectType::VERTEX, index));
-
-    if (index != lastVertexIndex) {
-      auto &lastVertex = m_editor->state->level->vertices.back();
-
-      for (uint32_t ldObjectId : lastVertex.connectedLineDefs) {
-        auto ldIndex = editor::getObjectIndex(ldObjectId);
-        auto &ld = m_editor->state->findLinedef(ldIndex);
-
-        if (ld.start == lastVertexIndex) ld.start = index;
-        if (ld.end == lastVertexIndex) ld.end = index;
-      }
-
-      replaceSelectionId(editor::makeObjectId(editor::EditorObjectType::VERTEX, lastVertexIndex),
-        editor::makeObjectId(editor::EditorObjectType::VERTEX, index));
-
-      vertex = lastVertex;
-    }
-    m_editor->state->level->vertices.pop_back();
   }
 
   ImGui::End();
@@ -453,8 +331,8 @@ void ImguiRenderer::drawSelectedVertexPopup(uint32_t objectId)
 
 void ImguiRenderer::createSelect(const char *label,
   const std::vector<gameloop::SideDef> &sidedefs,
-  int16_t &currentItem,
-  bool hasReset)
+  int32_t &currentItem,
+  const bool hasReset)
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
     if (hasReset) {
@@ -478,9 +356,7 @@ void ImguiRenderer::createSelect(const char *label,
 }
 
 constexpr ImVec2 ImguiRenderer::scale(ImVec2 vec, float_t scaleFactor)
-{
-  return { scaleFactor * vec.x, scaleFactor * vec.y };
-}
+{ return { scaleFactor * vec.x, scaleFactor * vec.y }; }
 
 
 }// namespace imguirenderer
