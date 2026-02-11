@@ -137,7 +137,16 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
       makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
   }
 
-  // TODO: process sectors
+  // process sectors
+  for (const auto &[floorHeight, ceilingHeight, specialType, lightLevel, tag] : _level.sectors) {
+    editorSectors.emplace_back();
+    auto &sec = editorSectors.back();
+    sec.floorHeight = floorHeight;
+    sec.ceilingHeight = ceilingHeight;
+    sec.specialType = specialType;
+    sec.lightLevel = lightLevel;
+    sec.tag = tag;
+  }
 
   this->level = std::make_unique<EditorLevel>(
     std::move(editorVertices), std::move(editorLinedefs), std::move(editorSectors), _level.sidedefs);
@@ -168,6 +177,9 @@ void EditorState::reset()
 
   isCreatingLine = false;
   lineStartVertexId = 0;
+
+  isBlockSelecting = false;
+  blockSelectionStart = { 0, 0 };
 
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
@@ -245,49 +257,56 @@ void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
   // level.linedefs.emplace_back(ld);
 }
 
-void Editor::addVertex(const int32_t sectorId, const int16_t x, const int16_t y) const
+void Editor::addVertex(const int16_t x, const int16_t y) const
 {
   m_history->execute(std::make_unique<commands::AddVertexCommand>(EditorVertex(x, y)), *state);
 
-  if (sectorId == -1) return;
 
   float_t dMin1 = std::numeric_limits<float_t>::max(), dMin2 = std::numeric_limits<float_t>::max();
   int16_t firstVertexIdx, secondVertexIdx;
 
   // find nearest two vertices with which to connect a vertex
-  auto &sector = state->findSector(sectorId);
-
-  for (const uint32_t ldIndex : sector.linedefIds) {
-    auto &ld = state->findLinedef(ldIndex);
-
-    auto &start = state->findVertex(ld.start);
-    auto &end = state->findVertex(ld.end);
-
-    float_t d1 = math_utils::getDistanceSq(start.x, start.y, x, y);
-    float_t d2 = math_utils::getDistanceSq(end.x, end.y, x, y);
-
-    if (d1 < dMin1) {
-      dMin2 = dMin1;
-      dMin1 = d1;
-      secondVertexIdx = firstVertexIdx;
-      firstVertexIdx = ld.start;
-    } else if (d1 < dMin2) {
-      dMin2 = d1;
-      secondVertexIdx = ld.start;
-    }
-
-    if (d2 < dMin1) {
-      dMin2 = dMin1;
-      dMin1 = d2;
-      secondVertexIdx = firstVertexIdx;
-      firstVertexIdx = ld.end;
-    } else if (d2 < dMin2) {
-      dMin2 = d2;
-      secondVertexIdx = ld.end;
-    }
-  }
+  // auto &sector = state->findSector(sectorId);
+  //
+  // for (const uint32_t ldIndex : sector.linedefIds) {
+  //   auto &ld = state->findLinedef(ldIndex);
+  //
+  //   auto &start = state->findVertex(ld.start);
+  //   auto &end = state->findVertex(ld.end);
+  //
+  //   float_t d1 = math_utils::getDistanceSq(start.x, start.y, x, y);
+  //   float_t d2 = math_utils::getDistanceSq(end.x, end.y, x, y);
+  //
+  //   if (d1 < dMin1) {
+  //     dMin2 = dMin1;
+  //     dMin1 = d1;
+  //     secondVertexIdx = firstVertexIdx;
+  //     firstVertexIdx = ld.start;
+  //   } else if (d1 < dMin2) {
+  //     dMin2 = d1;
+  //     secondVertexIdx = ld.start;
+  //   }
+  //
+  //   if (d2 < dMin1) {
+  //     dMin2 = dMin1;
+  //     dMin1 = d2;
+  //     secondVertexIdx = firstVertexIdx;
+  //     firstVertexIdx = ld.end;
+  //   } else if (d2 < dMin2) {
+  //     dMin2 = d2;
+  //     secondVertexIdx = ld.end;
+  //   }
+  // }
 }
 
-void Editor::executeCommand(std::unique_ptr<commands::Command> cmd) { m_history->execute(std::move(cmd), *state); }
+void Editor::executeCommand(std::unique_ptr<commands::Command> cmd) const
+{ m_history->execute(std::move(cmd), *state); }
+
+
+void Editor::drawConnectedLine(const uint32_t vertexIndex) const
+{
+  state->isCreatingLine = true;
+  state->lineStartVertexId = vertexIndex;
+}
 
 }// namespace editor

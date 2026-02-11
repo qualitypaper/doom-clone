@@ -5,14 +5,15 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
+#include "imgui_internal.h"
 
 #include <algorithm>
+#include <fmt/core.h>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace imguirenderer {
-
 static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
 static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
 static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
@@ -73,8 +74,6 @@ void ImguiRenderer::endFrame() const
 
 void ImguiRenderer::render() const
 {
-
-
   // Start the Dear ImGui frame
   startFrame();
 
@@ -98,13 +97,21 @@ void ImguiRenderer::render() const
   // so (x, y) will be now (y, x)
   m_editor->processInput(vertexRadius);
 
+  // render a window showing all the sidedefs and sectors
+  drawSectorsWindow();
+
+  // render a window showing all sidedefs
+  drawSidedefsWindow();
+
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
     showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
 
+  // draw map outlines
   drawMapOutlines(vertexRadius, thickness);
 
+  // draw popups for selected objects
   for (const auto &objectId : m_editor->state->selection) {
     const auto object = m_editor->state->findObject(objectId);
     if (!object) continue;
@@ -116,13 +123,99 @@ void ImguiRenderer::render() const
     }
   }
 
+  // draw line creation preview
+
+  if (m_editor->state->isCreatingLine) {
+    const auto &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
+
+    const ImVec2 mousePos = ImGui::GetMousePos();
+
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    drawList->AddLine(startVertex.toImVec2(), mousePos, g_hoverColor, thickness);
+  }
+
   ImGui::End();
 
   endFrame();
 }
 
-void ImguiRenderer::drawConnectedLineDefs(const editor::EditorLineDef &ld,
-  const std::vector<uint32_t> &connectedLineDefs,
+
+void ImguiRenderer::drawSidedefsWindow() const
+{
+  ImGui::Begin("SideDefs");
+
+  if (ImGui::Button("Create sidedef")) {
+    // create new sidedef
+    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0);
+  }
+
+  for (size_t i = 0; i < m_editor->state->level->sidedefs.size(); i++) {
+    auto &sideDef = m_editor->state->level->sidedefs[i];
+    ImGui::PushID(i);
+
+    ImGui::Text("Sidedef: %d", i);
+
+    int sectorId = sideDef.sectorId;
+    int xOffset = sideDef.xOffset;
+    int yOffset = sideDef.yOffset;
+
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::InputInt("Sector id", &sectorId)) {
+      // update sector id
+      sideDef.sectorId = static_cast<int16_t>(sectorId);
+    }
+
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::InputInt("Texture offset x", &xOffset)) {
+      // update texture offset x
+      sideDef.xOffset = static_cast<int16_t>(xOffset);
+    }
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::InputInt("Texture offset y", &yOffset)) {
+      // update texture offset y
+      sideDef.yOffset = static_cast<int16_t>(yOffset);
+    }
+
+    ImGui::NewLine();
+    ImGui::PopID();
+  }
+
+  ImGui::End();
+}
+
+void ImguiRenderer::drawSectorsWindow() const
+{
+
+  ImGui::Begin("Sectors");
+
+  if (ImGui::Button("Create sector")) { m_editor->state->level->sectors.emplace_back(); }
+
+  for (uint32_t sectorId = 0; sectorId < m_editor->state->level->sectors.size(); sectorId++) {
+    auto &sector = m_editor->state->findSector(sectorId);
+    ImGui::PushID(sectorId);
+
+    ImGui::Text("Sector: %d", sectorId);
+    ImGui::SetNextItemWidth(100);
+    int floorHeight = sector.floorHeight;
+    int ceilingHeight = sector.ceilingHeight;
+    if (ImGui::InputInt("Sector floor height", &floorHeight)) {
+      sector.floorHeight = static_cast<int16_t>(floorHeight);
+    }
+    ImGui::SetNextItemWidth(100);
+    if (ImGui::InputInt("Sector ceiling height", &ceilingHeight)) {
+      sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
+    }
+
+
+    ImGui::NewLine();
+    ImGui::PopID();
+  }
+
+  ImGui::End();
+}
+
+void ImguiRenderer::drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,
+  const editor::EditorLineDef &ld,
   const ImVec2 startDragged,
   const ImVec2 endDragged,
   ImDrawList *drawList,
@@ -148,12 +241,93 @@ void ImguiRenderer::drawConnectedLineDefs(const editor::EditorLineDef &ld,
   }
 }
 
-void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
+void ImguiRenderer::drawSelectedVertex(const uint32_t objectId,
+  const float_t vertexRadius,
+  const float_t thickness,
+  ImDrawList *drawList) const
 {
+  const auto index = editor::getObjectIndex(objectId);
+  const auto &v = m_editor->state->findVertex(index);
 
-  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  const ImVec2 dragged(static_cast<float_t>(v.x) + m_editor->state->draggingOffset.x,
+    static_cast<float_t>(v.y) + m_editor->state->draggingOffset.y);
 
-  // draw outlines
+  drawList->AddCircleFilled(dragged, vertexRadius, g_selectedColor);
+
+  // draw every linedef connected to this vertex
+  for (auto &ld : m_editor->state->level->linedefs) {
+    if (ld.start == index || ld.end == index) {
+      const auto otherVertexIndex = ld.start == index ? ld.end : ld.start;
+      auto &otherVertex = m_editor->state->findVertex(otherVertexIndex);
+
+      drawList->AddLine(dragged, otherVertex.toImVec2(), g_selectedColor, thickness);
+    }
+  }
+}
+void ImguiRenderer::drawSelectedLineDef(const uint32_t objectId,
+  const float_t vertexRadius,
+  const float_t thickness,
+  ImDrawList *drawList) const
+{
+  const auto index = editor::getObjectIndex(objectId);
+  auto &ld = m_editor->state->findLinedef(index);
+  auto start = m_editor->state->findVertex(ld.start);
+  auto end = m_editor->state->findVertex(ld.end);
+
+  ImVec2 startDragged(static_cast<float_t>(start.x) + m_editor->state->draggingOffset.x,
+    static_cast<float_t>(start.y) + m_editor->state->draggingOffset.y);
+  ImVec2 endDragged(static_cast<float_t>(end.x) + m_editor->state->draggingOffset.x,
+    static_cast<float_t>(end.y) + m_editor->state->draggingOffset.y);
+
+  drawList->AddLine(startDragged, endDragged, g_selectedColor, thickness);
+
+  drawList->AddCircleFilled(startDragged, vertexRadius, g_defaultColor);
+  drawList->AddCircleFilled(endDragged, vertexRadius, g_defaultColor);
+
+  // find all the linedefs connected to end/start and draw them to this line
+  drawConnectedLineDefs(start.connectedLineDefs, ld, startDragged, endDragged, drawList, thickness);
+  drawConnectedLineDefs(end.connectedLineDefs, ld, startDragged, endDragged, drawList, thickness);
+}
+void ImguiRenderer::drawSelection(const float_t vertexRadius, const float_t thickness, ImDrawList *drawList) const
+{
+  for (const uint32_t objectId : m_editor->state->selection) {
+    const auto object = m_editor->state->findObject(objectId);
+    if (!object) continue;
+
+    switch (object->type) {
+    case editor::EditorObjectType::LINEDEF: {
+      drawSelectedLineDef(objectId, vertexRadius, thickness, drawList);
+      break;
+    }
+    case editor::EditorObjectType::VERTEX: {
+      drawSelectedVertex(objectId, vertexRadius, thickness, drawList);
+      break;
+    }
+    default:
+      throw std::runtime_error("Selected an unexpected/unknown type.");
+    }
+  }
+}
+
+void ImguiRenderer::drawUnselectedVertices(const float_t vertexRadius, ImDrawList *drawList) const
+{
+  for (auto &v : m_editor->state->level->vertices) {
+    // selected vertices are processed separately
+    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) continue;
+
+    ImU32 color;
+
+    if (v.hovered) {
+      color = g_hoverColor;
+    } else {
+      color = g_defaultColor;
+    }
+
+    drawList->AddCircleFilled(v.toImVec2(), vertexRadius, color);
+  }
+}
+void ImguiRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *drawList) const
+{
   for (const auto &ld : m_editor->state->level->linedefs) {
     auto startVertex = m_editor->state->findVertex(ld.start);
     auto endVertex = m_editor->state->findVertex(ld.end);
@@ -177,76 +351,21 @@ void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t th
     }
 
     // tint a bit the color of the portal linedef
-    if (ld.backSidedef != -1) { color -= 0x32323200; }
+    if (ld.backSideDef != -1) { color -= 0x32323200; }
 
     drawList->AddLine(start, end, color, thickness);
   }
+}
+void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
+{
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
 
+  // draw outlines
+  drawUnselectedLineDefs(thickness, drawList);
   // draw vertices
-  for (auto &v : m_editor->state->level->vertices) {
-    // selected vertices are processed separately
-    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) continue;
-
-    ImU32 color;
-
-    if (v.hovered) {
-      color = g_hoverColor;
-    } else {
-      color = g_defaultColor;
-    }
-
-    drawList->AddCircleFilled(v.toImVec2(), vertexRadius, color);
-  }
-
+  drawUnselectedVertices(vertexRadius, drawList);
   // draw selected vertices/linedefs
-  for (const uint32_t objectId : m_editor->state->selection) {
-    const auto object = m_editor->state->findObject(objectId);
-    if (!object) continue;
-
-    switch (object->type) {
-    case editor::EditorObjectType::LINEDEF: {
-      const auto index = editor::getObjectIndex(objectId);
-      auto &ld = m_editor->state->findLinedef(index);
-      auto start = m_editor->state->findVertex(ld.start);
-      auto end = m_editor->state->findVertex(ld.end);
-
-      ImVec2 startDragged(start.x + m_editor->state->draggingOffset.x, start.y + m_editor->state->draggingOffset.y);
-      ImVec2 endDragged(end.x + m_editor->state->draggingOffset.x, end.y + m_editor->state->draggingOffset.y);
-
-      drawList->AddLine(startDragged, endDragged, g_selectedColor, thickness);
-
-      drawList->AddCircleFilled(startDragged, vertexRadius, g_defaultColor);
-      drawList->AddCircleFilled(endDragged, vertexRadius, g_defaultColor);
-
-      // find all the linedefs connected to end/start and draw them to this line
-      drawConnectedLineDefs(ld, start.connectedLineDefs, startDragged, endDragged, drawList, thickness);
-      drawConnectedLineDefs(ld, end.connectedLineDefs, startDragged, endDragged, drawList, thickness);
-
-      break;
-    }
-    case editor::EditorObjectType::VERTEX: {
-      const auto index = editor::getObjectIndex(objectId);
-      const auto &v = m_editor->state->findVertex(index);
-
-      ImVec2 dragged(v.x + m_editor->state->draggingOffset.x, v.y + m_editor->state->draggingOffset.y);
-
-      drawList->AddCircleFilled(dragged, vertexRadius, g_selectedColor);
-
-      // draw every linedef connected to this vertex
-      for (auto &ld : m_editor->state->level->linedefs) {
-        if (ld.start == index || ld.end == index) {
-          const auto otherVertexIndex = ld.start == index ? ld.end : ld.start;
-          auto &otherVertex = m_editor->state->findVertex(otherVertexIndex);
-
-          drawList->AddLine(dragged, otherVertex.toImVec2(), g_selectedColor, thickness);
-        }
-      }
-      break;
-    }
-    default:
-      throw std::runtime_error("Selected an unexpected/unknown type.");
-    }
-  }
+  drawSelection(vertexRadius, thickness, drawList);
 }
 
 void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const
@@ -258,7 +377,7 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
   const bool lineCreation = ImGui::Button("Create Line");
 
   if (vertexCreation) {
-    m_editor->addVertex(-1, static_cast<int16_t>(mousePos.x), static_cast<int16_t>(mousePos.y));
+    m_editor->addVertex(static_cast<int16_t>(mousePos.x), static_cast<int16_t>(mousePos.y));
     isOpen = false;
   } else if (connectedVertexCreation) {
     // TODO:
@@ -269,9 +388,9 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
   ImGui::End();
 }
 
-void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId) const
+void ImguiRenderer::drawSelectedLinePopup(const uint32_t lineId) const
 {
-  auto index = editor::getObjectIndex(objectId);
+  auto index = editor::getObjectIndex(lineId);
   auto &ld = m_editor->state->findLinedef(index);
 
   auto &start = m_editor->state->findVertex(ld.start);
@@ -280,6 +399,9 @@ void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId) const
   // render popup of linedef parameters
   const std::string windowTitle = "Linedef params " + std::to_string(index) + "###LinedefParams";
   ImGui::Begin(windowTitle.c_str());
+  ImGui::PushID(std::to_string(lineId).c_str());
+
+  ImGui::Text("LineDef params: %d", index);
 
   ImGui::SetNextItemWidth(80);
   ImGui::InputInt(": Start X", &start.x);
@@ -297,14 +419,18 @@ void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId) const
 
   ImGui::NewLine();
 
-  createSelect("Front Sidedef: ", m_editor->state->level->sidedefs, ld.frontSidedef);
-  createSelect("Back Sidedef: ", m_editor->state->level->sidedefs, ld.backSidedef, true);
+  const std::string frontSideDefLabel = fmt::format(":Front SideDef ##LDSidedef{0}", ld.start);
+  const std::string backSideDefLabel = fmt::format(":Back SideDef ##LDSidedef{0}", ld.end);
 
-  if (ImGui::Button("Delete")) {
-    editor::EditorLineDef::remove(*m_editor->state, index);
-    m_editor->state->selection.clear();
-  }
+  createSelect(frontSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.frontSideDef);
+  createSelect(backSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.backSideDef, true);
 
+  if (ImGui::Button("Delete")) { editor::EditorLineDef::remove(*m_editor->state, index); }
+
+  ImGui::NewLine();
+  ImGui::NewLine();
+
+  ImGui::PopID();
   ImGui::End();
 }
 
@@ -312,23 +438,22 @@ void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 {
   const uint32_t index = editor::getObjectIndex(selectedId);
 
-  const std::string windowTitle = "Vertex params: " + std::to_string(index) + "###VertexParams";
+  const auto &vertex = m_editor->state->findVertex(index);
+  const std::string windowTitle = "Vertex params: " + std::to_string(index) + "###Vertex" + std::to_string(index);
   ImGui::Begin(windowTitle.c_str());
 
-  if (ImGui::Button("Delete")) { editor::EditorVertex::remove(*m_editor->state, index); }
+  ImGui::PushID(std::to_string(selectedId).c_str());
 
-  for (auto &ldObjectId : m_editor->state->findVertex(index).connectedLineDefs) {
+  for (const auto &ldObjectId : vertex.connectedLineDefs) {
     const auto ldIndex = editor::getObjectIndex(ldObjectId);
-    const auto &ld = m_editor->state->findLinedef(ldIndex);
 
-    std::string ldLabel =
-      "Connected LineDef: " + std::to_string(ldIndex) + "###ConnectedLineDef" + std::to_string(ldIndex);
-    if (ImGui::Button(ldLabel.c_str())) {
-      m_editor->state->selection.clear();
-      m_editor->state->selection.emplace_back(ldObjectId);
-    }
+    ImGui::Text("Connected LineDef ID: %u", ldIndex);
   }
 
+  if (ImGui::Button("Create Connected Line")) { m_editor->drawConnectedLine(index); }
+  if (ImGui::Button("Delete")) { editor::EditorVertex::remove(*m_editor->state, index); }
+
+  ImGui::PopID();
   ImGui::End();
 }
 
@@ -339,23 +464,21 @@ void ImguiRenderer::createSelect(const char *label,
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
     // handling -1 option separately
-    if (hasReset) {
+    if (hasReset || currentItem == -1) {
       const bool isReset = currentItem == -1;
 
       const auto resetLabel = "-1";
       if (ImGui::Selectable(resetLabel, isReset)) { currentItem = -1; }
     }
 
-    if (currentItem != -1) {
-      for (size_t i = 0; i < sidedefs.size(); i++) {
-        const bool is_selected = static_cast<size_t>(currentItem) == i;
-        std::string optionLabel = std::to_string(i);
+    for (size_t i = 0; i < sidedefs.size(); i++) {
+      const bool is_selected = static_cast<size_t>(currentItem) == i;
+      std::string optionLabel = std::to_string(i);
 
-        if (ImGui::Selectable(optionLabel.c_str(), is_selected)) { currentItem = static_cast<int32_t>(i); }
+      if (ImGui::Selectable(optionLabel.c_str(), is_selected)) { currentItem = static_cast<int32_t>(i); }
 
-        // Set the initial focus when opening the combo (scrolling to selection)
-        if (is_selected) { ImGui::SetItemDefaultFocus(); }
-      }
+      // Set the initial focus when opening the combo (scrolling to selection)
+      if (is_selected) { ImGui::SetItemDefaultFocus(); }
     }
     ImGui::EndCombo();
   }

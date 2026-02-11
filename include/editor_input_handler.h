@@ -8,6 +8,7 @@ struct EditorInputHandler
 {
   EditorInputHandler() = default;
 
+  static void processMouseInputs(EditorState &state, commands::CommandHistory &history);
   static void processInput(EditorState &state, commands::CommandHistory &history, float_t vertexRadius);
   static void updateSelection(uint32_t id, bool selected, EditorState &state);
   static void resetSelection(EditorState &state);

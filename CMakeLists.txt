@@ -30,9 +30,13 @@ file(GLOB_RECURSE SOURCES "src/*.cpp")
 
 find_package(glm REQUIRED)
 find_package(SDL2 REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME}
     ${SOURCES}
+        src/renderer/commands.cpp
+        src/bsp/bsp.cpp
+        include/bsp.h
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -46,6 +50,7 @@ target_link_libraries(${PROJECT_NAME}
         glm::glm
         SDL2::SDL2
         SDL2::SDL2main
+        fmt::fmt
 )
 
 # ---- Install rules ----

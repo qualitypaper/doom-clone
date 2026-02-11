@@ -59,21 +59,21 @@ struct EditorLineDef : EditorObject
 {
   EditorLineDef(const gameloop::LineDef &_linedef)
     : EditorObject(EditorObjectType::LINEDEF), start(_linedef.start), end(_linedef.end), type(_linedef.type),
-      frontSidedef(_linedef.frontSidedef), backSidedef(_linedef.backSidedef)
+      frontSideDef(_linedef.frontSidedef), backSideDef(_linedef.backSidedef)
   {}
-  EditorLineDef(uint32_t _start,
-    uint32_t _end,
-    gameloop::LineDefType _type,
-    uint32_t _frontSidedef,
-    uint32_t _backSidedef)
-    : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSidedef(_frontSidedef),
-      backSidedef(_backSidedef)
+  EditorLineDef(const uint32_t _start,
+    const uint32_t _end,
+    const gameloop::LineDefType _type,
+    const uint32_t _frontSideDef,
+    const uint32_t _backSideDef)
+    : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSideDef(_frontSideDef),
+      backSideDef(_backSideDef)
   {}
   uint32_t start;
   uint32_t end;
   gameloop::LineDefType type;
-  int32_t frontSidedef;
-  int32_t backSidedef;
+  int32_t frontSideDef;
+  int32_t backSideDef;
 
   static void remove(const EditorState &state, uint32_t ldId);
 };
@@ -126,11 +126,11 @@ struct EditorSector : EditorObject
 {
   EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
 
-  int16_t floorHeight;
-  int16_t ceilingHeight;
-  int16_t specialType;
-  int16_t lightLevel;
-  int16_t tag;
+  int16_t floorHeight = 0;
+  int16_t ceilingHeight = 0;
+  int16_t specialType = 0;
+  int16_t lightLevel = 0;
+  int16_t tag = 0;
   AABB bounding_box;
   std::vector<uint32_t> linedefIds;
 };
@@ -246,10 +246,11 @@ public:
   Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height);
 
   void processInput(float_t vertexRadius) const;
-  void executeCommand(std::unique_ptr<commands::Command> cmd);
+  void executeCommand(std::unique_ptr<commands::Command> cmd) const;
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
   void addLineDef(int32_t sectorId, gameloop::LineDef &lineDef);
-  void addVertex(int32_t sectorId, int16_t x, int16_t y) const;
+  void addVertex(int16_t x, int16_t y) const;
+  void drawConnectedLine(uint32_t vertexIndex) const;
 };
 
 }// namespace editor

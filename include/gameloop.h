@@ -40,6 +40,8 @@ struct Vertex
 struct SideDef
 {
   int16_t sectorId;
+  int16_t xOffset = 0;
+  int16_t yOffset = 0;
 };
 
 enum class LineDefType { REGULAR, DOOR };

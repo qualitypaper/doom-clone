@@ -18,15 +18,15 @@ private:
   SDL_Renderer *renderer;
   SDL_Texture *texture;
 public:
-  SdlWindow(int16_t width, int16_t height);
+  SdlWindow(uint16_t width, uint16_t height);
   ~SdlWindow();
 
-  int16_t width, height;
+  uint16_t width, height;
 
-  void updatePixels(uint32_t *pixels);
-  void updateScreen();
+  void updatePixels(const uint32_t *pixels);
+  void updateScreen() const;
 
-  SDL_Window *getWindow();
-  SDL_Renderer *getRenderer();
+  SDL_Window *getWindow() const;
+  SDL_Renderer *getRenderer() const;
 };
 }// namespace sdl_window

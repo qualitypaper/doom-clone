@@ -28,15 +28,22 @@ private:
   static void startFrame();
   void endFrame() const;
 
+  void drawSidedefsWindow() const;
+  void drawSectorsWindow() const;
   void drawSelectedLinePopup(uint32_t selectedId) const;
   void drawSelectedVertexPopup(uint32_t selectedId) const;
   void drawMapOutlines(float_t vertexRadius, float_t thickness) const;
-  void drawConnectedLineDefs(const editor::EditorLineDef &ld,
-    const std::vector<uint32_t> &connectedLineDefs,
+  void drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,
+    const editor::EditorLineDef &ld,
     ImVec2 startDragged,
     ImVec2 endDragged,
     ImDrawList *drawList,
     float_t thickness) const;
+  void drawSelectedVertex(uint32_t objectId, float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
+  void drawSelectedLineDef(uint32_t objectId, float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
+  void drawSelection(float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
+  void drawUnselectedVertices(float_t vertexRadius, ImDrawList *drawList) const;
+  void drawUnselectedLineDefs(float_t thickness, ImDrawList *drawList) const;
 
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const;
 
