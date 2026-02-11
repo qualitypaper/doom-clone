@@ -56,8 +56,7 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
   }
   std::erase_if(
     vStart.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
-  std::erase_if(
-    vEnd.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+  std::erase_if(vEnd.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
 
   state.level->linedefs.pop_back();
 }
@@ -67,8 +66,8 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   auto &vertex = state.level->vertices[vertexId];
   // Remove all linedefs that reference this vertex (iterate backwards to avoid index issues)
   for (int i = static_cast<int>(vertex.connectedLineDefs.size()) - 1; i >= 0; i--) {
-    uint32_t ldId = editor::getObjectIndex(vertex.connectedLineDefs[i]);
-    auto &ld = state.level->linedefs[ldId];
+    uint32_t ldId = getObjectIndex(vertex.connectedLineDefs[i]);
+    const auto &ld = state.level->linedefs[ldId];
 
     if (ld.start == vertexId) {
       auto &vEnd = state.findVertex(ld.end);
@@ -86,7 +85,7 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   }
 
   // Remove the vertex using swap-and-pop
-  const uint32_t lastVertexIndex = static_cast<uint32_t>(state.level->vertices.size() - 1);
+  const auto lastVertexIndex = static_cast<uint32_t>(state.level->vertices.size() - 1);
 
   if (vertexId != lastVertexIndex) {
     const auto &lastVertex = state.level->vertices.back();
@@ -116,12 +115,12 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
   editorLinedefs.reserve(_level.linedefs.size());
   editorSectors.reserve(_level.sectors.size());
 
-  std::unordered_map<int16_t, uint32_t> vertexIdMap;
+  std::unordered_map<size_t, uint32_t> vertexIdMap;
   vertexIdMap.reserve(_level.vertices.size());
 
   // process vertices
-  for (uint16_t i = 0; i < _level.vertices.size(); ++i) {
-    auto &v = _level.vertices[i];
+  for (size_t i = 0; i < _level.vertices.size(); ++i) {
+    const auto &v = _level.vertices[i];
 
     auto convertedImvec2 = math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
     editorVertices.emplace_back(convertedImvec2.x, convertedImvec2.y);
@@ -129,11 +128,12 @@ EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _hei
   }
 
   // process linedefs
-  for (auto &ld : _level.linedefs) {
-    editorLinedefs.emplace_back(vertexIdMap[ld.start], vertexIdMap[ld.end], ld.type, ld.frontSidedef, ld.backSidedef);
-    editorVertices[vertexIdMap[ld.start]].connectedLineDefs.emplace_back(
+  for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
+    editorLinedefs.emplace_back(vertexIdMap[start], vertexIdMap[end], type, frontSidedef, backSidedef);
+
+    editorVertices[vertexIdMap[start]].connectedLineDefs.emplace_back(
       makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
-    editorVertices[vertexIdMap[ld.end]].connectedLineDefs.emplace_back(
+    editorVertices[vertexIdMap[end]].connectedLineDefs.emplace_back(
       makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
   }
 
@@ -216,15 +216,16 @@ Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
   this->m_history = std::make_unique<commands::CommandHistory>();
 }
 
-void Editor::processInput() { this->m_inputHandler->processInput(*this->state, *this->m_history); }
+void Editor::processInput(const float_t vertexRadius) const
+{ EditorInputHandler::processInput(*this->state, *this->m_history, vertexRadius); }
 
 void Editor::addLineDef(int32_t sectorId, gameloop::LineDef &linedef)
 {
-  state.get()->level.get()->linedefs.emplace_back(linedef);
+  state->level->linedefs.emplace_back(linedef);
 
   if (sectorId == -1) return;
 
-  auto sector = state.get()->findSector(sectorId);
+  auto sector = state->findSector(sectorId);
 
   sector.linedefIds.emplace_back();
   this->updateAABB(sectorId);
@@ -244,9 +245,9 @@ void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
   // level.linedefs.emplace_back(ld);
 }
 
-void Editor::addVertex(int32_t sectorId, int16_t x, int16_t y)
+void Editor::addVertex(const int32_t sectorId, const int16_t x, const int16_t y) const
 {
-  m_history->execute(std::unique_ptr<commands::AddVertexCommand>(new commands::AddVertexCommand({ x, y })), *state);
+  m_history->execute(std::make_unique<commands::AddVertexCommand>(EditorVertex(x, y)), *state);
 
   if (sectorId == -1) return;
 
@@ -256,7 +257,7 @@ void Editor::addVertex(int32_t sectorId, int16_t x, int16_t y)
   // find nearest two vertices with which to connect a vertex
   auto &sector = state->findSector(sectorId);
 
-  for (int16_t ldIndex : sector.linedefIds) {
+  for (const uint32_t ldIndex : sector.linedefIds) {
     auto &ld = state->findLinedef(ldIndex);
 
     auto &start = state->findVertex(ld.start);

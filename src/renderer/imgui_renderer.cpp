@@ -74,12 +74,16 @@ void ImguiRenderer::endFrame() const
 void ImguiRenderer::render() const
 {
 
+
   // Start the Dear ImGui frame
   startFrame();
 
   const ImGuiIO &io = ImGui::GetIO();
   ImGui::SetNextWindowPos(ImVec2(0, 0));
   ImGui::SetNextWindowSize(io.DisplaySize);
+
+  const float_t thickness = 2.0f * m_editor->state->canvasZoom;
+  const float_t vertexRadius = 4.0f * m_editor->state->canvasZoom;
 
   // 2. Set flags to make it invisible and non-interactive
   constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
@@ -92,14 +96,14 @@ void ImguiRenderer::render() const
 
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
-  m_editor->processInput();
+  m_editor->processInput(vertexRadius);
 
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
     showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
 
-  drawMapOutlines();
+  drawMapOutlines(vertexRadius, thickness);
 
   for (const auto &objectId : m_editor->state->selection) {
     const auto object = m_editor->state->findObject(objectId);
@@ -144,10 +148,8 @@ void ImguiRenderer::drawConnectedLineDefs(const editor::EditorLineDef &ld,
   }
 }
 
-void ImguiRenderer::drawMapOutlines() const
+void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
 {
-  const float_t thickness = 2.0f * m_editor->state->canvasZoom;
-  const float_t vertexRadius = 4.0f * m_editor->state->canvasZoom;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
@@ -251,12 +253,12 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
 {
   ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
-  bool vertexCreation = ImGui::Button("Create Vertex");
-  bool connectedVertexCreation = ImGui::Button("Create Connected Vertex");
-  bool lineCreation = ImGui::Button("Create Line");
+  const bool vertexCreation = ImGui::Button("Create Vertex");
+  const bool connectedVertexCreation = ImGui::Button("Create Connected Vertex");
+  const bool lineCreation = ImGui::Button("Create Line");
 
   if (vertexCreation) {
-    m_editor.get()->addVertex(-1, static_cast<int16_t>(mousePos.x), static_cast<int16_t>(mousePos.y));
+    m_editor->addVertex(-1, static_cast<int16_t>(mousePos.x), static_cast<int16_t>(mousePos.y));
     isOpen = false;
   } else if (connectedVertexCreation) {
     // TODO:
@@ -276,7 +278,7 @@ void ImguiRenderer::drawSelectedLinePopup(uint32_t objectId) const
   auto &end = m_editor->state->findVertex(ld.end);
 
   // render popup of linedef parameters
-  std::string windowTitle = "Linedef params " + std::to_string(index) + "###LinedefParams";
+  const std::string windowTitle = "Linedef params " + std::to_string(index) + "###LinedefParams";
   ImGui::Begin(windowTitle.c_str());
 
   ImGui::SetNextItemWidth(80);
@@ -319,7 +321,8 @@ void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
     const auto ldIndex = editor::getObjectIndex(ldObjectId);
     const auto &ld = m_editor->state->findLinedef(ldIndex);
 
-    std::string ldLabel = "Connected LineDef: " + std::to_string(ldIndex) + "###ConnectedLineDef" + std::to_string(ldIndex);
+    std::string ldLabel =
+      "Connected LineDef: " + std::to_string(ldIndex) + "###ConnectedLineDef" + std::to_string(ldIndex);
     if (ImGui::Button(ldLabel.c_str())) {
       m_editor->state->selection.clear();
       m_editor->state->selection.emplace_back(ldObjectId);
@@ -335,27 +338,30 @@ void ImguiRenderer::createSelect(const char *label,
   const bool hasReset)
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
+    // handling -1 option separately
     if (hasReset) {
-      bool isReset = currentItem == -1;
+      const bool isReset = currentItem == -1;
 
-      const char *resetLabel = "-1";
+      const auto resetLabel = "-1";
       if (ImGui::Selectable(resetLabel, isReset)) { currentItem = -1; }
     }
 
-    for (uint16_t i = 0; i < sidedefs.size(); i++) {
-      bool is_selected = (currentItem == i);
-      std::string optionLabel = std::to_string(i);
+    if (currentItem != -1) {
+      for (size_t i = 0; i < sidedefs.size(); i++) {
+        const bool is_selected = static_cast<size_t>(currentItem) == i;
+        std::string optionLabel = std::to_string(i);
 
-      if (ImGui::Selectable(optionLabel.c_str(), is_selected)) { currentItem = i; }
+        if (ImGui::Selectable(optionLabel.c_str(), is_selected)) { currentItem = static_cast<int32_t>(i); }
 
-      // Set the initial focus when opening the combo (scrolling to selection)
-      if (is_selected) { ImGui::SetItemDefaultFocus(); }
+        // Set the initial focus when opening the combo (scrolling to selection)
+        if (is_selected) { ImGui::SetItemDefaultFocus(); }
+      }
     }
     ImGui::EndCombo();
   }
 }
 
-constexpr ImVec2 ImguiRenderer::scale(ImVec2 vec, float_t scaleFactor)
+constexpr ImVec2 ImguiRenderer::scale(const ImVec2 vec, const float_t scaleFactor)
 { return { scaleFactor * vec.x, scaleFactor * vec.y }; }
 
 

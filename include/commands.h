@@ -2,6 +2,7 @@
 #include "editor.h"
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 namespace commands {
@@ -17,18 +18,18 @@ struct MoveVertexCommand : Command
   uint32_t vertexId;
   editor::EditorVertex oldVertex, newVertex;
 
-  MoveVertexCommand(uint32_t _vertexId, editor::EditorVertex _oldVertex, editor::EditorVertex _newVertex)
-    : vertexId(_vertexId), oldVertex(_oldVertex), newVertex(_newVertex)
+  MoveVertexCommand(const uint32_t _vertexId, editor::EditorVertex _oldVertex, editor::EditorVertex _newVertex)
+    : vertexId(_vertexId), oldVertex(std::move(_oldVertex)), newVertex(std::move(_newVertex))
   {}
 
-  void execute(editor::EditorState &state)
+  void execute(editor::EditorState &state) override
   {
     auto &vertex = state.findVertex(vertexId);
     vertex.x = newVertex.x;
     vertex.y = newVertex.y;
   }
 
-  void undo(editor::EditorState &state)
+  void undo(editor::EditorState &state) override
   {
     auto &vertex = state.findVertex(vertexId);
     vertex.x = oldVertex.x;
@@ -47,21 +48,35 @@ struct MoveLineDefCommand : Command
     editor::EditorVertex _oldEnd,
     editor::EditorVertex _newStart,
     editor::EditorVertex _newEnd)
-    : lineDefId(_lineDefId), oldStart(_oldStart), oldEnd(_oldEnd), newStart(_newStart), newEnd(_newEnd)
+    : lineDefId(_lineDefId), oldStart(std::move(_oldStart)), oldEnd(std::move(_oldEnd)), newStart(std::move(_newStart)),
+      newEnd(std::move(_newEnd))
   {}
 
-  void execute(editor::EditorState &state)
+  void execute(editor::EditorState &state) override
   {
-    auto &lineDef = state.findLinedef(lineDefId);
-    state.findVertex(editor::getObjectIndex(lineDef.start)) = newStart;
-    state.findVertex(editor::getObjectIndex(lineDef.end)) = newEnd;
+    const auto &lineDef = state.findLinedef(lineDefId);
+
+    auto &startVertex = state.findVertex(editor::getObjectIndex(lineDef.start));
+    auto &endVertex = state.findVertex(editor::getObjectIndex(lineDef.end));
+
+    startVertex.x = newStart.x;
+    startVertex.y = newStart.y;
+
+    endVertex.x = newEnd.x;
+    endVertex.y = newEnd.y;
   }
 
-  void undo(editor::EditorState &state)
+  void undo(editor::EditorState &state) override
   {
-    auto &lineDef = state.findLinedef(lineDefId);
-    state.findVertex(editor::getObjectIndex(lineDef.start)) = oldStart;
-    state.findVertex(editor::getObjectIndex(lineDef.end)) = oldEnd;
+    const auto &lineDef = state.findLinedef(lineDefId);
+    auto &startVertex = state.findVertex(editor::getObjectIndex(lineDef.start));
+    auto &endVertex = state.findVertex(editor::getObjectIndex(lineDef.end));
+
+    startVertex.x = oldStart.x;
+    startVertex.y = oldStart.y;
+
+    endVertex.x = oldEnd.x;
+    endVertex.y = oldEnd.y;
   }
 };
 
@@ -69,11 +84,11 @@ struct AddVertexCommand : Command
 {
   editor::EditorVertex vertex;
 
-  AddVertexCommand(editor::EditorVertex _vertex) : vertex(_vertex) {}
+  explicit AddVertexCommand(editor::EditorVertex _vertex) : vertex(std::move(_vertex)) {}
 
-  void execute(editor::EditorState &state) { state.level->vertices.emplace_back(vertex); }
+  void execute(editor::EditorState &state) override { state.level->vertices.emplace_back(vertex); }
 
-  void undo(editor::EditorState &state) { state.level->vertices.pop_back(); }
+  void undo(editor::EditorState &state) override { state.level->vertices.pop_back(); }
 };
 
 struct CommandHistory
@@ -83,7 +98,7 @@ struct CommandHistory
 
   void execute(std::unique_ptr<Command> cmd, editor::EditorState &state)
   {
-    cmd.get()->execute(state);
+    cmd->execute(state);
     undoStack.emplace_back(std::move(cmd));
     // new action resets the redoStack
     redoStack.clear();
@@ -91,17 +106,25 @@ struct CommandHistory
 
   void undo(editor::EditorState &state)
   {
-    auto &lastCmd = undoStack.back();
-    lastCmd.get()->undo(state);
+    if (undoStack.empty()) return;
 
+    auto lastCmd = std::move(undoStack.back());
+    lastCmd->undo(state);
     undoStack.pop_back();
+
+    redoStack.emplace_back(std::move(lastCmd));
   }
 
   void redo(editor::EditorState &state)
   {
-    auto &undoneCommand = redoStack.back();
-    undoneCommand.get()->execute(state);
+    if (redoStack.empty()) return;
+    std::cout << "redoing command\n";
+
+    auto undoneCommand = std::move(redoStack.back());
     redoStack.pop_back();
+
+    undoneCommand->execute(state);
+    undoStack.emplace_back(std::move(undoneCommand));
   }
 };
 }// namespace commands

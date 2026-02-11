@@ -11,12 +11,12 @@
 
 namespace editor {
 
-void EditorInputHandler::processInput(EditorState &state, commands::CommandHistory &history)
+void EditorInputHandler::processInput(EditorState &state, commands::CommandHistory &history, const float_t vertexRadius)
 {
   static float_t s_vertexHoveringThresholdSq = 25.0f * 25.0f;
   static float_t s_lineHoveringThresholdSq = 25.0f * 25.0f;
 
-  ImGuiIO &io = ImGui::GetIO();
+  const ImGuiIO &io = ImGui::GetIO();
 
   if (!io.WantCaptureKeyboard) {
     // reset the state when pressing escape
@@ -36,10 +36,13 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     }
   }
 
-  ImVec2 mousePos = ImGui::GetMousePos();
-  bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
+  const ImVec2 mousePos = ImGui::GetMousePos();
+  const bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
 
-  if (mousePos.x < 0 || mousePos.x > state.width || mousePos.y < 0 || mousePos.y > state.height) { return; }
+  if (mousePos.x < 0 || mousePos.x > static_cast<float_t>(state.width) || mousePos.y < 0
+      || mousePos.y > static_cast<float_t>(state.height)) {
+    return;
+  }
 
   if (!io.WantCaptureMouse) {
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -53,19 +56,19 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
       } else {
 
         if (state.selection.empty()) {
-          // start creating a line if clicking on empty space
-          state.isCreatingLine = true;
-          
+          // start block selection
+          state.isBlockSelecting = true;
+          state.blockSelectionStart = mousePos;
+
         } else {
           // state dragging
-
           state.isDragging = true;
           state.draggingOffset = { 0, 0 };
           state.draggingStart = mousePos;
         }
       }
 
-    } else {
+    } else if (state.isDragging && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
       // flush and reset the dragging state when the mouse button is released
       flushDragging(state, history);
 
@@ -86,7 +89,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     // reset to the initial state
     vertex.hovered = false;
 
-    float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - 4.0f;
+    const float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - vertexRadius;
 
     if (nodeDis < bestVertexDist) {
       bestVertexDist = nodeDis;
@@ -103,7 +106,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     auto &start = state.findVertex(ld.start);
     auto &end = state.findVertex(ld.end);
 
-    float_t distance = getDistanceToSegmentSq(start.toImVec2(), end.toImVec2(), mousePos);
+    const float_t distance = getDistanceToSegmentSq(start.toImVec2(), end.toImVec2(), mousePos);
 
     if (distance < bestLineDist) {
       bestLineDist = distance;
@@ -111,11 +114,11 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     }
   }
 
-  bool hasVertex = bestVertexDist < s_vertexHoveringThresholdSq;
-  bool hasLine = bestLineDist < s_lineHoveringThresholdSq;
+  const bool hasVertex = bestVertexDist < s_vertexHoveringThresholdSq;
+  const bool hasLine = bestLineDist < s_lineHoveringThresholdSq;
 
   if (hasVertex || hasLine) {
-    bool chooseVertex = hasVertex && (!hasLine || bestVertexDist <= bestLineDist);
+    const bool chooseVertex = hasVertex && (!hasLine || bestVertexDist <= bestLineDist);
 
     if (chooseVertex) {
       auto &vertex = state.findVertex(bestVertexId);
@@ -142,18 +145,15 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
   }
 }
 
-void EditorInputHandler::updateSelection(uint32_t id, bool selected, EditorState &state)
+void EditorInputHandler::updateSelection(uint32_t id, const bool selected, EditorState &state)
 {
-  ImGuiIO &io = ImGui::GetIO();
+  const ImGuiIO &io = ImGui::GetIO();
 
   if (io.KeyCtrl && !io.WantCaptureKeyboard) {
     if (selected) {
       state.selection.emplace_back(id);
     } else {
-      state.selection.erase(
-        std::remove_if(
-          state.selection.begin(), state.selection.end(), [id](auto &selectedId) { return selectedId == id; }),
-        state.selection.end());
+      std::erase_if(state.selection, [id](auto &selectedId) { return selectedId == id; });
     }
     return;
   }
@@ -164,7 +164,7 @@ void EditorInputHandler::updateSelection(uint32_t id, bool selected, EditorState
 
 void EditorInputHandler::resetSelection(EditorState &state)
 {
-  for (uint32_t id : state.selection) {
+  for (const uint32_t id : state.selection) {
     auto object = state.findObject(id);
 
     if (object) object->selected = false;
@@ -172,28 +172,36 @@ void EditorInputHandler::resetSelection(EditorState &state)
   state.selection.clear();
 }
 
-void EditorInputHandler::flushDragging(editor::EditorState &state, commands::CommandHistory &history)
+void EditorInputHandler::flushDragging(EditorState &state, commands::CommandHistory &history)
 {
-  for (uint32_t id : state.selection) {
-    auto object = state.findObject(id);
+  // early return if there is no dragging offset
+  if (state.draggingOffset.x == 0 && state.draggingOffset.y == 0) return;
 
-    uint32_t index = editor::getObjectIndex(id);
-    EditorObjectType type = editor::getObjectType(id);
+  for (const uint32_t id : state.selection) {
+    const auto object = state.findObject(id);
+
+    uint32_t index = getObjectIndex(id);
+    const EditorObjectType type = getObjectType(id);
 
     if (object) {
       switch (type) {
       case EditorObjectType::VERTEX: {
         auto &vertex = state.findVertex(index);
-        auto cmd = std::make_unique<commands::MoveVertexCommand>(
-          index, vertex, editor::EditorVertex(vertex.x + state.draggingOffset.x, vertex.y + state.draggingOffset.y));
+        auto cmd = std::make_unique<commands::MoveVertexCommand>(index,
+          vertex,
+          EditorVertex(static_cast<int32_t>(static_cast<float_t>(vertex.x) + state.draggingOffset.x),
+            static_cast<int32_t>(static_cast<float_t>(vertex.y) + state.draggingOffset.y)));
+
         history.execute(std::move(cmd), state);
         break;
       }
       case EditorObjectType::LINEDEF: {
-        auto &line = state.findLinedef(index);
+        const auto &line = state.findLinedef(index);
         auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
+
         auto cmd = std::make_unique<commands::MoveLineDefCommand>(
-          index, start, end, start + state.draggingOffset, end + state.draggingOffset);
+          index, start, end, start.add(state.draggingOffset), end.add(state.draggingOffset));
+
         history.execute(std::move(cmd), state);
         break;
       }
@@ -205,26 +213,28 @@ void EditorInputHandler::flushDragging(editor::EditorState &state, commands::Com
 }
 
 // @param origin is the base point from which the distance will be calculated
-float_t EditorInputHandler::getDistanceToSegmentSq(ImVec2 start, ImVec2 end, ImVec2 origin)
+float_t EditorInputHandler::getDistanceToSegmentSq(const ImVec2 start, const ImVec2 end, const ImVec2 origin)
 {
-  ImVec2 startToOrigin(origin.x - start.x, origin.y - start.y);
-  ImVec2 startToEnd(end.x - start.x, end.y - start.y);
+  assert(start.x != end.x || start.y != end.y);
 
-  float_t startToEndLength = math_utils::getDistanceSq(start, end);
+  const ImVec2 startToOrigin(origin.x - start.x, origin.y - start.y);
+  const ImVec2 startToEnd(end.x - start.x, end.y - start.y);
+
+  const float_t startToEndLength = math_utils::getDistanceSq(start, end);
 
   // Via simple dot product rule: originToStart * cos(alpha) = <originToStart, startToEnd>/startToEndLength
   // which will be exactly the projection
-  float_t projectedOriginToStartDistance = math_utils::dotProduct(startToOrigin, startToEnd) / startToEndLength;
+  const float_t projectedOriginToStartDistance = math_utils::dotProduct(startToOrigin, startToEnd) / startToEndLength;
 
-  float_t clampedProjectionDistance = std::fmax(0, std::fmin(1, projectedOriginToStartDistance));
+  const float_t clampedProjectionDistance = std::clamp(projectedOriginToStartDistance, 0.0f, 1.0f);
 
   // point which is orthogonal to the origin
-  ImVec2 orthogonalPoint(
+  const ImVec2 orthogonalPoint(
     start.x + startToEnd.x * clampedProjectionDistance, start.y + startToEnd.y * clampedProjectionDistance);
 
   // calculing distance from origin to the orthogonal point
-  float_t dx = orthogonalPoint.x - origin.x;
-  float_t dy = orthogonalPoint.y - origin.y;
+  const float_t dx = orthogonalPoint.x - origin.x;
+  const float_t dy = orthogonalPoint.y - origin.y;
 
   return dx * dx + dy * dy;
 }

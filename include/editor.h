@@ -80,12 +80,19 @@ struct EditorLineDef : EditorObject
 
 struct EditorVertex : EditorObject
 {
-  EditorVertex(int32_t _x, int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
+  EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
 
   int32_t x, y;
   std::vector<uint32_t> connectedLineDefs;// Linedef object IDs (EditorObjectType::LINEDEF).
 
-  bool isAnyConnectedLineDefSelected(const EditorState &state) const;
+  [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
+  // immutable add
+  [[nodiscard]] EditorVertex add(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
+  [[nodiscard]] EditorVertex add(const ImVec2 &other) const
+  {
+    return { static_cast<int32_t>(static_cast<float_t>(x) + other.x),
+      static_cast<int32_t>(static_cast<float_t>(y) + other.y) };
+  }
 
   constexpr EditorVertex &operator+=(const EditorVertex &other)
   {
@@ -101,7 +108,7 @@ struct EditorVertex : EditorObject
 
     return *this;
   }
-  constexpr ImVec2 toImVec2() const { return ImVec2(x, y); }
+  [[nodiscard]] constexpr ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
   static void remove(EditorState &state, uint32_t vertexId);
 };
 constexpr EditorVertex &operator+(EditorVertex &lhs, const EditorVertex &rhs) noexcept
@@ -145,7 +152,6 @@ struct EditorLevel
 
 struct EditorState
 {
-  EditorState(std::unique_ptr<EditorLevel> _level) : level(std::move(_level)) {}
   EditorState(gameloop::Level &_level, uint16_t width, uint16_t height);
   void reset();
 
@@ -154,14 +160,20 @@ struct EditorState
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
 
-  // dragging logic
+  // dragging state
   bool isDragging = false;
   ImVec2 draggingOffset = { 0, 0 };
   ImVec2 draggingStart = { 0, 0 };
 
+  // block selection state
+  bool isBlockSelecting = false;
+  ImVec2 blockSelectionStart = { 0, 0 };
+
+  // line creation state
   bool isCreatingLine = false;
   uint32_t lineStartVertexId = 0;
 
+  // options window state
   bool renderOptionsWindow = false;
   ImVec2 optionsWindowPos = { 0, 0 };
 
@@ -171,7 +183,7 @@ struct EditorState
   ImVec2 canvasScroll = { 0.0, 0.0 };
   float canvasZoom = 1.0f;
 
-  EditorVertex &findVertex(uint32_t id) const
+  [[nodiscard]] EditorVertex &findVertex(const uint32_t id) const
   {
     if (id >= level->vertices.size()) {
       throw std::runtime_error("Index is bigger than the vertices array. Index: " + std::to_string(id));
@@ -180,24 +192,24 @@ struct EditorState
     return level->vertices[id];
   }
 
-  EditorSector &findSector(uint32_t id) const
+  [[nodiscard]] EditorSector &findSector(const uint32_t id) const
   {
     if (id >= level->sectors.size()) { throw std::runtime_error("Index is bigger than the sectors array."); }
 
     return level->sectors[id];
   }
 
-  EditorLineDef &findLinedef(uint32_t id) const
+  [[nodiscard]] EditorLineDef &findLinedef(const uint32_t id) const
   {
     if (id >= level->linedefs.size()) { throw std::runtime_error("Index is bigger than the linedefs array."); }
 
     return level->linedefs[id];
   }
 
-  EditorObject *findObject(uint32_t objectId)
+  [[nodiscard]] EditorObject *findObject(const uint32_t objectId) const
   {
-    auto type = getObjectType(objectId);
-    auto index = getObjectIndex(objectId);
+    const auto type = getObjectType(objectId);
+    const auto index = getObjectIndex(objectId);
 
     switch (type) {
     case EditorObjectType::VERTEX:
@@ -220,7 +232,7 @@ struct EditorState
 class Editor
 {
 private:
-  std::unique_ptr<editor::EditorInputHandler> m_inputHandler;
+  std::unique_ptr<EditorInputHandler> m_inputHandler;
   std::unique_ptr<commands::CommandHistory> m_history;
 
 private:
@@ -228,16 +240,16 @@ private:
   void updateAABB(uint32_t sectorID);
 
 public:
-  std::unique_ptr<editor::EditorState> state;
+  std::unique_ptr<EditorState> state;
 
 public:
   Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height);
 
-  void processInput();
+  void processInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<commands::Command> cmd);
   void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
   void addLineDef(int32_t sectorId, gameloop::LineDef &lineDef);
-  void addVertex(int32_t sectorId, int16_t x, int16_t y);
+  void addVertex(int32_t sectorId, int16_t x, int16_t y) const;
 };
 
 }// namespace editor
