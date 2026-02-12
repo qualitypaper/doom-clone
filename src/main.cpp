@@ -142,7 +142,7 @@ int main()
   // setup the game renderer
   framebuffer::FrameBuffer fb(sdlWindow);
   renderer::Renderer renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
-  editor::Editor editor(level, sdlWindow.width, sdlWindow.height, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
+  editor::Editor editor(level, sdlWindow.width, sdlWindow.height);
 
   running = true;
   // game loop

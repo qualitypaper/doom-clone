@@ -10,6 +10,7 @@
 #include "imgui_internal.h"
 
 #include <algorithm>
+#include <array>
 #include <fmt/core.h>
 #include <memory>
 #include <string>
@@ -44,7 +45,7 @@ ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &
   ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
 
-  this->m_editor = std::make_unique<editor::Editor>(level, sdlWindow.width, sdlWindow.height, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
+  this->m_editor = std::make_unique<editor::Editor>(level, sdlWindow.width, sdlWindow.height);
   this->m_editorInputHandler = std::make_unique<editor::EditorInputHandler>();
 }
 
@@ -177,13 +178,21 @@ void ImguiRenderer::drawSidedefsWindow() const
       // update texture offset y
       sideDef.yOffset = static_cast<int16_t>(yOffset);
     }
+    float color[3] = { ImGui::ColorConvertU32ToFloat4(sideDef.color).x,
+      ImGui::ColorConvertU32ToFloat4(sideDef.color).y,
+      ImGui::ColorConvertU32ToFloat4(sideDef.color).z };
+
+    if (ImGui::ColorPicker3("Sidedef color", color)) {
+      // update sidedef color
+      sideDef.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+    }
 
     ImGui::NewLine();
     ImGui::PopID();
   }
 
   ImGui::End();
-}
+}// namespace imguirenderer
 
 void ImguiRenderer::drawSectorsWindow() const
 {

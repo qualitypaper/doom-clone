@@ -42,6 +42,7 @@ struct SideDef
   int16_t sectorId = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
+  uint32_t color = 0xFFFFFFFF; // RGBA format
 };
 
 enum class LineDefType { REGULAR, DOOR };

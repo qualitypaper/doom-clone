@@ -7,11 +7,11 @@ namespace entity
 
     struct Player
     {
-        float_t x;
-        float_t y;
-        float_t z;
-        float_t velocity;
-        float_t angle;
+        double_t x;
+        double_t y;
+        double_t z;
+        double_t velocity;
+        double_t angle;
         uint8_t health{100};
         uint8_t armor;
         uint8_t current_weapon;

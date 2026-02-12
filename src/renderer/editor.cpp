@@ -24,11 +24,7 @@ AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
   this->minY = std::min(start.y, end.y);
 }
 
-void EditorLevel::serialize(const char *filename,
-  uint16_t width,
-  uint16_t height,
-  uint16_t canvasWidth,
-  uint16_t canvasHeight) const
+void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t height) const
 {
   std::ofstream file(filename, std::ios::binary);
 
@@ -81,10 +77,11 @@ void EditorLevel::serialize(const char *filename,
 
   // write sidedefs
   file.write(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
-  for (auto &[sectorId, xOffset, yOffset] : sidedefs) {
+  for (auto &[sectorId, xOffset, yOffset, color] : sidedefs) {
     file.write(reinterpret_cast<const char *>(&sectorId), sizeof(sectorId));
     file.write(reinterpret_cast<const char *>(&xOffset), sizeof(xOffset));
     file.write(reinterpret_cast<const char *>(&yOffset), sizeof(yOffset));
+    file.write(reinterpret_cast<const char *>(&color), sizeof(color));
   }
 
   // write sectors
@@ -158,6 +155,7 @@ void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
     in.read(reinterpret_cast<char *>(&sd.sectorId), sizeof(sd.sectorId));
     in.read(reinterpret_cast<char *>(&sd.xOffset), sizeof(sd.xOffset));
     in.read(reinterpret_cast<char *>(&sd.yOffset), sizeof(sd.yOffset));
+    in.read(reinterpret_cast<char *>(&sd.color), sizeof(sd.color));
     level.sidedefs.emplace_back(sd);
   }
   if (in.fail()) return;
@@ -265,12 +263,7 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.level->vertices.pop_back();
 }
 
-EditorState::EditorState(gameloop::Level &_level,
-  uint16_t _width,
-  uint16_t _height,
-  uint16_t _canvasWidth,
-  uint16_t _canvasHeight)
-  : width(_width), height(_height), canvasWidth(_canvasWidth), canvasHeight(_canvasHeight)
+EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -386,13 +379,9 @@ void Editor::updateAABB(uint32_t sectorID)
   }
 }
 
-Editor::Editor(gameloop::Level &_level,
-  uint16_t _width,
-  uint16_t _height,
-  uint16_t _canvasWidth,
-  uint16_t _canvasHeight)
+Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
   : m_inputHandler(std::make_unique<EditorInputHandler>()), m_history(std::make_unique<commands::CommandHistory>()),
-    state(std::make_unique<EditorState>(_level, _width, _height, _canvasWidth, _canvasHeight))
+    state(std::make_unique<EditorState>(_level, _width, _height))
 {}
 
 void Editor::processInput(const float_t vertexRadius) const

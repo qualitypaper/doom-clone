@@ -12,8 +12,8 @@ constexpr uint16_t EDITOR_WINDOW_HEIGHT = 1200;
 constexpr uint16_t CANVAS_WIDTH = 320;
 constexpr uint16_t CANVAS_HEIGHT = 200;
 
-constexpr float SCALE_X = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(CANVAS_WIDTH);
-constexpr float SCALE_Y = static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(CANVAS_HEIGHT);
+constexpr double SCALE_X = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(CANVAS_WIDTH);
+constexpr double SCALE_Y = static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(CANVAS_HEIGHT);
 
 constexpr float NEAR_CLIPPING = 1;
 

@@ -145,7 +145,7 @@ struct EditorLevel
   {}
 
 
-  void serialize(const char *filename, uint16_t width, uint16_t height, uint16_t canvasWidth, uint16_t canvasHeight) const;
+  void serialize(const char *filename, uint16_t width, uint16_t height) const;
   static void deserialize(gameloop::Level &level, const char *filename);
 
   std::vector<EditorVertex> vertices;
@@ -156,11 +156,10 @@ struct EditorLevel
 
 struct EditorState
 {
-  EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height, uint16_t _canvasWidth, uint16_t _canvasHeight);
+  EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height);
   void reset();
 
   uint16_t width, height;
-  uint16_t canvasWidth, canvasHeight;
 
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
@@ -248,7 +247,7 @@ public:
   std::unique_ptr<EditorState> state;
 
 public:
-  Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height, uint16_t _canvasWidth, uint16_t _canvasHeight);
+  Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height);
 
   void processInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<commands::Command> cmd) const;
