@@ -6,6 +6,9 @@
 #include "math_utils.h"
 
 #include "algorithm"
+
+#include <filesystem>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <unordered_map>
@@ -19,6 +22,163 @@ AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
   this->minX = std::min(start.x, end.x);
   this->maxY = std::max(start.y, end.y);
   this->minY = std::min(start.y, end.y);
+}
+
+void EditorLevel::serialize(const char *filename,
+  uint16_t width,
+  uint16_t height,
+  uint16_t canvasWidth,
+  uint16_t canvasHeight) const
+{
+  std::ofstream file(filename, std::ios::binary);
+
+  std::cout << "Saving level to saved_level.bin...\n";
+  std::cout << std::filesystem::current_path() << '\n';
+
+  if (!file || !file.is_open() || file.fail()) {
+    std::cerr << "Failed to open file for saving." << std::endl;
+    return;
+  }
+
+  // write vertices
+  uint64_t verticesCount = vertices.size();
+  uint64_t linedefsCount = linedefs.size();
+  uint64_t sidedefsCount = sidedefs.size();
+  uint64_t sectorsCount = sectors.size();
+  file.write(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
+  for (auto &v : vertices) {
+    auto [x, y] = math_utils::toCenterCoordinates(gameloop::Vertex{ v.x, v.y }, width, height);
+    const EditorVertex canvasVertexInt{ static_cast<int16_t>(y), static_cast<int16_t>(x) };
+    file.write(reinterpret_cast<const char *>(&canvasVertexInt.x), sizeof(canvasVertexInt.x));
+    file.write(reinterpret_cast<const char *>(&canvasVertexInt.y), sizeof(canvasVertexInt.y));
+  }
+
+  // write linedefs
+  file.write(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
+  const auto fitsInt16 = [](int32_t value) {
+    return value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
+  };
+  for (auto &linedef : linedefs) {
+    if (linedef.start > static_cast<uint32_t>(std::numeric_limits<int16_t>::max())
+        || linedef.end > static_cast<uint32_t>(std::numeric_limits<int16_t>::max()) || !fitsInt16(linedef.frontSideDef)
+        || !fitsInt16(linedef.backSideDef)) {
+      std::cerr << "Linedef index out of int16_t range during serialization." << std::endl;
+      return;
+    }
+
+    const int16_t start = static_cast<int16_t>(linedef.start);
+    const int16_t end = static_cast<int16_t>(linedef.end);
+    const int32_t typeValue = static_cast<int32_t>(linedef.type);
+    const int16_t front = static_cast<int16_t>(linedef.frontSideDef);
+    const int16_t back = static_cast<int16_t>(linedef.backSideDef);
+
+    file.write(reinterpret_cast<const char *>(&start), sizeof(start));
+    file.write(reinterpret_cast<const char *>(&end), sizeof(end));
+    file.write(reinterpret_cast<const char *>(&typeValue), sizeof(typeValue));
+    file.write(reinterpret_cast<const char *>(&front), sizeof(front));
+    file.write(reinterpret_cast<const char *>(&back), sizeof(back));
+  }
+
+  // write sidedefs
+  file.write(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
+  for (auto &[sectorId, xOffset, yOffset] : sidedefs) {
+    file.write(reinterpret_cast<const char *>(&sectorId), sizeof(sectorId));
+    file.write(reinterpret_cast<const char *>(&xOffset), sizeof(xOffset));
+    file.write(reinterpret_cast<const char *>(&yOffset), sizeof(yOffset));
+  }
+
+  // write sectors
+  file.write(reinterpret_cast<const char *>(&sectorsCount), sizeof(sectorsCount));
+  for (const auto &sector : sectors) {
+    file.write(reinterpret_cast<const char *>(&sector.floorHeight), sizeof(sector.floorHeight));
+    file.write(reinterpret_cast<const char *>(&sector.ceilingHeight), sizeof(sector.ceilingHeight));
+    file.write(reinterpret_cast<const char *>(&sector.specialType), sizeof(sector.specialType));
+    file.write(reinterpret_cast<const char *>(&sector.lightLevel), sizeof(sector.lightLevel));
+    file.write(reinterpret_cast<const char *>(&sector.tag), sizeof(sector.tag));
+  }
+
+  file.flush();
+  file.close();
+}
+
+void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
+{
+  std::ifstream in(filename, std::ios::binary);
+  if (!in || !in.is_open()) {
+    std::cerr << "Failed to open saved_level.bin for loading. Using hardcoded level data." << std::endl;
+    return;
+  }
+
+  level.vertices.clear();
+  level.linedefs.clear();
+  level.sidedefs.clear();
+  level.sectors.clear();
+
+  uint64_t verticesCount, linedefsCount, sidedefsCount, sectorsCount;
+
+  in.read(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
+  for (size_t i = 0; i < verticesCount; i++) {
+    gameloop::Vertex v{};
+    in.read(reinterpret_cast<char *>(&v.x), sizeof(v.x));
+    in.read(reinterpret_cast<char *>(&v.y), sizeof(v.y));
+    level.vertices.emplace_back(v);
+  }
+  if (in.fail()) return;
+  std::cout << "Read vertices\n";
+
+  in.read(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
+  for (size_t i = 0; i < linedefsCount; i++) {
+    gameloop::LineDef ld{};
+    int16_t start = 0;
+    int16_t end = 0;
+    int32_t typeValue = 0;
+    int16_t front = 0;
+    int16_t back = 0;
+
+    in.read(reinterpret_cast<char *>(&start), sizeof(start));
+    in.read(reinterpret_cast<char *>(&end), sizeof(end));
+    in.read(reinterpret_cast<char *>(&typeValue), sizeof(typeValue));
+    in.read(reinterpret_cast<char *>(&front), sizeof(front));
+    in.read(reinterpret_cast<char *>(&back), sizeof(back));
+
+    ld.start = start;
+    ld.end = end;
+    ld.type = static_cast<gameloop::LineDefType>(typeValue);
+    ld.frontSidedef = front;
+    ld.backSidedef = back;
+
+    level.linedefs.emplace_back(ld);
+  }
+  if (in.fail()) return;
+  std::cout << "Read linedefs\n";
+
+  in.read(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
+  for (size_t i = 0; i < sidedefsCount; i++) {
+    gameloop::SideDef sd;
+    in.read(reinterpret_cast<char *>(&sd.sectorId), sizeof(sd.sectorId));
+    in.read(reinterpret_cast<char *>(&sd.xOffset), sizeof(sd.xOffset));
+    in.read(reinterpret_cast<char *>(&sd.yOffset), sizeof(sd.yOffset));
+    level.sidedefs.emplace_back(sd);
+  }
+  if (in.fail()) return;
+  std::cout << "Read sidedefs\n";
+
+  in.read(reinterpret_cast<char *>(&sectorsCount), sizeof(sectorsCount));
+  for (size_t i = 0; i < sectorsCount; i++) {
+    gameloop::Sector sec{};
+    in.read(reinterpret_cast<char *>(&sec.floorHeight), sizeof(sec.floorHeight));
+    in.read(reinterpret_cast<char *>(&sec.ceilingHeight), sizeof(sec.ceilingHeight));
+    in.read(reinterpret_cast<char *>(&sec.specialType), sizeof(sec.specialType));
+    in.read(reinterpret_cast<char *>(&sec.lightLevel), sizeof(sec.lightLevel));
+    in.read(reinterpret_cast<char *>(&sec.tag), sizeof(sec.tag));
+    level.sectors.emplace_back(sec);
+  }
+  if (in.fail()) {
+    std::cerr << "Failed to read sectors from file." << std::endl;
+    return;
+  }
+  std::cout << "Read sectors\n";
+  std::cout << "Finished loading level from file.\n";
 }
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
@@ -105,7 +265,12 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.level->vertices.pop_back();
 }
 
-EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
+EditorState::EditorState(gameloop::Level &_level,
+  uint16_t _width,
+  uint16_t _height,
+  uint16_t _canvasWidth,
+  uint16_t _canvasHeight)
+  : width(_width), height(_height), canvasWidth(_canvasWidth), canvasHeight(_canvasHeight)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -221,12 +386,14 @@ void Editor::updateAABB(uint32_t sectorID)
   }
 }
 
-Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
-{
-  this->state = std::make_unique<EditorState>(_level, _width, _height);
-  this->m_inputHandler = std::make_unique<EditorInputHandler>();
-  this->m_history = std::make_unique<commands::CommandHistory>();
-}
+Editor::Editor(gameloop::Level &_level,
+  uint16_t _width,
+  uint16_t _height,
+  uint16_t _canvasWidth,
+  uint16_t _canvasHeight)
+  : m_inputHandler(std::make_unique<EditorInputHandler>()), m_history(std::make_unique<commands::CommandHistory>()),
+    state(std::make_unique<EditorState>(_level, _width, _height, _canvasWidth, _canvasHeight))
+{}
 
 void Editor::processInput(const float_t vertexRadius) const
 { EditorInputHandler::processInput(*this->state, *this->m_history, vertexRadius); }

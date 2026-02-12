@@ -9,6 +9,9 @@ namespace math_utils {
 constexpr gameloop::Vertex toCenterCoordinates(gameloop::Vertex vec, uint16_t width, uint16_t height) {
   return gameloop::Vertex(vec.x - width /2, height/2 - vec.y);
 }
+constexpr gameloop::Vertex toCenterCoordinates(const editor::EditorVertex &vec, uint16_t width, uint16_t height) {
+  return gameloop::Vertex(vec.x - width /2, height/2 - vec.y);
+}
 
 constexpr ImVec2 fromCenterCoordinates(ImVec2 vec, uint16_t width, uint16_t height)
 {

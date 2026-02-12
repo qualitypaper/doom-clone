@@ -1,6 +1,7 @@
 #include "gameloop.h"
 #include "config.h"
 #include "sdl_window.h"
+
 #include <SDL_mouse.h>
 #include <SDL_stdinc.h>
 #include <SDL_video.h>
@@ -9,7 +10,7 @@ struct InputState;
 
 namespace gameloop {
 
-void handleMouseMovement(SDL_Event &event, InputState &input)
+void handleMouseMovement(const SDL_Event &event, InputState &input)
 {
   input.mouse_dx = event.motion.xrel;
   input.mouse_dy = event.motion.yrel;

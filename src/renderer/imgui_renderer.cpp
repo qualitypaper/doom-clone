@@ -1,4 +1,6 @@
 #include "imgui_renderer.h"
+
+#include "config.h"
 #include "editor.h"
 #include "editor_input_handler.h"
 
@@ -42,7 +44,7 @@ ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &
   ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
 
-  this->m_editor = std::make_unique<editor::Editor>(level, sdlWindow.width, sdlWindow.height);
+  this->m_editor = std::make_unique<editor::Editor>(level, sdlWindow.width, sdlWindow.height, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
   this->m_editorInputHandler = std::make_unique<editor::EditorInputHandler>();
 }
 

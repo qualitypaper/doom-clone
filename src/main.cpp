@@ -105,73 +105,6 @@ static std::vector<gameloop::LineDef> linedefs = {
   { 4, 1, gameloop::LineDefType::REGULAR, 7, -1 },
 };
 
-bool constructLevelFromFile(gameloop::Level &level)
-{
-  std::ifstream in("saved_level.bin", std::ios::binary);
-  if (!in || !in.is_open()) {
-    std::cerr << "Failed to open saved_level.bin for loading. Using hardcoded level data." << std::endl;
-    return false;
-  }
-
-  level.vertices.clear();
-  level.linedefs.clear();
-  level.sidedefs.clear();
-  level.sectors.clear();
-
-  uint64_t verticesCount, linedefsCount, sidedefsCount, sectorsCount;
-
-  in.read(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
-  for (size_t i = 0; i < verticesCount; i++) {
-    gameloop::Vertex v;
-    in.read(reinterpret_cast<char *>(&v.x), sizeof(v.x));
-    in.read(reinterpret_cast<char *>(&v.y), sizeof(v.y));
-    level.vertices.emplace_back(v);
-  }
-  if (in.fail()) return false;
-  std::cout << "Read vertices\n";
-
-  in.read(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
-  for (size_t i = 0; i < linedefsCount; i++) {
-    gameloop::LineDef ld;
-    in.read(reinterpret_cast<char *>(&ld.start), sizeof(ld.start));
-    in.read(reinterpret_cast<char *>(&ld.end), sizeof(ld.end));
-    in.read(reinterpret_cast<char *>(&ld.type), sizeof(ld.type));
-    in.read(reinterpret_cast<char *>(&ld.frontSidedef), sizeof(ld.frontSidedef));
-    in.read(reinterpret_cast<char *>(&ld.backSidedef), sizeof(ld.backSidedef));
-    level.linedefs.emplace_back(ld);
-  }
-  if (in.fail()) return false;
-  std::cout << "Read linedefs\n";
-
-  in.read(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
-  for (size_t i = 0; i < sidedefsCount; i++) {
-    gameloop::SideDef sd;
-    in.read(reinterpret_cast<char *>(&sd.sectorId), sizeof(sd.sectorId));
-    in.read(reinterpret_cast<char *>(&sd.xOffset), sizeof(sd.xOffset));
-    in.read(reinterpret_cast<char *>(&sd.yOffset), sizeof(sd.yOffset));
-    level.sidedefs.emplace_back(sd);
-  }
-  if (in.fail()) return false;
-  std::cout << "Read sidedefs\n";
-
-  in.read(reinterpret_cast<char *>(&sectorsCount), sizeof(sectorsCount));
-  for (size_t i = 0; i < sectorsCount; i++) {
-    gameloop::Sector sec;
-    in.read(reinterpret_cast<char *>(&sec.floorHeight), sizeof(sec.floorHeight));
-    in.read(reinterpret_cast<char *>(&sec.ceilingHeight), sizeof(sec.ceilingHeight));
-    in.read(reinterpret_cast<char *>(&sec.specialType), sizeof(sec.specialType));
-    in.read(reinterpret_cast<char *>(&sec.lightLevel), sizeof(sec.lightLevel));
-    in.read(reinterpret_cast<char *>(&sec.tag), sizeof(sec.tag));
-    level.sectors.emplace_back(sec);
-  }
-  if (in.fail()) {
-    std::cerr << "Failed to read sectors from file." << std::endl;
-    return false;
-  }
-  std::cout << "Read sectors\n";
-
-  return true;
-}
 int main()
 {
   // sanity checks for hardcoded values
@@ -190,11 +123,13 @@ int main()
   };
 
   gameloop::Level level;
-  if (!constructLevelFromFile(level)) {
-    std::cerr << "Failed to construct level from file. Using hardcoded level data." << std::endl;
-    level = { vertices, linedefs, sidedefs, sectors };
+  if (true) {
+    editor::EditorLevel::deserialize(level, "saved_level.bin");
+  } else {
+    level = { .vertices = vertices, .linedefs = linedefs, .sidedefs = sidedefs, .sectors = sectors };
   }
 
+  // assert(!level.linedefs.empty() && !level.sectors.empty() && !level.vertices.empty() && !level.sidedefs.empty());
 
   // setup sdl window
   sdl_window::SdlWindow sdlWindow(
@@ -207,11 +142,12 @@ int main()
   // setup the game renderer
   framebuffer::FrameBuffer fb(sdlWindow);
   renderer::Renderer renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
-  editor::Editor editor(level, sdlWindow.width, sdlWindow.height);
+  editor::Editor editor(level, sdlWindow.width, sdlWindow.height, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
 
   running = true;
   // game loop
-  const double_t dt = 1 / static_cast<double>(config::DESIRED_FRAMERATE);
+  constexpr double_t dt = 1 / static_cast<double>(config::DESIRED_FRAMERATE);
+  const double_t perfFreq = static_cast<double_t>(SDL_GetPerformanceFrequency());
   double_t acc = 0.0;
 
   uint64_t prev = SDL_GetPerformanceCounter();
@@ -220,6 +156,7 @@ int main()
   double_t fpsAccumulator = 0.0;
 
   while (running) {
+    const uint64_t frameStart = SDL_GetPerformanceCounter();
     // reseting the states to defaults
     renderer.resetClippingArrays();
     fb.reset();
@@ -230,11 +167,14 @@ int main()
 
     if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
       imguiRenderer.render();
+      const uint64_t frameEnd = SDL_GetPerformanceCounter();
+      const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
+      if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
       continue;
     }
 
     uint64_t now = SDL_GetPerformanceCounter();
-    double_t frameTime = static_cast<double>(now - prev) / SDL_GetPerformanceFrequency();
+    double_t frameTime = static_cast<double>(now - prev) / perfFreq;
     prev = now;
     if (frameTime > 0.25) frameTime = 0.25;
     acc += frameTime;
@@ -254,6 +194,10 @@ int main()
       frameCount = 0;
       fpsAccumulator = 0.0;
     }
+
+    const uint64_t frameEnd = SDL_GetPerformanceCounter();
+    const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
+    if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
   }
 
 

@@ -75,61 +75,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
       // save the current level into a .bin file
       // vertices, linedefs, sidedefs, sectors
-
-      std::ofstream file("saved_level.bin", std::ios::binary);
-
-      std::cout << "Saving level to saved_level.bin...\n";
-      std::cout << std::filesystem::current_path() << '\n';
-
-      if (!file || !file.is_open() || file.fail()) {
-        std::cerr << "Failed to open file for saving." << std::endl;
-        return;
-      }
-
-      // write vertices
-      uint64_t verticesCount = state.level->vertices.size();
-      uint64_t linedefsCount = state.level->linedefs.size();
-      uint64_t sidedefsCount = state.level->sidedefs.size();
-      uint64_t sectorsCount = state.level->sectors.size();
-      file.write(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
-      for (auto &v : state.level->vertices) {
-        file.write(reinterpret_cast<const char *>(&v.x), sizeof(v.x));
-        file.write(reinterpret_cast<const char *>(&v.y), sizeof(v.y));
-      }
-
-      // write linedefs
-      file.write(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
-      for (auto &ld : state.level->linedefs) {
-        const int16_t start = static_cast<int16_t>(ld.start);
-        const int16_t end = static_cast<int16_t>(ld.end);
-        const int16_t frontSidedef = static_cast<int16_t>(ld.frontSideDef);
-        const int16_t backSidedef = static_cast<int16_t>(ld.backSideDef);
-        file.write(reinterpret_cast<const char *>(&start), sizeof(start));
-        file.write(reinterpret_cast<const char *>(&end), sizeof(end));
-        file.write(reinterpret_cast<const char *>(&ld.type), sizeof(ld.type));
-        file.write(reinterpret_cast<const char *>(&frontSidedef), sizeof(frontSidedef));
-        file.write(reinterpret_cast<const char *>(&backSidedef), sizeof(backSidedef));
-      }
-
-      // write sidedefs
-      file.write(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
-      for (auto &sd : state.level->sidedefs) {
-        file.write(reinterpret_cast<const char *>(&sd.sectorId), sizeof(sd.sectorId));
-        file.write(reinterpret_cast<const char *>(&sd.xOffset), sizeof(sd.xOffset));
-        file.write(reinterpret_cast<const char *>(&sd.yOffset), sizeof(sd.yOffset));
-      }
-
-      // write sectors
-      file.write(reinterpret_cast<const char *>(&sectorsCount), sizeof(sectorsCount));
-      for (auto &sec : state.level->sectors) {
-        file.write(reinterpret_cast<const char *>(&sec.floorHeight), sizeof(sec.floorHeight));
-        file.write(reinterpret_cast<const char *>(&sec.ceilingHeight), sizeof(sec.ceilingHeight));
-        file.write(reinterpret_cast<const char *>(&sec.specialType), sizeof(sec.specialType));
-        file.write(reinterpret_cast<const char *>(&sec.lightLevel), sizeof(sec.lightLevel));
-        file.write(reinterpret_cast<const char *>(&sec.tag), sizeof(sec.tag));
-      }
-
-      file.close();
+      state.level->serialize("saved_level.bin", state.width, state.height, state.canvasWidth, state.canvasHeight);
     }
 
     if (io.KeyCtrl && !io.WantCaptureMouse && io.MouseWheel != 0) {
@@ -295,7 +241,7 @@ void EditorInputHandler::flushDragging(EditorState &state, commands::CommandHist
 // @param origin is the base point from which the distance will be calculated
 float_t EditorInputHandler::getDistanceToSegmentSq(const ImVec2 start, const ImVec2 end, const ImVec2 origin)
 {
-  assert(start.x != end.x || start.y != end.y);
+  // assert(!(start.x == end.x && start.y == end.y));
 
   const ImVec2 startToOrigin(origin.x - start.x, origin.y - start.y);
   const ImVec2 startToEnd(end.x - start.x, end.y - start.y);

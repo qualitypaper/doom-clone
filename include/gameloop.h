@@ -33,13 +33,13 @@ struct GameState
 
 struct Vertex
 {
-  int32_t x;
-  int32_t y;
+  int32_t x = 0;
+  int32_t y = 0;
 };
 
 struct SideDef
 {
-  int16_t sectorId;
+  int16_t sectorId = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
 };
@@ -70,9 +70,12 @@ struct Level
   std::vector<LineDef> linedefs;
   std::vector<SideDef> sidedefs;
   std::vector<Sector> sectors;
+
+  void serialize(const char* filename);
+  bool deserialize(const char* filename);
 };
 
-void handleMouseMovement(SDL_Event &event, InputState &input);
+void handleMouseMovement(const SDL_Event &event, InputState &input);
 void handleKeyInput(SDL_Event &event, InputState &input);
 void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode, sdl_window::SdlWindow &sdlWindow);
 }// namespace gameloop
