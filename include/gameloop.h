@@ -77,4 +77,4 @@ struct Level
 
 void handleMouseMovement(const SDL_Event &event, InputState &input);
 void handleKeyInput(SDL_Event &event, InputState &input);
-void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode, sdl_window::SdlWindow &sdlWindow);
+void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode, SdlWindow &sdlWindow);

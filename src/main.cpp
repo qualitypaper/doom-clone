@@ -16,7 +16,7 @@
 #include <fstream>
 #include <iostream>
 
-void poll_sdl_events(GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
+void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window);
 
 bool running;
 
@@ -132,9 +132,10 @@ int main()
   // assert(!level.linedefs.empty() && !level.sectors.empty() && !level.vertices.empty() && !level.sidedefs.empty());
 
   // setup sdl window
-  sdl_window::SdlWindow sdlWindow(
-    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
-    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT);
+  SdlWindow sdlWindow(
+    gameState.currentMode == EngineMode::EDITOR_2D ? 0 : config::WINDOW_WIDTH,
+    gameState.currentMode == EngineMode::EDITOR_2D ? 0 : config::WINDOW_HEIGHT,
+    gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
   imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, level);
@@ -204,7 +205,7 @@ int main()
   return 0;
 }
 
-void poll_sdl_events(GameState &gameState, InputState &input, sdl_window::SdlWindow &window)
+void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
 {
   SDL_Event event;
 

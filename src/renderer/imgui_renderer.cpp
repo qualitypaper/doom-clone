@@ -21,7 +21,7 @@ static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
 static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
 static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 
-ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
+ImguiRenderer::ImguiRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
 {
   const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 

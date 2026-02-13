@@ -13,7 +13,7 @@ class FrameBuffer
 {
 private:
 
-  sdl_window::SdlWindow &sdlWindow;
+  SdlWindow &sdlWindow;
 
 public:
   int16_t width;
@@ -21,7 +21,7 @@ public:
 
   uint32_t *pixels;
 
-  FrameBuffer(sdl_window::SdlWindow &sdlWindow);
+  FrameBuffer(SdlWindow &sdlWindow);
   ~FrameBuffer();
 
   void update();

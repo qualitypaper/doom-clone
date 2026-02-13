@@ -15,13 +15,13 @@ namespace imguirenderer {
 class ImguiRenderer
 {
 public:
-  ImguiRenderer(sdl_window::SdlWindow &sdlWindow, Level &level);
+  ImguiRenderer(SdlWindow &sdlWindow, Level &level);
   ~ImguiRenderer();
 
   void render() const;
 
 private:
-  sdl_window::SdlWindow &m_sdlWindow;
+  SdlWindow &m_sdlWindow;
   std::unique_ptr<editor::Editor> m_editor;
   std::unique_ptr<editor::EditorInputHandler> m_editorInputHandler;
 

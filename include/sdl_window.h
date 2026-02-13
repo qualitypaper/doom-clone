@@ -10,7 +10,6 @@ struct InputState
   int mouse_dy;
 };
 
-namespace sdl_window {
 class SdlWindow
 {
 private:
@@ -18,15 +17,14 @@ private:
   SDL_Renderer *renderer;
   SDL_Texture *texture;
 public:
-  SdlWindow(uint16_t width, uint16_t height);
+  SdlWindow(uint16_t width, uint16_t height, uint32_t flags = 0);
   ~SdlWindow();
 
   uint16_t width, height;
 
-  void updatePixels(const uint32_t *pixels);
+  void updatePixels(const uint32_t *pixels) const;
   void updateScreen() const;
 
-  SDL_Window *getWindow() const;
-  SDL_Renderer *getRenderer() const;
+  [[nodiscard]] SDL_Window *getWindow() const;
+  [[nodiscard]] SDL_Renderer *getRenderer() const;
 };
-}// namespace sdl_window
