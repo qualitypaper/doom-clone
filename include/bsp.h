@@ -2,13 +2,18 @@
 #include "gameloop.h"
 
 #include <array>
+#include <span>
 
-struct EditorSeg
+enum class SegmentPosition {FRONT, BACK, SPANNING};
+
+struct Seg
 {
-  gameloop::Vertex *start;
-  gameloop::Vertex *end;
-  gameloop::LineDef *linedef;
+  int16_t startVertex;
+  int16_t endVertex;
+  int16_t angle;
+  int16_t linedefIndex;
   int8_t side;// 0 for front, 1 for back
+  int16_t offset;
 };
 
 struct BspNode
@@ -16,4 +21,38 @@ struct BspNode
   int x, y, dx, dy;
   std::array<int16_t, 4> leftBoundingBox, rightBoundingBox;
   int16_t leftChild, rightChild;
+};
+
+struct SubSector
+{
+  int16_t segCount;
+  int16_t firstSegIndex;
+};
+
+struct SplitResult
+{
+  BspNode node;
+  std::vector<Seg> front;
+  std::vector<Seg> back;
+};
+
+class BSPBuilder
+{
+private:
+  std::vector<BspNode> nodes;
+  std::vector<Seg> segments;
+  std::vector<SubSector> subsectors;
+  Level &level;
+
+private:
+  SplitResult SplitBySplitter(const std::vector<Seg> &segs, const Seg &splitter);
+  uint32_t SelectSplittingLine(const std::vector<Seg> &segs);
+  [[nodiscard]] uint32_t EvaluateSplitter(const Seg &seg) const;
+  [[nodiscard]] SegmentPosition DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const;
+  bool IsConvex(const std::vector<Seg> &segs);
+
+public:
+  BSPBuilder(Level &_level);
+
+  void BuildBSPTree(const std::vector<Seg> &segs);
 };

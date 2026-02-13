@@ -16,7 +16,7 @@
 
 namespace editor {
 
-AABB::AABB(gameloop::Vertex start, gameloop::Vertex end)
+AABB::AABB(Vertex start, Vertex end)
 {
   this->maxX = std::max(start.x, end.x);
   this->minX = std::min(start.x, end.x);
@@ -43,7 +43,7 @@ void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t heigh
   uint64_t sectorsCount = sectors.size();
   file.write(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
   for (auto &v : vertices) {
-    auto [x, y] = math_utils::toCenterCoordinates(gameloop::Vertex{ v.x, v.y }, width, height);
+    auto [x, y] = math_utils::toCenterCoordinates(Vertex{ v.x, v.y }, width, height);
     const EditorVertex canvasVertexInt{ static_cast<int16_t>(y), static_cast<int16_t>(x) };
     file.write(reinterpret_cast<const char *>(&canvasVertexInt.x), sizeof(canvasVertexInt.x));
     file.write(reinterpret_cast<const char *>(&canvasVertexInt.y), sizeof(canvasVertexInt.y));
@@ -98,7 +98,7 @@ void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t heigh
   file.close();
 }
 
-void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
+void EditorLevel::deserialize(Level &level, const char *filename)
 {
   std::ifstream in(filename, std::ios::binary);
   if (!in || !in.is_open()) {
@@ -115,7 +115,7 @@ void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
 
   in.read(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
   for (size_t i = 0; i < verticesCount; i++) {
-    gameloop::Vertex v{};
+    Vertex v{};
     in.read(reinterpret_cast<char *>(&v.x), sizeof(v.x));
     in.read(reinterpret_cast<char *>(&v.y), sizeof(v.y));
     level.vertices.emplace_back(v);
@@ -125,7 +125,7 @@ void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
 
   in.read(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
   for (size_t i = 0; i < linedefsCount; i++) {
-    gameloop::LineDef ld{};
+    LineDef ld{};
     int16_t start = 0;
     int16_t end = 0;
     int32_t typeValue = 0;
@@ -140,7 +140,7 @@ void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
 
     ld.start = start;
     ld.end = end;
-    ld.type = static_cast<gameloop::LineDefType>(typeValue);
+    ld.type = static_cast<LineDefType>(typeValue);
     ld.frontSidedef = front;
     ld.backSidedef = back;
 
@@ -151,7 +151,7 @@ void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
 
   in.read(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
   for (size_t i = 0; i < sidedefsCount; i++) {
-    gameloop::SideDef sd;
+    SideDef sd;
     in.read(reinterpret_cast<char *>(&sd.sectorId), sizeof(sd.sectorId));
     in.read(reinterpret_cast<char *>(&sd.xOffset), sizeof(sd.xOffset));
     in.read(reinterpret_cast<char *>(&sd.yOffset), sizeof(sd.yOffset));
@@ -163,7 +163,7 @@ void EditorLevel::deserialize(gameloop::Level &level, const char *filename)
 
   in.read(reinterpret_cast<char *>(&sectorsCount), sizeof(sectorsCount));
   for (size_t i = 0; i < sectorsCount; i++) {
-    gameloop::Sector sec{};
+    Sector sec{};
     in.read(reinterpret_cast<char *>(&sec.floorHeight), sizeof(sec.floorHeight));
     in.read(reinterpret_cast<char *>(&sec.ceilingHeight), sizeof(sec.ceilingHeight));
     in.read(reinterpret_cast<char *>(&sec.specialType), sizeof(sec.specialType));
@@ -263,7 +263,7 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.level->vertices.pop_back();
 }
 
-EditorState::EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
+EditorState::EditorState(Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -379,7 +379,7 @@ void Editor::updateAABB(uint32_t sectorID)
   }
 }
 
-Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
+Editor::Editor(Level &_level, uint16_t _width, uint16_t _height)
   : m_inputHandler(std::make_unique<EditorInputHandler>()), m_history(std::make_unique<commands::CommandHistory>()),
     state(std::make_unique<EditorState>(_level, _width, _height))
 {}
@@ -387,7 +387,7 @@ Editor::Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height)
 void Editor::processInput(const float_t vertexRadius) const
 { EditorInputHandler::processInput(*this->state, *this->m_history, vertexRadius); }
 
-void Editor::addLineDef(int32_t sectorId, gameloop::LineDef &linedef)
+void Editor::addLineDef(int32_t sectorId, LineDef &linedef)
 {
   state->level->linedefs.emplace_back(linedef);
 
@@ -399,14 +399,14 @@ void Editor::addLineDef(int32_t sectorId, gameloop::LineDef &linedef)
   this->updateAABB(sectorId);
 }
 
-void Editor::addLineDef(gameloop::Vertex start, gameloop::Vertex end)
+void Editor::addLineDef(Vertex start, Vertex end)
 {
   // level.vertices.emplace_back(start);
   // level.vertices.emplace_back(end);
 
-  // gameloop::LineDef ld{ .start = static_cast<int16_t>(level.vertices.size() - 2),
+  // LineDef ld{ .start = static_cast<int16_t>(level.vertices.size() - 2),
   //   .end = static_cast<int16_t>(level.vertices.size() - 1),
-  //   .type = gameloop::LineDefType::REGULAR,
+  //   .type = LineDefType::REGULAR,
   //   .frontSidedef = -1,
   //   .backSidedef = -1 };
 

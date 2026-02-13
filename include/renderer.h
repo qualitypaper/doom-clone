@@ -15,7 +15,7 @@ class Renderer
 {
 public:
   Renderer(framebuffer::FrameBuffer &fb, uint16_t canvasWidth, uint16_t canvasHeight);
-  void render(const gameloop::GameState &gameState, const gameloop::Level &level);
+  void render(const GameState &gameState, const Level &level);
   void resetClippingArrays();
 
 private:

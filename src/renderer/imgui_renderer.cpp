@@ -21,7 +21,7 @@ static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
 static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
 static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 
-ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &level) : m_sdlWindow(sdlWindow)
+ImguiRenderer::ImguiRenderer(sdl_window::SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
 {
   const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
@@ -469,7 +469,7 @@ void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 }
 
 void ImguiRenderer::createSelect(const char *label,
-  const std::vector<gameloop::SideDef> &sidedefs,
+  const std::vector<SideDef> &sidedefs,
   int32_t &currentItem,
   const bool hasReset)
 {

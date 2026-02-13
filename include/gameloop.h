@@ -9,9 +9,6 @@
  Z - vertical plane,
 */
 
-namespace gameloop {
-
-
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D };
 
 struct WorldState
@@ -19,7 +16,6 @@ struct WorldState
   // BSP nodes, sectors,
   int placeholder;
 };
-
 
 struct GameState
 {
@@ -35,6 +31,9 @@ struct Vertex
 {
   int32_t x = 0;
   int32_t y = 0;
+
+  Vertex operator+(const Vertex &other) const { return Vertex{ x + other.x, y + other.y }; }
+  Vertex operator-(const Vertex &other) const { return Vertex{ x - other.x, y - other.y }; }
 };
 
 struct SideDef
@@ -42,7 +41,7 @@ struct SideDef
   int16_t sectorId = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
-  uint32_t color = 0xFFFFFFFF; // RGBA format
+  uint32_t color = 0xFFFFFFFF;// RGBA format
 };
 
 enum class LineDefType { REGULAR, DOOR };
@@ -72,11 +71,10 @@ struct Level
   std::vector<SideDef> sidedefs;
   std::vector<Sector> sectors;
 
-  void serialize(const char* filename);
-  bool deserialize(const char* filename);
+  void serialize(const char *filename);
+  bool deserialize(const char *filename);
 };
 
 void handleMouseMovement(const SDL_Event &event, InputState &input);
 void handleKeyInput(SDL_Event &event, InputState &input);
 void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode, sdl_window::SdlWindow &sdlWindow);
-}// namespace gameloop

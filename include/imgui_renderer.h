@@ -15,7 +15,7 @@ namespace imguirenderer {
 class ImguiRenderer
 {
 public:
-  ImguiRenderer(sdl_window::SdlWindow &sdlWindow, gameloop::Level &level);
+  ImguiRenderer(sdl_window::SdlWindow &sdlWindow, Level &level);
   ~ImguiRenderer();
 
   void render() const;
@@ -48,7 +48,7 @@ private:
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const;
 
   static void createSelect(const char *label,
-    const std::vector<gameloop::SideDef> &sidedefs,
+    const std::vector<SideDef> &sidedefs,
     int32_t &currentItem,
     bool hasReset = false);
   static constexpr ImVec2 scale(ImVec2 vec, float_t scaleFactor);

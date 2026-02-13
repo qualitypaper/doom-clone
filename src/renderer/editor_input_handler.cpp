@@ -140,7 +140,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
       if (lmbClicked) {
         if (state.isCreatingLine) {
           // draw a line between the start vertex and the hovered vertex
-          const EditorLineDef lineDef(state.lineStartVertexId, bestVertexId, gameloop::LineDefType::REGULAR, -1, -1);
+          const EditorLineDef lineDef(state.lineStartVertexId, bestVertexId, LineDefType::REGULAR, -1, -1);
 
           auto cmd = std::make_unique<commands::AddLineDefCommand>(commands::AddLineDefCommand(lineDef));
           history.execute(std::move(cmd), state);

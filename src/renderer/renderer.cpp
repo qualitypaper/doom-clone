@@ -83,9 +83,9 @@ void rotate(const float_t x, const float_t y, const double_t angle, double_t &xR
 }
 
 void applyTransformations(const entity::Player &playerState,
-  const gameloop::Vertex start,
-  const gameloop::Vertex end,
-  const gameloop::Sector &sector,
+  const Vertex start,
+  const Vertex end,
+  const Sector &sector,
   double_t &viewX1,
   double_t &viewY1,
   double_t &viewX2,
@@ -107,12 +107,12 @@ void applyTransformations(const entity::Player &playerState,
 }
 
 
-void Renderer::render(const gameloop::GameState &gameState, const gameloop::Level &level)
+void Renderer::render(const GameState &gameState, const Level &level)
 {
 
-  for (const gameloop::LineDef ld : level.linedefs) {
-    const gameloop::SideDef sidedef = level.sidedefs[ld.frontSidedef];
-    gameloop::Sector sector = level.sectors[sidedef.sectorId];
+  for (const LineDef ld : level.linedefs) {
+    const SideDef sidedef = level.sidedefs[ld.frontSidedef];
+    Sector sector = level.sectors[sidedef.sectorId];
 
     double_t viewX1 = 0, viewY1 = 0, viewX2 = 0, viewY2 = 0;
     int16_t floorZ = 0, ceilingZ = 0;
@@ -173,8 +173,8 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
         this->drawSolidWall(i, projectedCeilingY, projectedFloorY);
       } else {
         // portal
-        const gameloop::SideDef backSidedef = level.sidedefs[ld.backSidedef];
-        const gameloop::Sector nextSector = level.sectors[backSidedef.sectorId];
+        const SideDef backSidedef = level.sidedefs[ld.backSidedef];
+        const Sector nextSector = level.sectors[backSidedef.sectorId];
 
         const int16_t nextCeilZ =
           static_cast<int16_t>(static_cast<float>(nextSector.ceilingHeight) - gameState.playerState.z);
@@ -185,9 +185,9 @@ void Renderer::render(const gameloop::GameState &gameState, const gameloop::Leve
         const int32_t nextCeilY = projectZ(nextCeilZ, inv_y);
         const int32_t nextFloorY = projectZ(nextFloorZ, inv_y);
 
-        if (ld.type == gameloop::LineDefType::REGULAR) {
+        if (ld.type == LineDefType::REGULAR) {
           drawDefaultPortal(i, projectedFloorY, projectedCeilingY, nextFloorY, nextCeilY);
-        } else if (ld.type == gameloop::LineDefType::DOOR) {
+        } else if (ld.type == LineDefType::DOOR) {
           // TODO: create a drawing function for door portal
         }
       }

@@ -24,7 +24,7 @@ struct EditorInputHandler;
 struct AABB
 {
   AABB() = default;
-  AABB(gameloop::Vertex start, gameloop::Vertex end);
+  AABB(Vertex start, Vertex end);
   int16_t maxX, maxY;
   int16_t minX, minY;
 
@@ -57,13 +57,13 @@ struct EditorObject
 
 struct EditorLineDef : EditorObject
 {
-  EditorLineDef(const gameloop::LineDef &_linedef)
+  EditorLineDef(const LineDef &_linedef)
     : EditorObject(EditorObjectType::LINEDEF), start(_linedef.start), end(_linedef.end), type(_linedef.type),
       frontSideDef(_linedef.frontSidedef), backSideDef(_linedef.backSidedef)
   {}
   EditorLineDef(const uint32_t _start,
     const uint32_t _end,
-    const gameloop::LineDefType _type,
+    const LineDefType _type,
     const uint32_t _frontSideDef,
     const uint32_t _backSideDef)
     : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSideDef(_frontSideDef),
@@ -71,7 +71,7 @@ struct EditorLineDef : EditorObject
   {}
   uint32_t start;
   uint32_t end;
-  gameloop::LineDefType type;
+  LineDefType type;
   int32_t frontSideDef;
   int32_t backSideDef;
 
@@ -140,23 +140,23 @@ struct EditorLevel
   EditorLevel(std::vector<EditorVertex> _vertices,
     std::vector<EditorLineDef> _lines,
     std::vector<EditorSector> _sectors,
-    std::vector<gameloop::SideDef> &_sidedefs)
+    std::vector<SideDef> &_sidedefs)
     : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)), sidedefs(_sidedefs)
   {}
 
 
   void serialize(const char *filename, uint16_t width, uint16_t height) const;
-  static void deserialize(gameloop::Level &level, const char *filename);
+  static void deserialize(Level &level, const char *filename);
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;
   std::vector<EditorSector> sectors;
-  std::vector<gameloop::SideDef> &sidedefs;
+  std::vector<SideDef> &sidedefs;
 };
 
 struct EditorState
 {
-  EditorState(gameloop::Level &_level, uint16_t _width, uint16_t _height);
+  EditorState(Level &_level, uint16_t _width, uint16_t _height);
   void reset();
 
   uint16_t width, height;
@@ -240,19 +240,19 @@ private:
   std::unique_ptr<commands::CommandHistory> m_history;
 
 private:
-  void addToSector(uint16_t i, gameloop::LineDef &linedef, gameloop::SideDef &sidedef);
+  void addToSector(uint16_t i, LineDef &linedef, SideDef &sidedef);
   void updateAABB(uint32_t sectorID);
 
 public:
   std::unique_ptr<EditorState> state;
 
 public:
-  Editor(gameloop::Level &_level, uint16_t _width, uint16_t _height);
+  Editor(Level &_level, uint16_t _width, uint16_t _height);
 
   void processInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<commands::Command> cmd) const;
-  void addLineDef(gameloop::Vertex start, gameloop::Vertex end);
-  void addLineDef(int32_t sectorId, gameloop::LineDef &lineDef);
+  void addLineDef(Vertex start, Vertex end);
+  void addLineDef(int32_t sectorId, LineDef &lineDef);
   void addVertex(int16_t x, int16_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
 };

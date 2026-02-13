@@ -4,7 +4,7 @@
 namespace simulation {
 
 // updates the gamec state with a constant rate of @param dt
-void update(gameloop::GameState &gameState, const InputState &input, const double_t dt)
+void update(GameState &gameState, const InputState &input, const double_t dt)
 {
 
   // mouse

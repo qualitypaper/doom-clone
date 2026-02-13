@@ -16,14 +16,14 @@
 #include <fstream>
 #include <iostream>
 
-void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
+void poll_sdl_events(GameState &gameState, InputState &input, sdl_window::SdlWindow &window);
 
 bool running;
 
 // ==========================================
 // 1. VERTICES (World Coordinates)
 // ==========================================
-static std::vector<gameloop::Vertex> vertices = {
+static std::vector<Vertex> vertices = {
   // Sector 0 (The Starting Room)
   { 0, 0 },// 0
   { 50, 0 },// 1
@@ -38,7 +38,7 @@ static std::vector<gameloop::Vertex> vertices = {
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static std::vector<gameloop::Sector> sectors = {
+static std::vector<Sector> sectors = {
 
   { // Sector 0
     .floorHeight = 0,
@@ -58,7 +58,7 @@ static std::vector<gameloop::Sector> sectors = {
 // 3. SIDEDEFS (Visual sides of lines)
 // ==========================================
 // Note: You usually add textures here. For now, we just link to sectors.
-static std::vector<gameloop::SideDef> sidedefs = {
+static std::vector<SideDef> sidedefs = {
   // -- Sector 0 Sides --
   { .sectorId = 0 },// 0: South wall
   { .sectorId = 0 },// 1: Portal line (facing Sector 1)
@@ -76,33 +76,33 @@ static std::vector<gameloop::SideDef> sidedefs = {
 // 4. LINEDEFS (The Geometry)
 // ==========================================
 // -1 indicates "No Side" (Solid wall)
-static std::vector<gameloop::LineDef> linedefs = {
+static std::vector<LineDef> linedefs = {
   // --- SECTOR 0 (Square) ---
   // Start, End, Type, FrontSide, BackSide
 
   // Wall: (0,0) to (50,0)
-  { 0, 1, gameloop::LineDefType::REGULAR, 0, -1 },
+  { 0, 1, LineDefType::REGULAR, 0, -1 },
 
   // PORTAL: (50,0) to (50,50) -> Connects Sector 0 and 1
   // Notice it has a Back SideDef (index 4)
-  { 1, 2, gameloop::LineDefType::REGULAR, 1, 4 },
+  { 1, 2, LineDefType::REGULAR, 1, 4 },
 
   // Wall: (50,50) to (0,50)
-  { 2, 3, gameloop::LineDefType::REGULAR, 2, -1 },
+  { 2, 3, LineDefType::REGULAR, 2, -1 },
 
   // Wall: (0,50) to (0,0)
-  { 3, 0, gameloop::LineDefType::REGULAR, 3, -1 },
+  { 3, 0, LineDefType::REGULAR, 3, -1 },
 
   // --- SECTOR 1 (Rectangular extension) ---
 
   // Wall: (50,50) to (100,50)
-  { 2, 5, gameloop::LineDefType::REGULAR, 5, -1 },
+  { 2, 5, LineDefType::REGULAR, 5, -1 },
 
   // Wall: (100,50) to (100,0)
-  { 5, 4, gameloop::LineDefType::REGULAR, 6, -1 },
+  { 5, 4, LineDefType::REGULAR, 6, -1 },
 
   // Wall: (100,0) to (50,0)
-  { 4, 1, gameloop::LineDefType::REGULAR, 7, -1 },
+  { 4, 1, LineDefType::REGULAR, 7, -1 },
 };
 
 int main()
@@ -116,13 +116,13 @@ int main()
 
   // setup inputs and states
   InputState input{};
-  gameloop::GameState gameState{ .currentMode = gameloop::EngineMode::EDITOR_2D };
+  GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
 
   gameState.playerState = entity::Player{
     .x = 25, .y = 25, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
-  gameloop::Level level;
+  Level level;
   if (true) {
     editor::EditorLevel::deserialize(level, "saved_level.bin");
   } else {
@@ -133,8 +133,8 @@ int main()
 
   // setup sdl window
   sdl_window::SdlWindow sdlWindow(
-    gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
-    gameState.currentMode == gameloop::EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT);
+    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
+    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT);
 
   // setup Dear ImGui
   imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, level);
@@ -165,7 +165,7 @@ int main()
 
     poll_sdl_events(gameState, input, sdlWindow);
 
-    if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D) {
+    if (gameState.currentMode == EngineMode::EDITOR_2D) {
       imguiRenderer.render();
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
@@ -204,7 +204,7 @@ int main()
   return 0;
 }
 
-void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_window::SdlWindow &window)
+void poll_sdl_events(GameState &gameState, InputState &input, sdl_window::SdlWindow &window)
 {
   SDL_Event event;
 
@@ -224,10 +224,10 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_wind
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_F1) {
         std::cout << "Changing mode\n";
-        if (gameState.currentMode == gameloop::EngineMode::GAMEPLAY_3D) {
-          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::EDITOR_2D, window);
+        if (gameState.currentMode == EngineMode::GAMEPLAY_3D) {
+          setEngineMode(gameState, input, EngineMode::EDITOR_2D, window);
         } else {
-          gameloop::setEngineMode(gameState, input, gameloop::EngineMode::GAMEPLAY_3D, window);
+          setEngineMode(gameState, input, EngineMode::GAMEPLAY_3D, window);
         }
 
         continue;
@@ -235,7 +235,7 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_wind
     }
 
     // early skip for preventing capturing mouse and keyboard inputs, while in EDITOR_2D engine mode
-    if (gameState.currentMode == gameloop::EngineMode::EDITOR_2D
+    if (gameState.currentMode == EngineMode::EDITOR_2D
         && ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP))) {
       continue;
     }
@@ -243,10 +243,10 @@ void poll_sdl_events(gameloop::GameState &gameState, InputState &input, sdl_wind
     switch (event.type) {
     case SDL_KEYDOWN:
     case SDL_KEYUP:
-      gameloop::handleKeyInput(event, input);
+      handleKeyInput(event, input);
       break;
     case SDL_MOUSEMOTION:
-      gameloop::handleMouseMovement(event, input);
+      handleMouseMovement(event, input);
       break;
     }
   }

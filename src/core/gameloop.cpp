@@ -8,8 +8,6 @@
 
 struct InputState;
 
-namespace gameloop {
-
 void handleMouseMovement(const SDL_Event &event, InputState &input)
 {
   input.mouse_dx = event.motion.xrel;
@@ -46,4 +44,3 @@ void setEngineMode(GameState &state, InputState &input, EngineMode newMode, sdl_
     input.mouse_dy = 0;
   }
 }
-}// namespace gameloop
