@@ -8,6 +8,7 @@
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include "imgui_internal.h"
+#include "math_utils.h"
 
 #include <algorithm>
 #include <array>
@@ -87,20 +88,20 @@ void ImguiRenderer::render() const
   const float_t thickness = 2.0f * m_editor->state->canvasZoom;
   const float_t vertexRadius = 4.0f * m_editor->state->canvasZoom;
 
-  // 2. Set flags to make it invisible and non-interactive
+  // 2. Set flags
   constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
                                      | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus;
 
   ImGui::Begin("HUDOverlay", nullptr, flags);
 
-  // 3. Draw your "screen-level" elements
+  // 3. Draw "screen-level" elements
   ImGui::TextColored(ImVec4(1, 1, 0, 1), "FPS: %.1f", io.Framerate);
 
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
   m_editor->processInput(vertexRadius);
 
-  // render a window showing all the sidedefs and sectors
+  // render a window showing all the sectors
   drawSectorsWindow();
 
   // render a window showing all sidedefs
@@ -132,6 +133,10 @@ void ImguiRenderer::render() const
     const auto &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
 
     const ImVec2 mousePos = ImGui::GetMousePos();
+
+    if (mousePos.x < 0 || mousePos.x > io.DisplaySize.x || mousePos.y < 0 || mousePos.y > io.DisplaySize.y) {
+      return;
+    }
 
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     drawList->AddLine(startVertex.toImVec2(), mousePos, g_hoverColor, thickness);
@@ -281,13 +286,13 @@ void ImguiRenderer::drawSelectedLineDef(const uint32_t objectId,
   ImDrawList *drawList) const
 {
   const auto index = editor::getObjectIndex(objectId);
-  auto &ld = m_editor->state->findLinedef(index);
-  auto start = m_editor->state->findVertex(ld.start);
-  auto end = m_editor->state->findVertex(ld.end);
+  const auto &ld = m_editor->state->findLinedef(index);
+  const auto start = m_editor->state->findVertex(ld.start);
+  const auto end = m_editor->state->findVertex(ld.end);
 
-  ImVec2 startDragged(static_cast<float_t>(start.x) + m_editor->state->draggingOffset.x,
+  const ImVec2 startDragged(static_cast<float_t>(start.x) + m_editor->state->draggingOffset.x,
     static_cast<float_t>(start.y) + m_editor->state->draggingOffset.y);
-  ImVec2 endDragged(static_cast<float_t>(end.x) + m_editor->state->draggingOffset.x,
+  const ImVec2 endDragged(static_cast<float_t>(end.x) + m_editor->state->draggingOffset.x,
     static_cast<float_t>(end.y) + m_editor->state->draggingOffset.y);
 
   drawList->AddLine(startDragged, endDragged, g_selectedColor, thickness);
@@ -365,6 +370,24 @@ void ImguiRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *
     if (ld.backSideDef != -1) { color -= 0x32323200; }
 
     drawList->AddLine(start, end, color, thickness);
+
+    // draw a small arrow showing the direction of the linedef
+    static double s_arrowLength = 15;
+    static double s_arrowAngle = 135;
+
+    editor::EditorVertex linedefDir{ endVertex.x - startVertex.x, endVertex.y - startVertex.y };
+    linedefDir.normalize();
+
+    const ImVec2 leftArrowDir = math_utils::rotateAroundX(linedefDir, s_arrowAngle);
+    const ImVec2 rightArrowDir = math_utils::rotateAroundX(linedefDir, -s_arrowAngle);
+
+    ImVec2 leftArrowEnd{ static_cast<float>(endVertex.x + leftArrowDir.x * s_arrowLength),
+      static_cast<float>(endVertex.y + leftArrowDir.y * s_arrowLength) };
+    ImVec2 rightArrowEnd{ static_cast<float>(endVertex.x + rightArrowDir.x * s_arrowLength),
+      static_cast<float>(endVertex.y + rightArrowDir.y * s_arrowLength) };
+
+    drawList->AddLine(end, leftArrowEnd, color, thickness/1.5f);
+    drawList->AddLine(end, rightArrowEnd, color, thickness/1.5f);
   }
 }
 void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
@@ -401,7 +424,7 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
 
 void ImguiRenderer::drawSelectedLinePopup(const uint32_t lineId) const
 {
-  auto index = editor::getObjectIndex(lineId);
+  const auto index = editor::getObjectIndex(lineId);
   auto &ld = m_editor->state->findLinedef(index);
 
   auto &start = m_editor->state->findVertex(ld.start);
@@ -427,6 +450,12 @@ void ImguiRenderer::drawSelectedLinePopup(const uint32_t lineId) const
   ImGui::SameLine();
   ImGui::SetNextItemWidth(80);
   ImGui::InputInt("End Y: ", &end.y);
+
+  if (ImGui::Button("Swap")) {
+    const uint32_t temp = ld.start;
+    ld.start = ld.end;
+    ld.end = temp;
+  }
 
   ImGui::NewLine();
 

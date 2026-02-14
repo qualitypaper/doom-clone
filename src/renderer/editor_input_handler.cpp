@@ -8,7 +8,6 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <limits>
 
 namespace editor {
@@ -191,7 +190,7 @@ void EditorInputHandler::updateSelection(uint32_t id, const bool selected, Edito
 void EditorInputHandler::resetSelection(EditorState &state)
 {
   for (const uint32_t id : state.selection) {
-    auto object = state.findObject(id);
+    EditorObject *object = state.findObject(id);
 
     if (object) object->selected = false;
   }
@@ -226,7 +225,7 @@ void EditorInputHandler::flushDragging(EditorState &state, commands::CommandHist
         auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
 
         auto cmd = std::make_unique<commands::MoveLineDefCommand>(
-          index, start, end, start.add(state.draggingOffset), end.add(state.draggingOffset));
+          index, start, end, start + state.draggingOffset, end + state.draggingOffset);
 
         history.execute(std::move(cmd), state);
         break;

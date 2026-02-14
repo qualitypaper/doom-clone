@@ -9,6 +9,9 @@ std::vector<BspNode> nodes;
 std::vector<Seg> segments;
 std::vector<SubSector> subsectors;
 
+BspNode::BspNode(const int16_t _x, const int16_t _y, const int16_t _dx, const int16_t _dy)
+  : x(_x), y(_y), dx(_dx), dy(_dy)
+{}
 
 BSPBuilder::BSPBuilder(Level &_level) : level(_level)
 {
@@ -65,11 +68,35 @@ SplitResult BSPBuilder::SplitBySplitter(const std::vector<Seg> &segs, const Seg 
 
       const double k = math_utils::findLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
       const Vertex intersection = segStart + segDirection * k;
-      level.vertices.push_back(intersection);
+      level.vertices.emplace_back(intersection);
+      const int16_t newVertexId = static_cast<int16_t>(level.vertices.size() - 1);
 
-      // TODO: finish segment splitting algorithm
+      const LineDef segLd = level.linedefs[seg.linedefIndex];
+      LineDef startLd{ segLd.start, newVertexId, segLd.type, segLd.frontSidedef, segLd.backSidedef };
+      LineDef endLd{ newVertexId, segLd.end, segLd.type, segLd.frontSidedef, segLd.backSidedef };
+
+      level.linedefs.emplace_back(startLd);
+      level.linedefs.emplace_back(endLd);
+
+      Seg newSeg{ segLd.start, newVertexId, 0, static_cast<int16_t>(level.linedefs.size() - 2), 0, 0 };
+      Seg newOtherSeg{ newVertexId, segLd.end, 0, static_cast<int16_t>(level.linedefs.size() - 1), 0, 0 };
+
+      const SegmentPosition newSegPos = DetermineSegmentPosition(splitter, newSeg);
+
+      if (newSegPos == SegmentPosition::FRONT) {
+        res.front.emplace_back(newSeg);
+        res.back.emplace_back(newOtherSeg);
+      } else {
+        res.front.emplace_back(newOtherSeg);
+        res.back.emplace_back(newSeg);
+      }
     }
   }
+
+  res.node = { static_cast<int16_t>(splitterStart.x),
+    static_cast<int16_t>(splitterStart.y),
+    static_cast<int16_t>(splitterDirection.x),
+    static_cast<int16_t>(splitterDirection.y) };
 
   return res;
 }

@@ -28,7 +28,7 @@ struct MoveVertexCommand : Command
   uint32_t vertexId;
   editor::EditorVertex oldVertex, newVertex;
 
-  MoveVertexCommand(const uint32_t _vertexId, editor::EditorVertex _oldVertex, editor::EditorVertex _newVertex);
+  MoveVertexCommand(uint32_t _vertexId, editor::EditorVertex _oldVertex, editor::EditorVertex _newVertex);
 
   void execute(editor::EditorState &state) override;
 

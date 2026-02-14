@@ -12,19 +12,18 @@ namespace framebuffer {
 class FrameBuffer
 {
 private:
-
   SdlWindow &sdlWindow;
 
 public:
-  int16_t width;
-  int16_t height;
+  uint16_t width;
+  uint16_t height;
 
   uint32_t *pixels;
 
-  FrameBuffer(SdlWindow &sdlWindow);
+  explicit FrameBuffer(SdlWindow &sdlWindow);
   ~FrameBuffer();
 
-  void update();
-  void reset();
+  void update() const;
+  void reset() const;
 };
 }// namespace framebuffer

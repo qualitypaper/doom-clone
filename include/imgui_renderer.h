@@ -30,7 +30,7 @@ private:
 
   void drawSidedefsWindow() const;
   void drawSectorsWindow() const;
-  void drawSelectedLinePopup(uint32_t selectedId) const;
+  void drawSelectedLinePopup(uint32_t lineId) const;
   void drawSelectedVertexPopup(uint32_t selectedId) const;
   void drawMapOutlines(float_t vertexRadius, float_t thickness) const;
   void drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,

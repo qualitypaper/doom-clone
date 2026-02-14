@@ -387,7 +387,7 @@ Editor::Editor(Level &_level, uint16_t _width, uint16_t _height)
 void Editor::processInput(const float_t vertexRadius) const
 { EditorInputHandler::processInput(*this->state, *this->m_history, vertexRadius); }
 
-void Editor::addLineDef(int32_t sectorId, LineDef &linedef)
+void Editor::addLineDef(const int32_t sectorId, LineDef &linedef)
 {
   state->level->linedefs.emplace_back(linedef);
 
@@ -399,60 +399,9 @@ void Editor::addLineDef(int32_t sectorId, LineDef &linedef)
   this->updateAABB(sectorId);
 }
 
-void Editor::addLineDef(Vertex start, Vertex end)
-{
-  // level.vertices.emplace_back(start);
-  // level.vertices.emplace_back(end);
-
-  // LineDef ld{ .start = static_cast<int16_t>(level.vertices.size() - 2),
-  //   .end = static_cast<int16_t>(level.vertices.size() - 1),
-  //   .type = LineDefType::REGULAR,
-  //   .frontSidedef = -1,
-  //   .backSidedef = -1 };
-
-  // level.linedefs.emplace_back(ld);
-}
-
 void Editor::addVertex(const int16_t x, const int16_t y) const
 {
   m_history->execute(std::make_unique<commands::AddVertexCommand>(EditorVertex(x, y)), *state);
-
-
-  float_t dMin1 = std::numeric_limits<float_t>::max(), dMin2 = std::numeric_limits<float_t>::max();
-  int16_t firstVertexIdx, secondVertexIdx;
-
-  // find nearest two vertices with which to connect a vertex
-  // auto &sector = state->findSector(sectorId);
-  //
-  // for (const uint32_t ldIndex : sector.linedefIds) {
-  //   auto &ld = state->findLinedef(ldIndex);
-  //
-  //   auto &start = state->findVertex(ld.start);
-  //   auto &end = state->findVertex(ld.end);
-  //
-  //   float_t d1 = math_utils::getDistanceSq(start.x, start.y, x, y);
-  //   float_t d2 = math_utils::getDistanceSq(end.x, end.y, x, y);
-  //
-  //   if (d1 < dMin1) {
-  //     dMin2 = dMin1;
-  //     dMin1 = d1;
-  //     secondVertexIdx = firstVertexIdx;
-  //     firstVertexIdx = ld.start;
-  //   } else if (d1 < dMin2) {
-  //     dMin2 = d1;
-  //     secondVertexIdx = ld.start;
-  //   }
-  //
-  //   if (d2 < dMin1) {
-  //     dMin2 = dMin1;
-  //     dMin1 = d2;
-  //     secondVertexIdx = firstVertexIdx;
-  //     firstVertexIdx = ld.end;
-  //   } else if (d2 < dMin2) {
-  //     dMin2 = d2;
-  //     secondVertexIdx = ld.end;
-  //   }
-  // }
 }
 
 void Editor::executeCommand(std::unique_ptr<commands::Command> cmd) const

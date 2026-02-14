@@ -133,9 +133,9 @@ int main()
 
   // setup sdl window
   SdlWindow sdlWindow(
-    gameState.currentMode == EngineMode::EDITOR_2D ? 0 : config::WINDOW_WIDTH,
-    gameState.currentMode == EngineMode::EDITOR_2D ? 0 : config::WINDOW_HEIGHT,
-    gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_SHOWN);
+    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
+    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT,
+    gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
   imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, level);
@@ -168,6 +168,7 @@ int main()
 
     if (gameState.currentMode == EngineMode::EDITOR_2D) {
       imguiRenderer.render();
+
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
       if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }

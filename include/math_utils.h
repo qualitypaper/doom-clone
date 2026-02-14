@@ -6,6 +6,10 @@
 
 namespace math_utils {
 
+constexpr double PI = 3.141592653589793;
+
+constexpr double toRadians(const double angle) { return PI * angle / 180; }
+
 constexpr Vertex toCenterCoordinates(Vertex vec, uint16_t width, uint16_t height)
 { return Vertex(vec.x - width / 2, height / 2 - vec.y); }
 constexpr Vertex toCenterCoordinates(const editor::EditorVertex &vec, uint16_t width, uint16_t height)
@@ -49,5 +53,21 @@ constexpr double findLinesIntersection(const Vertex p1, const Vertex d1, const V
   } else {
     throw std::runtime_error("Direction is a null vector.");
   }
+}
+
+constexpr Vertex rotateAroundX(const Vertex v, const double angleDegrees)
+{
+  const double cos = std::cos(toRadians(angleDegrees));
+  const double sin = std::sin(toRadians(angleDegrees));
+
+  return { static_cast<int32_t>(cos * v.x - sin * v.y), static_cast<int32_t>(sin * v.x + cos * v.y) };
+}
+
+inline ImVec2 rotateAroundX(const editor::EditorVertex &v, const double angleDegrees)
+{
+  const double cos = std::cos(toRadians(angleDegrees));
+  const double sin = std::sin(toRadians(angleDegrees));
+
+  return { static_cast<float>(cos * v.x - sin * v.y), static_cast<float>(sin * v.x + cos * v.y) };
 }
 }// namespace math_utils

@@ -28,7 +28,7 @@ struct AABB
   int16_t maxX, maxY;
   int16_t minX, minY;
 
-  bool contains(int16_t x, int16_t y) { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
+  [[nodiscard]] bool contains(const int16_t x, const int16_t y) const { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
 enum class EditorObjectType { LINEDEF, VERTEX, SECTOR };
@@ -82,45 +82,35 @@ struct EditorVertex : EditorObject
 {
   EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
 
-  int32_t x, y;
+  int32_t x = 0, y = 0;
   std::vector<uint32_t> connectedLineDefs;// Linedef object IDs (EditorObjectType::LINEDEF).
 
+  EditorVertex operator+(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
+
+  EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
+
+  EditorVertex operator+(const ImVec2 &other) const
+  { return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) }; }
+
+  EditorVertex operator-(const ImVec2 &other) const
+  { return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) }; }
+
+  EditorVertex operator*(const double c) const { return { static_cast<int32_t>(x * c), static_cast<int32_t>(y * c) }; }
+  EditorVertex operator/(const double c) const { return { static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
+
   [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
-  // immutable add
-  [[nodiscard]] EditorVertex add(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
-  [[nodiscard]] EditorVertex add(const ImVec2 &other) const
-  {
-    return { static_cast<int32_t>(static_cast<float_t>(x) + other.x),
-      static_cast<int32_t>(static_cast<float_t>(y) + other.y) };
-  }
-
-  constexpr EditorVertex &operator+=(const EditorVertex &other)
-  {
-    x += other.x;
-    y += other.y;
-    return *this;
-  }
-
-  constexpr EditorVertex &operator+=(const ImVec2 &offset)
-  {
-    x += static_cast<int32_t>(offset.x);
-    y += static_cast<int32_t>(offset.y);
-
-    return *this;
-  }
   [[nodiscard]] constexpr ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
+  [[nodiscard]] constexpr double length() const { return std::sqrt(x * x + y * y); }
+
+  void normalize()
+  {
+    const double len = length();
+
+    x = static_cast<int32_t>(static_cast<double>(x) / len);
+    y = static_cast<int32_t>(static_cast<double>(y) / len);
+  }
   static void remove(EditorState &state, uint32_t vertexId);
 };
-constexpr EditorVertex &operator+(EditorVertex &lhs, const EditorVertex &rhs) noexcept
-{
-  lhs += rhs;
-  return lhs;
-}
-constexpr EditorVertex &operator+(EditorVertex &lhs, const ImVec2 &rhs) noexcept
-{
-  lhs += rhs;
-  return lhs;
-}
 
 struct EditorSector : EditorObject
 {
@@ -131,7 +121,7 @@ struct EditorSector : EditorObject
   int16_t specialType = 0;
   int16_t lightLevel = 0;
   int16_t tag = 0;
-  AABB bounding_box;
+  AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
 };
 
@@ -252,7 +242,7 @@ public:
   void processInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<commands::Command> cmd) const;
   void addLineDef(Vertex start, Vertex end);
-  void addLineDef(int32_t sectorId, LineDef &lineDef);
+  void addLineDef(int32_t sectorId, LineDef &linedef);
   void addVertex(int16_t x, int16_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
 };

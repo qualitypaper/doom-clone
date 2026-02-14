@@ -4,7 +4,7 @@
 #include <array>
 #include <span>
 
-enum class SegmentPosition {FRONT, BACK, SPANNING};
+enum class SegmentPosition { FRONT, BACK, SPANNING };
 
 struct Seg
 {
@@ -18,8 +18,11 @@ struct Seg
 
 struct BspNode
 {
-  int x, y, dx, dy;
-  std::array<int16_t, 4> leftBoundingBox, rightBoundingBox;
+  BspNode() = default;
+  BspNode(int16_t _x, int16_t _y, int16_t _dx, int16_t _dy);
+
+  int16_t x=0, y=0, dx=0, dy=0;
+  std::array<int16_t, 4> leftBoundingBox{}, rightBoundingBox{};
   int16_t leftChild = -1, rightChild = -1;
 };
 
