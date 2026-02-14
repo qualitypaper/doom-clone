@@ -36,4 +36,18 @@ constexpr int32_t crossProductLength(const Vertex v1, const Vertex v2) { return 
 constexpr float getDistanceSq(ImVec2 a, ImVec2 b) { return getDistanceSq(a.x, a.y, b.x, b.y); }
 constexpr float getDistanceSq(Vertex v1, Vertex v2) { return getDistanceSq(v1.x, v1.y, v2.x, v2.y); }
 constexpr float dotProduct(ImVec2 a, ImVec2 b) { return a.x * b.x + a.y * b.y; }
+
+// returns the parameter for the second line
+// so the solution will be: p2 + returnValue * d2
+constexpr double findLinesIntersection(const Vertex p1, const Vertex d1, const Vertex p2, const Vertex d2)
+{
+  if (d1.x != 0) {
+    const double temp = static_cast<double>(d1.y) / static_cast<double>(d1.x);
+    return (p2.y - p1.y - temp * (p2.x - p1.x)) / (temp * d2.x - d2.y);
+  } else if (d1.y != 0) {
+    return -(p2.x - p1.x) / static_cast<double>(p2.x);
+  } else {
+    throw std::runtime_error("Direction is a null vector.");
+  }
+}
 }// namespace math_utils

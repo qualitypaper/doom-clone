@@ -40,9 +40,41 @@ void BSPBuilder::BuildBSPTree(const std::vector<Seg> &segs)
   BuildBSPTree(split.back);
 }
 
-SplitResult BSPBuilder::SplitBySplitter(const std::vector<Seg> &segs, const Seg &splitter) {}
+SplitResult BSPBuilder::SplitBySplitter(const std::vector<Seg> &segs, const Seg &splitter) const
+{
+  SplitResult res{};
 
-uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs)
+  const Vertex splitterStart = level.vertices[splitter.startVertex];
+  const Vertex splitterDirection = level.vertices[splitter.endVertex] - splitterStart;
+
+  for (auto &seg : segs) {
+    const SegmentPosition pos = DetermineSegmentPosition(splitter, seg);
+
+    if (pos == SegmentPosition::FRONT) {
+      res.front.emplace_back(seg);
+    } else if (pos == SegmentPosition::BACK) {
+      res.back.emplace_back(seg);
+    } else {
+      // split the segment into two parts
+      const Vertex segStart = level.vertices[seg.startVertex];
+      const Vertex segDirection = level.vertices[seg.endVertex] - segStart;
+
+      const Vertex diff = segDirection - splitterDirection;
+      // check for seg == splitter
+      if (diff.x == 0 && diff.y == 0) continue;
+
+      const double k = math_utils::findLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
+      const Vertex intersection = segStart + segDirection * k;
+      level.vertices.push_back(intersection);
+
+      // TODO: finish segment splitting algorithm
+    }
+  }
+
+  return res;
+}
+
+uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 {
   int maxX = std::numeric_limits<int>::min();
   int maxY = std::numeric_limits<int>::min();
@@ -107,35 +139,19 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
 
   // check for line intersection
   if ((splitterDirection.x != 0 || splitterDirection.y != 0) && (segDirection.x != 0 || segDirection.y != 0)) {
-    double k{};
+    const double k =
+      math_utils::findLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
 
-    if (splitterDirection.x != 0) {
-      double temp = static_cast<double>(splitterDirection.y) / static_cast<double>(splitterDirection.x);
-      k = ((startSegVertex.y - startSplitterVertex.y - temp * (startSegVertex.x - startSplitterVertex.x)))
-                 / (temp * segDirection.x - segDirection.y);
-
-    } else if (splitterDirection.y != 0) {
-      k = -(startSegVertex.x - startSplitterVertex.x) / static_cast<double>(startSegVertex.x);
-    } else {
-      throw std::runtime_error("Direction is a null vector.");
-    }
-
-    if (k > 0 && k < 1) {
-      return SegmentPosition::SPANNING;
-    } else if (k <= 0) {
-      return SegmentPosition::FRONT;
-    } else {
-      return SegmentPosition::BACK;
-    }
+    if (k > 0 && k < 1) { return SegmentPosition::SPANNING; }
   }
 
-  const int32_t length = math_utils::crossProductLength(splitterDirection, segDirection);
+  const int32_t length = math_utils::crossProductLength(splitterDirection, startSegVertex);
 
-  if (length >= 0) {
-    // front (left), covers also lines that are collinear with the splitter
+  if (length <= 0) {
+    // front (right), covers also lines that are collinear with the splitter
     return SegmentPosition::FRONT;
   } else {
-    // back(right)
+    // back(left)
     return SegmentPosition::BACK;
   }
 }
@@ -149,13 +165,29 @@ uint32_t BSPBuilder::EvaluateSplitter(const Seg &splitter) const
     // 0 = front, 1 = back, 2 = spanning
     const SegmentPosition position = DetermineSegmentPosition(splitter, seg);
 
-    if (position == SegmentPosition::FRONT) left++;
-    else if (position == SegmentPosition::BACK) right++;
-    else if (position == SegmentPosition::SPANNING) spanning++;
+    if (position == SegmentPosition::FRONT)
+      right++;
+    else if (position == SegmentPosition::BACK)
+      left++;
+    else if (position == SegmentPosition::SPANNING)
+      spanning++;
   }
 
   return std::abs(left - right) + spanning * 8;
 }
 
-// checks whether a set of segments forms a convex shape
-bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) {}
+/*
+ checks whether a set of segments forms a convex shape. A subsector (list of segments) forms a convex region,
+ when any line drawn through the subsector crosses at most 2 other lines
+*/
+bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
+{
+  for (auto &seg : segs) {
+    for (auto &other : segs) {
+      const SegmentPosition pos = DetermineSegmentPosition(seg, other);
+      if (pos != SegmentPosition::FRONT) return false;
+    }
+  }
+
+  return true;
+}

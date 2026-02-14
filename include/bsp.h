@@ -20,7 +20,7 @@ struct BspNode
 {
   int x, y, dx, dy;
   std::array<int16_t, 4> leftBoundingBox, rightBoundingBox;
-  int16_t leftChild, rightChild;
+  int16_t leftChild = -1, rightChild = -1;
 };
 
 struct SubSector
@@ -45,11 +45,11 @@ private:
   Level &level;
 
 private:
-  SplitResult SplitBySplitter(const std::vector<Seg> &segs, const Seg &splitter);
-  uint32_t SelectSplittingLine(const std::vector<Seg> &segs);
+  SplitResult SplitBySplitter(const std::vector<Seg> &segs, const Seg &splitter) const;
+  uint32_t SelectSplittingLine(const std::vector<Seg> &segs) const;
   [[nodiscard]] uint32_t EvaluateSplitter(const Seg &seg) const;
   [[nodiscard]] SegmentPosition DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const;
-  bool IsConvex(const std::vector<Seg> &segs);
+  bool IsConvex(const std::vector<Seg> &segs) const;
 
 public:
   BSPBuilder(Level &_level);

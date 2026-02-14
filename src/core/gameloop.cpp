@@ -21,7 +21,7 @@ void handleKeyInput(SDL_Event &event, InputState &input)
   input.keys[scancode] = pressed;
 }
 
-void setEngineMode(GameState &state, InputState &input, EngineMode newMode, SdlWindow &sdlWindow)
+void setEngineMode(GameState &state, InputState &input, const EngineMode newMode, const SdlWindow &sdlWindow)
 {
   // nothing to change
   if (state.currentMode == newMode) return;
