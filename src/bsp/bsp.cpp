@@ -3,11 +3,8 @@
 #include "math_utils.h"
 
 #include <queue>
+#include <set>
 #include <unordered_map>
-
-std::vector<BspNode> nodes;
-std::vector<Seg> segments;
-std::vector<SubSector> subsectors;
 
 BspNode::BspNode(const int16_t _x, const int16_t _y, const int16_t _dx, const int16_t _dy)
   : x(_x), y(_y), dx(_dx), dy(_dy)
@@ -25,25 +22,41 @@ BSPBuilder::BSPBuilder(Level &_level) : level(_level)
   }
 }
 
-void BSPBuilder::BuildBSPTree(const std::vector<Seg> &segs)
+void BSPBuilder::BuildBSPTree() { BuildBSPTree(segments); }
+
+int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
   // base case
-  if (segs.size() <= 2 || IsConvex(segs)) { return; }
+  if (segs.size() <= 2 || IsConvex(segs)) {
+    BspNode node{};
+    return static_cast<int>(nodes.size() - 1);
+  }
 
   nodes.reserve(level.linedefs.size());
 
   // selecting a splitter line
   const uint32_t bestSplitterIndex = SelectSplittingLine(segs);
   // partitioning segments into two groups based on the splitter line
-  const SplitResult split = SplitBySplitter(segs, segs[bestSplitterIndex]);
+  SplitResult split = SplitBySplitter(segs, segs[bestSplitterIndex]);
   // recursively building the tree for each group a convex subsector is reached
   nodes.push_back(split.node);
 
-  BuildBSPTree(split.front);
-  BuildBSPTree(split.back);
+  const int id = static_cast<int>(nodes.size() - 1);
+
+  const int leftId = BuildBSPTree(split.front);
+  const int rightId = BuildBSPTree(split.back);
+
+  nodes[id].leftChild = leftId;
+  nodes[id].rightChild = rightId;
+
+  return id;
+}
+void BSPBuilder::printTree() const
+{
+  for (auto &node : nodes) { std::cout << node << '\n'; }
 }
 
-SplitResult BSPBuilder::SplitBySplitter(const std::vector<Seg> &segs, const Seg &splitter) const
+SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const
 {
   SplitResult res{};
 
@@ -51,11 +64,15 @@ SplitResult BSPBuilder::SplitBySplitter(const std::vector<Seg> &segs, const Seg 
   const Vertex splitterDirection = level.vertices[splitter.endVertex] - splitterStart;
 
   for (auto &seg : segs) {
+    if (seg.endVertex == splitter.endVertex && seg.startVertex == splitter.startVertex) continue;
+
     const SegmentPosition pos = DetermineSegmentPosition(splitter, seg);
 
     if (pos == SegmentPosition::FRONT) {
+      seg.side = 0;
       res.front.emplace_back(seg);
     } else if (pos == SegmentPosition::BACK) {
+      seg.side = 1;
       res.back.emplace_back(seg);
     } else {
       // split the segment into two parts
@@ -84,9 +101,15 @@ SplitResult BSPBuilder::SplitBySplitter(const std::vector<Seg> &segs, const Seg 
       const SegmentPosition newSegPos = DetermineSegmentPosition(splitter, newSeg);
 
       if (newSegPos == SegmentPosition::FRONT) {
+        newSeg.side = 0;
+        newOtherSeg.side = 1;
+
         res.front.emplace_back(newSeg);
         res.back.emplace_back(newOtherSeg);
       } else {
+        newSeg.side = 1;
+        newOtherSeg.side = 0;
+
         res.front.emplace_back(newOtherSeg);
         res.back.emplace_back(newSeg);
       }
@@ -124,25 +147,27 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
   std::unordered_map<int, std::vector<size_t>> distanceToSegmentsMap;
 
   for (size_t i = 0; i < segs.size(); i++) {
-    const int dx = std::min(
-      std::abs(level.vertices[segs[i].startVertex].y - minY), std::abs(level.vertices[segs[i].startVertex].y - maxY));
     const int dy = std::min(
+      std::abs(level.vertices[segs[i].startVertex].y - minY), std::abs(level.vertices[segs[i].startVertex].y - maxY));
+    const int dx = std::min(
       std::abs(level.vertices[segs[i].startVertex].x - minX), std::abs(level.vertices[segs[i].startVertex].x - maxX));
 
     const int distanceSq = dx * dx + dy * dy;
-    minHeap.push(distanceSq);
+    if (!distanceToSegmentsMap.contains(distanceSq)) { minHeap.push(distanceSq); }
     distanceToSegmentsMap[distanceSq].push_back(i);
   }
 
-  // pick top 10 lines as potential splitters and evaluate them
   size_t bestSplitterIndex = 0;
   uint32_t bestScore = std::numeric_limits<uint32_t>::max();
 
-  for (size_t i = 0; i < segs.size() && !minHeap.empty(); i++) {
-    const int distanceSq = minHeap.top();
+  int distanceSq = -1;
+
+  while (!minHeap.empty()) {
+    distanceSq = minHeap.top();
     minHeap.pop();
 
     for (const size_t segIndex : distanceToSegmentsMap[distanceSq]) {
+      if (segIndex == 10) { std::cout << ""; }
       const uint32_t score = EvaluateSplitter(segs[segIndex]);
 
       if (score < bestScore) {
@@ -200,7 +225,7 @@ uint32_t BSPBuilder::EvaluateSplitter(const Seg &splitter) const
       spanning++;
   }
 
-  return std::abs(left - right) + spanning * 8;
+  return std::abs(left - right) + spanning * 3;
 }
 
 /*

@@ -10,9 +10,7 @@
 #include <fstream>
 #include <limits>
 
-namespace editor {
-
-void EditorInputHandler::processMouseInputs(EditorState &state, commands::CommandHistory &history)
+void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &history)
 {
   const ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse) return;
@@ -52,7 +50,7 @@ void EditorInputHandler::processMouseInputs(EditorState &state, commands::Comman
   }
 }
 
-void EditorInputHandler::processInput(EditorState &state, commands::CommandHistory &history, const float_t vertexRadius)
+void EditorInputHandler::processInput(EditorState &state, CommandHistory &history, const float_t vertexRadius)
 {
   static float_t s_vertexHoveringThresholdSq = 25.0f * 25.0f;
   static float_t s_lineHoveringThresholdSq = 25.0f * 25.0f;
@@ -141,7 +139,7 @@ void EditorInputHandler::processInput(EditorState &state, commands::CommandHisto
           // draw a line between the start vertex and the hovered vertex
           const EditorLineDef lineDef(state.lineStartVertexId, bestVertexId, LineDefType::REGULAR, -1, -1);
 
-          auto cmd = std::make_unique<commands::AddLineDefCommand>(commands::AddLineDefCommand(lineDef));
+          auto cmd = std::make_unique<AddLineDefCommand>(AddLineDefCommand(lineDef));
           history.execute(std::move(cmd), state);
           state.isCreatingLine = false;
           state.lineStartVertexId = 0;
@@ -197,7 +195,7 @@ void EditorInputHandler::resetSelection(EditorState &state)
   state.selection.clear();
 }
 
-void EditorInputHandler::flushDragging(EditorState &state, commands::CommandHistory &history)
+void EditorInputHandler::flushDragging(EditorState &state, CommandHistory &history)
 {
   // early return if there is no dragging offset
   if (state.draggingOffset.x == 0 && state.draggingOffset.y == 0) return;
@@ -212,7 +210,7 @@ void EditorInputHandler::flushDragging(EditorState &state, commands::CommandHist
       switch (type) {
       case EditorObjectType::VERTEX: {
         auto &vertex = state.findVertex(index);
-        auto cmd = std::make_unique<commands::MoveVertexCommand>(index,
+        auto cmd = std::make_unique<MoveVertexCommand>(index,
           vertex,
           EditorVertex(static_cast<int32_t>(static_cast<float_t>(vertex.x) + state.draggingOffset.x),
             static_cast<int32_t>(static_cast<float_t>(vertex.y) + state.draggingOffset.y)));
@@ -224,7 +222,7 @@ void EditorInputHandler::flushDragging(EditorState &state, commands::CommandHist
         const auto &line = state.findLinedef(index);
         auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
 
-        auto cmd = std::make_unique<commands::MoveLineDefCommand>(
+        auto cmd = std::make_unique<MoveLineDefCommand>(
           index, start, end, start + state.draggingOffset, end + state.draggingOffset);
 
         history.execute(std::move(cmd), state);
@@ -263,4 +261,3 @@ float_t EditorInputHandler::getDistanceToSegmentSq(const ImVec2 start, const ImV
 
   return dx * dx + dy * dy;
 }
-}// namespace editor

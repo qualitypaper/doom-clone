@@ -12,7 +12,7 @@ constexpr double toRadians(const double angle) { return PI * angle / 180; }
 
 constexpr Vertex toCenterCoordinates(Vertex vec, uint16_t width, uint16_t height)
 { return Vertex(vec.x - width / 2, height / 2 - vec.y); }
-constexpr Vertex toCenterCoordinates(const editor::EditorVertex &vec, uint16_t width, uint16_t height)
+constexpr Vertex toCenterCoordinates(const EditorVertex &vec, uint16_t width, uint16_t height)
 { return Vertex(vec.x - width / 2, height / 2 - vec.y); }
 
 constexpr ImVec2 fromCenterCoordinates(ImVec2 vec, uint16_t width, uint16_t height)
@@ -63,11 +63,12 @@ constexpr Vertex rotateAroundX(const Vertex v, const double angleDegrees)
   return { static_cast<int32_t>(cos * v.x - sin * v.y), static_cast<int32_t>(sin * v.x + cos * v.y) };
 }
 
-inline ImVec2 rotateAroundX(const editor::EditorVertex &v, const double angleDegrees)
+inline ImVec2 rotateAroundX(const EditorVertex &v, const double angleDegrees)
 {
   const double cos = std::cos(toRadians(angleDegrees));
   const double sin = std::sin(toRadians(angleDegrees));
 
-  return { static_cast<float>(cos * v.x - sin * v.y), static_cast<float>(sin * v.x + cos * v.y) };
+  return { static_cast<float>(cos * v.x) - static_cast<float>(sin * v.y),
+    static_cast<float>(sin * v.x) + static_cast<float>(cos * v.y) };
 }
 }// namespace math_utils

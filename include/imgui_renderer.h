@@ -22,8 +22,8 @@ public:
 
 private:
   SdlWindow &m_sdlWindow;
-  std::unique_ptr<editor::Editor> m_editor;
-  std::unique_ptr<editor::EditorInputHandler> m_editorInputHandler;
+  std::unique_ptr<Editor> m_editor;
+  std::unique_ptr<EditorInputHandler> m_editorInputHandler;
 
   static void startFrame();
   void endFrame() const;
@@ -34,7 +34,7 @@ private:
   void drawSelectedVertexPopup(uint32_t selectedId) const;
   void drawMapOutlines(float_t vertexRadius, float_t thickness) const;
   void drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,
-    const editor::EditorLineDef &ld,
+    const EditorLineDef &ld,
     ImVec2 startDragged,
     ImVec2 endDragged,
     ImDrawList *drawList,
@@ -43,10 +43,16 @@ private:
   void drawSelectedLineDef(uint32_t objectId, float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
   void drawSelection(float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
   void drawUnselectedVertices(float_t vertexRadius, ImDrawList *drawList) const;
+  void drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, float_t thickness) const;
   void drawUnselectedLineDefs(float_t thickness, ImDrawList *drawList) const;
 
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const;
 
+  static void drawArrowForLinedef(ImDrawList *drawList,
+    float_t thickness,
+    const EditorVertex &startVertex,
+    const EditorVertex &endVertex,
+    ImU32 color);
   static void createSelect(const char *label,
     const std::vector<SideDef> &sidedefs,
     int32_t &currentItem,

@@ -14,8 +14,6 @@
 #include <unordered_map>
 #include <vector>
 
-namespace editor {
-
 AABB::AABB(Vertex start, Vertex end)
 {
   this->maxX = std::max(start.x, end.x);
@@ -231,12 +229,12 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
       auto &vEnd = state.findVertex(ld.end);
 
       std::erase_if(
-        vEnd.connectedLineDefs, [&ldId](const auto &ldObjectId) { return editor::getObjectIndex(ldObjectId) == ldId; });
+        vEnd.connectedLineDefs, [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
     } else if (ld.end == vertexId) {
       auto &vStart = state.findVertex(ld.start);
 
       std::erase_if(vStart.connectedLineDefs,
-        [&ldId](const auto &ldObjectId) { return editor::getObjectIndex(ldObjectId) == ldId; });
+        [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
     }
 
     EditorLineDef::remove(state, ldId);
@@ -249,7 +247,7 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
     const auto &lastVertex = state.level->vertices.back();
 
     for (const uint32_t ldObjectId : lastVertex.connectedLineDefs) {
-      const auto ldIndex = editor::getObjectIndex(ldObjectId);
+      const auto ldIndex = getObjectIndex(ldObjectId);
       auto &ld = state.findLinedef(ldIndex);
 
       if (ld.start == lastVertexIndex) ld.start = vertexId;
@@ -347,9 +345,9 @@ void EditorState::reset()
   canvasZoom = 1.0f;
 }
 
-void Editor::updateAABB(uint32_t sectorID)
+void Editor::updateAABB(const uint32_t sectorID) const
 {
-  EditorSector &sec = this->state.get()->findSector(sectorID);
+  EditorSector &sec = state->findSector(sectorID);
 
   // set values to max/min double values, so the first vertex overrides them
   sec.bounding_box.minX = std::numeric_limits<int16_t>::max();
@@ -357,11 +355,11 @@ void Editor::updateAABB(uint32_t sectorID)
   sec.bounding_box.maxX = std::numeric_limits<int16_t>::lowest();
   sec.bounding_box.maxY = std::numeric_limits<int16_t>::lowest();
 
-  for (int16_t ldId : sec.linedefIds) {
-    const auto &ld = state.get()->findLinedef(ldId);
+  for (const uint16_t ldId : sec.linedefIds) {
+    const auto &ld = state->findLinedef(ldId);
 
-    const auto &start = state.get()->findVertex(ld.start);
-    const auto &end = state.get()->findVertex(ld.end);
+    const auto &start = state->findVertex(ld.start);
+    const auto &end = state->findVertex(ld.end);
 
     // check start
     if (start.x < sec.bounding_box.minX) sec.bounding_box.minX = start.x;
@@ -380,14 +378,14 @@ void Editor::updateAABB(uint32_t sectorID)
 }
 
 Editor::Editor(Level &_level, uint16_t _width, uint16_t _height)
-  : m_inputHandler(std::make_unique<EditorInputHandler>()), m_history(std::make_unique<commands::CommandHistory>()),
+  : m_inputHandler(std::make_unique<EditorInputHandler>()), m_history(std::make_unique<CommandHistory>()),
     state(std::make_unique<EditorState>(_level, _width, _height))
 {}
 
 void Editor::processInput(const float_t vertexRadius) const
 { EditorInputHandler::processInput(*this->state, *this->m_history, vertexRadius); }
 
-void Editor::addLineDef(const int32_t sectorId, LineDef &linedef)
+void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 {
   state->level->linedefs.emplace_back(linedef);
 
@@ -401,10 +399,10 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef)
 
 void Editor::addVertex(const int16_t x, const int16_t y) const
 {
-  m_history->execute(std::make_unique<commands::AddVertexCommand>(EditorVertex(x, y)), *state);
+  m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(x, y)), *state);
 }
 
-void Editor::executeCommand(std::unique_ptr<commands::Command> cmd) const
+void Editor::executeCommand(std::unique_ptr<Command> cmd) const
 { m_history->execute(std::move(cmd), *state); }
 
 
@@ -413,5 +411,3 @@ void Editor::drawConnectedLine(const uint32_t vertexIndex) const
   state->isCreatingLine = true;
   state->lineStartVertexId = vertexIndex;
 }
-
-}// namespace editor

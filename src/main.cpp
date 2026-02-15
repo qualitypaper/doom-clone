@@ -1,3 +1,4 @@
+#include "bsp.h"
 #include "config.h"
 #include "editor.h"
 #include "framebuffer.h"
@@ -107,30 +108,26 @@ static std::vector<LineDef> linedefs = {
 
 int main()
 {
-  // sanity checks for hardcoded values
-  for (auto &sector : sectors) { assert(sector.floorHeight < sector.ceilingHeight); }
-  for (auto &ld : linedefs) {
-    assert(ld.start != ld.end);
-    assert(ld.frontSidedef >= 0);
-  }
-
   // setup inputs and states
   InputState input{};
   GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
 
   gameState.playerState = entity::Player{
-    .x = 25, .y = 25, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
+    .x = 0, .y = 0, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
   Level level;
   if (true) {
-    editor::EditorLevel::deserialize(level, "saved_level.bin");
+    EditorLevel::deserialize(level, "saved_level.bin");
   } else {
     level = { .vertices = vertices, .linedefs = linedefs, .sidedefs = sidedefs, .sectors = sectors };
   }
 
-  // assert(!level.linedefs.empty() && !level.sectors.empty() && !level.vertices.empty() && !level.sidedefs.empty());
+  BSPBuilder builder(level);
+  builder.BuildBSPTree();
+  builder.printTree();
 
+  return 0;
   // setup sdl window
   SdlWindow sdlWindow(
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
@@ -143,7 +140,7 @@ int main()
   // setup the game renderer
   framebuffer::FrameBuffer fb(sdlWindow);
   renderer::Renderer renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
-  editor::Editor editor(level, sdlWindow.width, sdlWindow.height);
+  Editor editor(level, sdlWindow.width, sdlWindow.height);
 
   running = true;
   // game loop

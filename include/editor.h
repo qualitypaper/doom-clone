@@ -10,12 +10,8 @@
 #include <vector>
 
 // forward declarations
-namespace commands {
 struct CommandHistory;
 struct Command;
-}// namespace commands
-
-namespace editor {
 
 // forward declaractions
 struct EditorState;
@@ -28,7 +24,8 @@ struct AABB
   int16_t maxX, maxY;
   int16_t minX, minY;
 
-  [[nodiscard]] bool contains(const int16_t x, const int16_t y) const { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
+  [[nodiscard]] bool contains(const int16_t x, const int16_t y) const
+  { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
 enum class EditorObjectType { LINEDEF, VERTEX, SECTOR };
@@ -81,17 +78,18 @@ struct EditorLineDef : EditorObject
 struct EditorVertex : EditorObject
 {
   EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
+  explicit EditorVertex(const ImVec2 vec)
+    : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
+  {}
 
   int32_t x = 0, y = 0;
   std::vector<uint32_t> connectedLineDefs;// Linedef object IDs (EditorObjectType::LINEDEF).
 
   EditorVertex operator+(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
-
   EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
 
   EditorVertex operator+(const ImVec2 &other) const
   { return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) }; }
-
   EditorVertex operator-(const ImVec2 &other) const
   { return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) }; }
 
@@ -106,8 +104,8 @@ struct EditorVertex : EditorObject
   {
     const double len = length();
 
-    x = static_cast<int32_t>(static_cast<double>(x) / len);
-    y = static_cast<int32_t>(static_cast<double>(y) / len);
+    x = std::round(static_cast<double>(x) / len);
+    y = std::round(static_cast<double>(y) / len);
   }
   static void remove(EditorState &state, uint32_t vertexId);
 };
@@ -227,11 +225,11 @@ class Editor
 {
 private:
   std::unique_ptr<EditorInputHandler> m_inputHandler;
-  std::unique_ptr<commands::CommandHistory> m_history;
+  std::unique_ptr<CommandHistory> m_history;
 
 private:
   void addToSector(uint16_t i, LineDef &linedef, SideDef &sidedef);
-  void updateAABB(uint32_t sectorID);
+  void updateAABB(uint32_t sectorID) const;
 
 public:
   std::unique_ptr<EditorState> state;
@@ -240,11 +238,9 @@ public:
   Editor(Level &_level, uint16_t _width, uint16_t _height);
 
   void processInput(float_t vertexRadius) const;
-  void executeCommand(std::unique_ptr<commands::Command> cmd) const;
+  void executeCommand(std::unique_ptr<Command> cmd) const;
   void addLineDef(Vertex start, Vertex end);
-  void addLineDef(int32_t sectorId, LineDef &linedef);
+  void addLineDef(int32_t sectorId, LineDef &linedef) const;
   void addVertex(int16_t x, int16_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
 };
-
-}// namespace editor
