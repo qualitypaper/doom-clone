@@ -2,13 +2,22 @@
 
 AddLineDefCommand::AddLineDefCommand(EditorLineDef _lineDef) : lineDef(std::move(_lineDef)) {}
 
-void AddLineDefCommand::execute(EditorState &state) { state.level->linedefs.emplace_back(lineDef); }
+void AddLineDefCommand::execute(EditorState &state)
+{
+  state.level->linedefs.emplace_back(lineDef);
+  const size_t ldIndex = state.level->linedefs.size() - 1;
+  state.findVertex(lineDef.start).connectedLineDefs.push_back(ldIndex);
+  state.findVertex(lineDef.end).connectedLineDefs.push_back(ldIndex);
+}
 
-void AddLineDefCommand::undo(EditorState &state) { state.level->linedefs.pop_back(); }
+void AddLineDefCommand::undo(EditorState &state)
+{
+  state.level->linedefs.pop_back();
+  state.findVertex(lineDef.start).connectedLineDefs.pop_back();
+  state.findVertex(lineDef.end).connectedLineDefs.pop_back();
+}
 
-MoveVertexCommand::MoveVertexCommand(const uint32_t _vertexId,
-  EditorVertex _oldVertex,
-  EditorVertex _newVertex)
+MoveVertexCommand::MoveVertexCommand(const uint32_t _vertexId, EditorVertex _oldVertex, EditorVertex _newVertex)
   : vertexId(_vertexId), oldVertex(std::move(_oldVertex)), newVertex(std::move(_newVertex))
 {}
 

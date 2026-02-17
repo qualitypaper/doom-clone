@@ -25,6 +25,7 @@ public:
   void updatePixels(const uint32_t *pixels) const;
   void updateScreen() const;
 
+  [[nodiscard]] SDL_Texture *getTexture() const;
   [[nodiscard]] SDL_Window *getWindow() const;
   [[nodiscard]] SDL_Renderer *getRenderer() const;
 };

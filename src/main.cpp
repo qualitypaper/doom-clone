@@ -126,8 +126,8 @@ int main()
   BSPBuilder builder(level);
   builder.BuildBSPTree();
   builder.printTree();
+  // builder.visualize();
 
-  return 0;
   // setup sdl window
   SdlWindow sdlWindow(
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
@@ -140,7 +140,6 @@ int main()
   // setup the game renderer
   framebuffer::FrameBuffer fb(sdlWindow);
   renderer::Renderer renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
-  Editor editor(level, sdlWindow.width, sdlWindow.height);
 
   running = true;
   // game loop

@@ -101,7 +101,7 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
     // reset to the initial state
     vertex.hovered = false;
 
-    const float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - vertexRadius;
+    const float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - vertexRadius*vertexRadius;
 
     if (nodeDis < bestVertexDist) {
       bestVertexDist = nodeDis;
@@ -139,7 +139,7 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
           // draw a line between the start vertex and the hovered vertex
           const EditorLineDef lineDef(state.lineStartVertexId, bestVertexId, LineDefType::REGULAR, -1, -1);
 
-          auto cmd = std::make_unique<AddLineDefCommand>(AddLineDefCommand(lineDef));
+          auto cmd = std::make_unique<AddLineDefCommand>(lineDef);
           history.execute(std::move(cmd), state);
           state.isCreatingLine = false;
           state.lineStartVertexId = 0;

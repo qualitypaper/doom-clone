@@ -60,3 +60,4 @@ SdlWindow::~SdlWindow()
 SDL_Window *SdlWindow::getWindow() const { return window; }
 
 SDL_Renderer *SdlWindow::getRenderer() const { return renderer; }
+SDL_Texture *SdlWindow::getTexture() const { return texture; }

@@ -3,6 +3,7 @@
 
 #include <array>
 #include <fstream>
+#include <memory>
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 
@@ -51,7 +52,7 @@ private:
   std::vector<BspNode> nodes;
   std::vector<Seg> segments;
   std::vector<SubSector> subsectors;
-  Level &level;
+  std::vector<Seg> newSegments;
 
 private:
   SplitResult SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const;
@@ -61,9 +62,13 @@ private:
   [[nodiscard]] bool IsConvex(const std::vector<Seg> &segs) const;
 
 public:
-  explicit BSPBuilder(Level &_level);
+  std::unique_ptr<Level> level;
+
+public:
+  explicit BSPBuilder(const Level &_level);
 
   void BuildBSPTree();
   int BuildBSPTree(std::vector<Seg> &segs);
   void printTree() const;
+  void visualize() const;
 };

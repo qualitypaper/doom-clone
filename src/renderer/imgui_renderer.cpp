@@ -134,7 +134,11 @@ void ImguiRenderer::render() const
 
     const ImVec2 mousePos = ImGui::GetMousePos();
 
-    if (mousePos.x < 0 || mousePos.x > io.DisplaySize.x || mousePos.y < 0 || mousePos.y > io.DisplaySize.y) { return; }
+    if (mousePos.x < 0 || mousePos.x > io.DisplaySize.x || mousePos.y < 0 || mousePos.y > io.DisplaySize.y) {
+      ImGui::End();
+      endFrame();
+      return;
+    }
 
     ImDrawList *drawList = ImGui::GetWindowDrawList();
     drawList->AddLine(startVertex.toImVec2(), mousePos, g_hoverColor, thickness);
@@ -327,7 +331,9 @@ void ImguiRenderer::drawUnselectedVertices(const float_t vertexRadius, ImDrawLis
 {
   for (auto &v : m_editor->state->level->vertices) {
     // selected vertices are processed separately
-    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) continue;
+    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) {
+      continue;
+    }
 
     ImU32 color;
 
@@ -386,11 +392,12 @@ void ImguiRenderer::drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, c
   drawList->AddLine(start, end, color, thickness);
 
   // draw a small arrow showing the direction of the linedef
-  drawArrowForLinedef(drawList, thickness, startVertex, endVertex, color);
+  // drawArrowForLinedef(drawList, thickness, startVertex, endVertex, color);
 }
 void ImguiRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *drawList) const
 {
-  for (const auto &ld : m_editor->state->level->linedefs) {
+  for (size_t i = 0; i < m_editor->state->level->linedefs.size(); i++) {
+    const auto &ld = m_editor->state->level->linedefs[i];
     auto startVertex = m_editor->state->findVertex(ld.start);
     auto endVertex = m_editor->state->findVertex(ld.end);
 

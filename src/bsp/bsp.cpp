@@ -1,22 +1,24 @@
 #include "bsp.h"
 
+#include "config.h"
+#include "framebuffer.h"
+#include "imgui_renderer.h"
 #include "math_utils.h"
 
 #include <queue>
-#include <set>
 #include <unordered_map>
 
 BspNode::BspNode(const int16_t _x, const int16_t _y, const int16_t _dx, const int16_t _dy)
   : x(_x), y(_y), dx(_dx), dy(_dy)
 {}
 
-BSPBuilder::BSPBuilder(Level &_level) : level(_level)
+BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_level))
 {
-  segments.reserve(level.linedefs.size());
-  subsectors.reserve(level.linedefs.size() / 2);
+  segments.reserve(level->linedefs.size());
+  subsectors.reserve(level->linedefs.size() / 2);
 
-  for (size_t i = 0; i < level.linedefs.size(); i++) {
-    auto &ld = level.linedefs[i];
+  for (size_t i = 0; i < level->linedefs.size(); i++) {
+    auto &ld = level->linedefs[i];
     segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0);
     if (ld.backSidedef) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
   }
@@ -27,12 +29,17 @@ void BSPBuilder::BuildBSPTree() { BuildBSPTree(segments); }
 int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
   // base case
-  if (segs.size() <= 2 || IsConvex(segs)) {
-    BspNode node{};
-    return static_cast<int>(nodes.size() - 1);
+  if (segs.empty())
+    return -1;
+  else if (segs.size() <= 2 || IsConvex(segs)) {
+    const size_t firstIndex = newSegments.size();
+    for (auto &seg : segs) { newSegments.emplace_back(seg); }
+
+    subsectors.emplace_back(segs.size(), static_cast<int16_t>(firstIndex));
+    return -1;
   }
 
-  nodes.reserve(level.linedefs.size());
+  nodes.reserve(level->linedefs.size());
 
   // selecting a splitter line
   const uint32_t bestSplitterIndex = SelectSplittingLine(segs);
@@ -56,12 +63,46 @@ void BSPBuilder::printTree() const
   for (auto &node : nodes) { std::cout << node << '\n'; }
 }
 
+void BSPBuilder::visualize() const
+{
+  SdlWindow sdlWindow(config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+  framebuffer::FrameBuffer fb(sdlWindow);
+  imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, *level);
+
+  imguiRenderer.render();
+
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 255, 255);
+
+  for (const auto &subsector : subsectors) {
+    // SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
+    // SDL_RenderClear(sdlWindow.getRenderer());
+    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 255, 255);
+
+    for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
+      const auto &seg = newSegments[i];
+      const auto &startVertex = level->vertices[seg.startVertex];
+      const auto &endVertex = level->vertices[seg.endVertex];
+
+      const auto mappedStart = math_utils::fromCenterCoordinates(
+        { static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) }, sdlWindow.width, sdlWindow.height);
+      const auto mappedEnd = math_utils::fromCenterCoordinates(
+        { static_cast<float>(endVertex.x), static_cast<float>(endVertex.y) }, sdlWindow.width, sdlWindow.height);
+
+      SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
+    }
+
+    SDL_RenderPresent(sdlWindow.getRenderer());
+  }
+
+  SDL_Delay(60 * 1000);
+}
+
 SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const
 {
   SplitResult res{};
 
-  const Vertex splitterStart = level.vertices[splitter.startVertex];
-  const Vertex splitterDirection = level.vertices[splitter.endVertex] - splitterStart;
+  const Vertex splitterStart = level->vertices[splitter.startVertex];
+  const Vertex splitterDirection = level->vertices[splitter.endVertex] - splitterStart;
 
   for (auto &seg : segs) {
     if (seg.endVertex == splitter.endVertex && seg.startVertex == splitter.startVertex) continue;
@@ -76,8 +117,8 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
       res.back.emplace_back(seg);
     } else {
       // split the segment into two parts
-      const Vertex segStart = level.vertices[seg.startVertex];
-      const Vertex segDirection = level.vertices[seg.endVertex] - segStart;
+      const Vertex segStart = level->vertices[seg.startVertex];
+      const Vertex segDirection = level->vertices[seg.endVertex] - segStart;
 
       const Vertex diff = segDirection - splitterDirection;
       // check for seg == splitter
@@ -85,18 +126,18 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
 
       const double k = math_utils::findLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
       const Vertex intersection = segStart + segDirection * k;
-      level.vertices.emplace_back(intersection);
-      const int16_t newVertexId = static_cast<int16_t>(level.vertices.size() - 1);
+      level->vertices.emplace_back(intersection);
+      const int16_t newVertexId = static_cast<int16_t>(level->vertices.size() - 1);
 
-      const LineDef segLd = level.linedefs[seg.linedefIndex];
+      const LineDef segLd = level->linedefs[seg.linedefIndex];
       LineDef startLd{ segLd.start, newVertexId, segLd.type, segLd.frontSidedef, segLd.backSidedef };
       LineDef endLd{ newVertexId, segLd.end, segLd.type, segLd.frontSidedef, segLd.backSidedef };
 
-      level.linedefs.emplace_back(startLd);
-      level.linedefs.emplace_back(endLd);
+      level->linedefs.emplace_back(startLd);
+      level->linedefs.emplace_back(endLd);
 
-      Seg newSeg{ segLd.start, newVertexId, 0, static_cast<int16_t>(level.linedefs.size() - 2), 0, 0 };
-      Seg newOtherSeg{ newVertexId, segLd.end, 0, static_cast<int16_t>(level.linedefs.size() - 1), 0, 0 };
+      Seg newSeg{ segLd.start, newVertexId, 0, static_cast<int16_t>(level->linedefs.size() - 2), 0, 0 };
+      Seg newOtherSeg{ newVertexId, segLd.end, 0, static_cast<int16_t>(level->linedefs.size() - 1), 0, 0 };
 
       const SegmentPosition newSegPos = DetermineSegmentPosition(splitter, newSeg);
 
@@ -133,8 +174,8 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 
   // creating a bounding box for segments
   for (const auto &seg : segs) {
-    int x1 = level.vertices[seg.startVertex].x;
-    int y1 = level.vertices[seg.endVertex].y;
+    int x1 = level->vertices[seg.startVertex].x;
+    int y1 = level->vertices[seg.endVertex].y;
 
     maxX = std::max(maxX, x1);
     maxY = std::max(maxY, y1);
@@ -148,9 +189,9 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 
   for (size_t i = 0; i < segs.size(); i++) {
     const int dy = std::min(
-      std::abs(level.vertices[segs[i].startVertex].y - minY), std::abs(level.vertices[segs[i].startVertex].y - maxY));
+      std::abs(level->vertices[segs[i].startVertex].y - minY), std::abs(level->vertices[segs[i].startVertex].y - maxY));
     const int dx = std::min(
-      std::abs(level.vertices[segs[i].startVertex].x - minX), std::abs(level.vertices[segs[i].startVertex].x - maxX));
+      std::abs(level->vertices[segs[i].startVertex].x - minX), std::abs(level->vertices[segs[i].startVertex].x - maxX));
 
     const int distanceSq = dx * dx + dy * dy;
     if (!distanceToSegmentsMap.contains(distanceSq)) { minHeap.push(distanceSq); }
@@ -160,10 +201,8 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
   size_t bestSplitterIndex = 0;
   uint32_t bestScore = std::numeric_limits<uint32_t>::max();
 
-  int distanceSq = -1;
-
   while (!minHeap.empty()) {
-    distanceSq = minHeap.top();
+    int distanceSq = minHeap.top();
     minHeap.pop();
 
     for (const size_t segIndex : distanceToSegmentsMap[distanceSq]) {
@@ -182,12 +221,12 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 
 SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const
 {
-  const Vertex startSplitterVertex = level.vertices[splitter.startVertex];
-  const Vertex startSegVertex = level.vertices[seg.startVertex];
+  const Vertex startSplitterVertex = level->vertices[splitter.startVertex];
+  const Vertex startSegVertex = level->vertices[seg.startVertex];
 
   // cross product -> positive = left, negative = right, zero = collinear
-  const Vertex splitterDirection = level.vertices[splitter.endVertex] - startSplitterVertex;
-  const Vertex segDirection = level.vertices[seg.endVertex] - startSegVertex;
+  const Vertex splitterDirection = level->vertices[splitter.endVertex] - startSplitterVertex;
+  const Vertex segDirection = level->vertices[seg.endVertex] - startSegVertex;
 
   // check for line intersection
   if ((splitterDirection.x != 0 || splitterDirection.y != 0) && (segDirection.x != 0 || segDirection.y != 0)) {
@@ -221,7 +260,7 @@ uint32_t BSPBuilder::EvaluateSplitter(const Seg &splitter) const
       right++;
     else if (position == SegmentPosition::BACK)
       left++;
-    else if (position == SegmentPosition::SPANNING)
+    else
       spanning++;
   }
 

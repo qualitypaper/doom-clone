@@ -14,13 +14,41 @@
 #include <unordered_map>
 #include <vector>
 
-AABB::AABB(Vertex start, Vertex end)
+AABB::AABB(const Vertex start, const Vertex end)
 {
   this->maxX = std::max(start.x, end.x);
   this->minX = std::min(start.x, end.x);
   this->maxY = std::max(start.y, end.y);
   this->minY = std::min(start.y, end.y);
 }
+
+void EditorLineDef::serialize(std::ofstream &file) const
+{
+  const int16_t startVertex = static_cast<int16_t>(start);
+  const int16_t endVertex = static_cast<int16_t>(end);
+  const int32_t typeValue = static_cast<int32_t>(type);
+  const int16_t front = static_cast<int16_t>(frontSideDef);
+  const int16_t back = static_cast<int16_t>(backSideDef);
+
+  file.write(reinterpret_cast<const char *>(&startVertex), sizeof(startVertex));
+  file.write(reinterpret_cast<const char *>(&endVertex), sizeof(endVertex));
+  file.write(reinterpret_cast<const char *>(&typeValue), sizeof(typeValue));
+  file.write(reinterpret_cast<const char *>(&front), sizeof(front));
+  file.write(reinterpret_cast<const char *>(&back), sizeof(back));
+}
+
+void EditorLineDef::deserialize(const std::ifstream &ostream) const {}
+
+void EditorSector::serialize(std::ofstream &file) const
+{
+  file.write(reinterpret_cast<const char *>(&floorHeight), sizeof(floorHeight));
+  file.write(reinterpret_cast<const char *>(&ceilingHeight), sizeof(ceilingHeight));
+  file.write(reinterpret_cast<const char *>(&specialType), sizeof(specialType));
+  file.write(reinterpret_cast<const char *>(&lightLevel), sizeof(lightLevel));
+  file.write(reinterpret_cast<const char *>(&tag), sizeof(tag));
+}
+
+void EditorSector::deserialize(const std::ifstream &ostream) const {}
 
 void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t height) const
 {
@@ -42,35 +70,17 @@ void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t heigh
   file.write(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
   for (auto &v : vertices) {
     auto [x, y] = math_utils::toCenterCoordinates(Vertex{ v.x, v.y }, width, height);
-    const EditorVertex canvasVertexInt{ static_cast<int16_t>(y), static_cast<int16_t>(x) };
+    const EditorVertex canvasVertexInt{ y, x };
+
     file.write(reinterpret_cast<const char *>(&canvasVertexInt.x), sizeof(canvasVertexInt.x));
     file.write(reinterpret_cast<const char *>(&canvasVertexInt.y), sizeof(canvasVertexInt.y));
   }
 
   // write linedefs
   file.write(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
-  const auto fitsInt16 = [](int32_t value) {
-    return value >= std::numeric_limits<int16_t>::min() && value <= std::numeric_limits<int16_t>::max();
-  };
+
   for (auto &linedef : linedefs) {
-    if (linedef.start > static_cast<uint32_t>(std::numeric_limits<int16_t>::max())
-        || linedef.end > static_cast<uint32_t>(std::numeric_limits<int16_t>::max()) || !fitsInt16(linedef.frontSideDef)
-        || !fitsInt16(linedef.backSideDef)) {
-      std::cerr << "Linedef index out of int16_t range during serialization." << std::endl;
-      return;
-    }
-
-    const int16_t start = static_cast<int16_t>(linedef.start);
-    const int16_t end = static_cast<int16_t>(linedef.end);
-    const int32_t typeValue = static_cast<int32_t>(linedef.type);
-    const int16_t front = static_cast<int16_t>(linedef.frontSideDef);
-    const int16_t back = static_cast<int16_t>(linedef.backSideDef);
-
-    file.write(reinterpret_cast<const char *>(&start), sizeof(start));
-    file.write(reinterpret_cast<const char *>(&end), sizeof(end));
-    file.write(reinterpret_cast<const char *>(&typeValue), sizeof(typeValue));
-    file.write(reinterpret_cast<const char *>(&front), sizeof(front));
-    file.write(reinterpret_cast<const char *>(&back), sizeof(back));
+    linedef.serialize(file);
   }
 
   // write sidedefs
@@ -84,15 +94,8 @@ void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t heigh
 
   // write sectors
   file.write(reinterpret_cast<const char *>(&sectorsCount), sizeof(sectorsCount));
-  for (const auto &sector : sectors) {
-    file.write(reinterpret_cast<const char *>(&sector.floorHeight), sizeof(sector.floorHeight));
-    file.write(reinterpret_cast<const char *>(&sector.ceilingHeight), sizeof(sector.ceilingHeight));
-    file.write(reinterpret_cast<const char *>(&sector.specialType), sizeof(sector.specialType));
-    file.write(reinterpret_cast<const char *>(&sector.lightLevel), sizeof(sector.lightLevel));
-    file.write(reinterpret_cast<const char *>(&sector.tag), sizeof(sector.tag));
-  }
+  for (const auto &sector : sectors) { sector.serialize(file); }
 
-  file.flush();
   file.close();
 }
 
@@ -122,7 +125,10 @@ void EditorLevel::deserialize(Level &level, const char *filename)
   std::cout << "Read vertices\n";
 
   in.read(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
+  if (in.fail()) return;
   for (size_t i = 0; i < linedefsCount; i++) {
+    if (linedefsCount == i) continue;
+
     LineDef ld{};
     int16_t start = 0;
     int16_t end = 0;
@@ -148,6 +154,8 @@ void EditorLevel::deserialize(Level &level, const char *filename)
   std::cout << "Read linedefs\n";
 
   in.read(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
+  if (in.fail()) return;
+
   for (size_t i = 0; i < sidedefsCount; i++) {
     SideDef sd;
     in.read(reinterpret_cast<char *>(&sd.sectorId), sizeof(sd.sectorId));
@@ -160,6 +168,7 @@ void EditorLevel::deserialize(Level &level, const char *filename)
   std::cout << "Read sidedefs\n";
 
   in.read(reinterpret_cast<char *>(&sectorsCount), sizeof(sectorsCount));
+  if (in.fail()) return;
   for (size_t i = 0; i < sectorsCount; i++) {
     Sector sec{};
     in.read(reinterpret_cast<char *>(&sec.floorHeight), sizeof(sec.floorHeight));
@@ -233,8 +242,8 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
     } else if (ld.end == vertexId) {
       auto &vStart = state.findVertex(ld.start);
 
-      std::erase_if(vStart.connectedLineDefs,
-        [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+      std::erase_if(
+        vStart.connectedLineDefs, [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
     }
 
     EditorLineDef::remove(state, ldId);
@@ -260,8 +269,10 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.selection.clear();
   state.level->vertices.pop_back();
 }
+void EditorVertex::serialize(std::ofstream &file) const { EditorObject::serialize(file); }
+void EditorVertex::deserialize(const std::ifstream &ostream) const { EditorObject::deserialize(ostream); }
 
-EditorState::EditorState(Level &_level, uint16_t _width, uint16_t _height) : width(_width), height(_height)
+EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _height) : width(_width), height(_height)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -398,12 +409,9 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 }
 
 void Editor::addVertex(const int16_t x, const int16_t y) const
-{
-  m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(x, y)), *state);
-}
+{ m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(x, y)), *state); }
 
-void Editor::executeCommand(std::unique_ptr<Command> cmd) const
-{ m_history->execute(std::move(cmd), *state); }
+void Editor::executeCommand(std::unique_ptr<Command> cmd) const { m_history->execute(std::move(cmd), *state); }
 
 
 void Editor::drawConnectedLine(const uint32_t vertexIndex) const

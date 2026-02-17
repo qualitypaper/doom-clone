@@ -8,6 +8,7 @@
 #include <memory>
 #include <stacktrace>
 #include <vector>
+#include <fstream>
 
 // forward declarations
 struct CommandHistory;
@@ -44,17 +45,20 @@ constexpr uint32_t getObjectIndex(uint32_t objectId) { return objectId & kObject
 
 struct EditorObject
 {
-  EditorObject(EditorObjectType _type) : type(_type) {}
+  explicit EditorObject(const EditorObjectType _type) : type(_type) {}
   virtual ~EditorObject() = default;
 
   EditorObjectType type;
   bool selected = false;
   bool hovered = false;
+
+  virtual void serialize(std::ofstream &file) const {}
+  virtual void deserialize(const std::ifstream &istream) const {}
 };
 
 struct EditorLineDef : EditorObject
 {
-  EditorLineDef(const LineDef &_linedef)
+  explicit EditorLineDef(const LineDef &_linedef)
     : EditorObject(EditorObjectType::LINEDEF), start(_linedef.start), end(_linedef.end), type(_linedef.type),
       frontSideDef(_linedef.frontSidedef), backSideDef(_linedef.backSidedef)
   {}
@@ -66,6 +70,7 @@ struct EditorLineDef : EditorObject
     : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSideDef(_frontSideDef),
       backSideDef(_backSideDef)
   {}
+
   uint32_t start;
   uint32_t end;
   LineDefType type;
@@ -73,6 +78,8 @@ struct EditorLineDef : EditorObject
   int32_t backSideDef;
 
   static void remove(const EditorState &state, uint32_t ldId);
+  void serialize(std::ofstream &file) const override;
+  void deserialize(const std::ifstream &ostream) const override;
 };
 
 struct EditorVertex : EditorObject
@@ -108,6 +115,9 @@ struct EditorVertex : EditorObject
     y = std::round(static_cast<double>(y) / len);
   }
   static void remove(EditorState &state, uint32_t vertexId);
+
+  void serialize(std::ofstream &file) const override;
+  void deserialize(const std::ifstream &ostream) const override;
 };
 
 struct EditorSector : EditorObject
@@ -121,6 +131,9 @@ struct EditorSector : EditorObject
   int16_t tag = 0;
   AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
+
+  void serialize(std::ofstream &file) const override;
+  void deserialize(const std::ifstream &ostream) const override;
 };
 
 struct EditorLevel
