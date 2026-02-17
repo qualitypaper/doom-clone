@@ -82,8 +82,26 @@ void BSPBuilder::visualize() const
     SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
     imguiRenderer.render();
 
-    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 255, 255);
+    const BspNode root = nodes[0];
+    ImVec2 rootVertex = math_utils::fromCenterCoordinates(
+      { static_cast<float>(root.x), static_cast<float>(root.y) }, sdlWindow.width, sdlWindow.height);
 
+    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 255, 0, 255);
+    SDL_RenderDrawLine(sdlWindow.getRenderer(),
+      rootVertex.x,
+      rootVertex.y,
+      static_cast<int>(static_cast<double>(root.dy) / static_cast<double>(root.dx + 0.001))
+        * (sdlWindow.width - root.x),
+      static_cast<int>(static_cast<double>(root.dx) / static_cast<double>(root.dy + 0.001))
+        * (sdlWindow.height - root.y));
+
+    SDL_RenderDrawLine(sdlWindow.getRenderer(),
+      static_cast<int>(static_cast<double>(root.dy) / static_cast<double>(root.dx) * rootVertex.x),
+      static_cast<int>(static_cast<double>(root.dx) / static_cast<double>(root.dy) * rootVertex.y),
+      rootVertex.x,
+      rootVertex.y);
+
+    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
     for (const auto &subsector : subsectors) {
       for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
         const auto &seg = newSegments[i];

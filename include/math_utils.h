@@ -10,22 +10,23 @@ constexpr double PI = 3.141592653589793;
 
 constexpr double toRadians(const double angle) { return PI * angle / 180; }
 
-constexpr Vertex toCenterCoordinates(Vertex vec, uint16_t width, uint16_t height)
+constexpr Vertex toCenterCoordinates(const Vertex vec, const uint16_t width, const uint16_t height)
 { return Vertex(vec.x - width / 2, height / 2 - vec.y); }
-constexpr Vertex toCenterCoordinates(const EditorVertex &vec, uint16_t width, uint16_t height)
+constexpr Vertex toCenterCoordinates(const EditorVertex &vec, const uint16_t width, const uint16_t height)
 { return Vertex(vec.x - width / 2, height / 2 - vec.y); }
 
-constexpr ImVec2 fromCenterCoordinates(ImVec2 vec, uint16_t width, uint16_t height)
+constexpr ImVec2 fromCenterCoordinates(const ImVec2 vec, const uint16_t width, const uint16_t height)
 {
-  return ImVec2(std::max(0.0f, std::min(static_cast<float>(width), width / 2 + vec.x)),
-    std::max(0.0f, std::min(static_cast<float>(height), height / 2 - vec.y)));
+  return { std::max(0.0f, std::min(static_cast<float>(width), static_cast<float>(width) / 2 + vec.x)),
+    std::max(0.0f, std::min(static_cast<float>(height), static_cast<float>(height) / 2 - vec.y)) };
 }
 
-constexpr ImVec2 convertVertexIntoImVec2(Vertex vertex) { return ImVec2(vertex.y, vertex.x); }
+constexpr ImVec2 convertVertexIntoImVec2(const Vertex vertex)
+{ return { static_cast<float>(vertex.x), static_cast<float>(vertex.y) }; }
 
-constexpr Vertex convertImVec2IntoVertex(ImVec2 v) { return { static_cast<int16_t>(v.x), static_cast<int16_t>(v.y) }; };
+constexpr Vertex convertImVec2IntoVertex(const ImVec2 v) { return { static_cast<int16_t>(v.x), static_cast<int16_t>(v.y) }; };
 
-constexpr float getDistanceSq(float x1, float y1, float x2, float y2)
+constexpr float getDistanceSq(const float x1, const float y1, const float x2, const float y2)
 {
 
   const float x = x2 - x1;
