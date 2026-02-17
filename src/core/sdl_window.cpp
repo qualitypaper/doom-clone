@@ -14,7 +14,7 @@ void SdlWindow::updateScreen() const
   // Not needed when using renderer - SDL_RenderPresent handles this
 }
 
-SdlWindow::SdlWindow(const uint16_t _width, const uint16_t _height, const uint32_t flags)
+SdlWindow::SdlWindow(const char* title, const uint16_t _width, const uint16_t _height, const uint32_t flags)
 {
   if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
     throw std::runtime_error("SDL failed to initialize, Error: " + std::string(SDL_GetError()));
@@ -31,7 +31,7 @@ SdlWindow::SdlWindow(const uint16_t _width, const uint16_t _height, const uint32
     height = _height;
   }
 
-  window = SDL_CreateWindow("Doom Clone", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
+  window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
 
   if (!window) { throw std::runtime_error("SDL failed to create a window, Error: " + std::string(SDL_GetError())); }
 

@@ -17,7 +17,7 @@ private:
   SDL_Renderer *renderer;
   SDL_Texture *texture;
 public:
-  SdlWindow(uint16_t width, uint16_t height, uint32_t flags = 0);
+  SdlWindow(const char* title, uint16_t width, uint16_t height, uint32_t flags = 0);
   ~SdlWindow();
 
   uint16_t width, height;

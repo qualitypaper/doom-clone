@@ -29,8 +29,8 @@ private:
     int32_t nextFloorY,
     int32_t nextCeilY);
 
-  int32_t projectZ(double_t z, double_t inv_y) const;
-  int32_t projectX(double_t x, double_t inv_y) const;
+  [[nodiscard]] int32_t projectZ(double_t z, double_t inv_y) const;
+  [[nodiscard]] int32_t projectX(double_t x, double_t inv_y) const;
 
   std::vector<int32_t> floorClipping;
   std::vector<int32_t> ceilingClipping;

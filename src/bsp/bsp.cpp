@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "framebuffer.h"
+#include "imgui_impl_sdl2.h"
 #include "imgui_renderer.h"
 #include "math_utils.h"
 
@@ -65,36 +66,51 @@ void BSPBuilder::printTree() const
 
 void BSPBuilder::visualize() const
 {
-  SdlWindow sdlWindow(config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-  framebuffer::FrameBuffer fb(sdlWindow);
-  imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, *level);
+  SdlWindow sdlWindow("BSP Builder", config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+  const imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, *level);
 
-  imguiRenderer.render();
+  const time_t start = time(nullptr);
+  uint64_t prev = SDL_GetPerformanceCounter();
+  const double freq = static_cast<double>(SDL_GetPerformanceFrequency());
+  const double df = 1 / 144.0;
+  bool running = true;
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 255, 255);
+  while (running) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) { ImGui_ImplSDL2_ProcessEvent(&event); }
 
-  for (const auto &subsector : subsectors) {
-    // SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
-    // SDL_RenderClear(sdlWindow.getRenderer());
+    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
+    imguiRenderer.render();
+
     SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 255, 255);
 
-    for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
-      const auto &seg = newSegments[i];
-      const auto &startVertex = level->vertices[seg.startVertex];
-      const auto &endVertex = level->vertices[seg.endVertex];
+    for (const auto &subsector : subsectors) {
+      for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
+        const auto &seg = newSegments[i];
+        const auto &startVertex = level->vertices[seg.startVertex];
+        const auto &endVertex = level->vertices[seg.endVertex];
 
-      const auto mappedStart = math_utils::fromCenterCoordinates(
-        { static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) }, sdlWindow.width, sdlWindow.height);
-      const auto mappedEnd = math_utils::fromCenterCoordinates(
-        { static_cast<float>(endVertex.x), static_cast<float>(endVertex.y) }, sdlWindow.width, sdlWindow.height);
+        const auto mappedStart = math_utils::fromCenterCoordinates(
+          { static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) }, sdlWindow.width, sdlWindow.height);
+        const auto mappedEnd = math_utils::fromCenterCoordinates(
+          { static_cast<float>(endVertex.x), static_cast<float>(endVertex.y) }, sdlWindow.width, sdlWindow.height);
 
-      SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
+        // SDL_Rect rect{(int) mappedStart.x, (int) mappedStart.y+1, (int) (mappedEnd.x - mappedStart.x), (int)
+        // (mappedEnd.y - mappedStart.y) + 1}; SDL_RenderFillRect(sdlWindow.getRenderer(), &rect);
+        SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
+      }
     }
 
     SDL_RenderPresent(sdlWindow.getRenderer());
-  }
 
-  SDL_Delay(60 * 1000);
+    const uint64_t now = SDL_GetPerformanceCounter();
+    double frameTime = static_cast<double>(now - prev) / freq;
+    prev = now;
+    if (frameTime > 0.25) frameTime = 0.25;
+
+    if (frameTime < df) { SDL_Delay(static_cast<uint64_t>((df - frameTime) * 1000.0)); }
+    running = time(nullptr) - start < 60 * 1000;
+  }
 }
 
 SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const

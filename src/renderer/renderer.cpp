@@ -109,7 +109,6 @@ void applyTransformations(const entity::Player &playerState,
 
 void Renderer::render(const GameState &gameState, const Level &level)
 {
-
   for (const LineDef ld : level.linedefs) {
     const SideDef sidedef = level.sidedefs[ld.frontSidedef];
     Sector sector = level.sectors[sidedef.sectorId];

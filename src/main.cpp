@@ -126,10 +126,11 @@ int main()
   BSPBuilder builder(level);
   builder.BuildBSPTree();
   builder.printTree();
-  // builder.visualize();
+  builder.visualize();
+  // return 0;
 
   // setup sdl window
-  SdlWindow sdlWindow(
+  SdlWindow sdlWindow("Doom Clone",
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT,
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
@@ -156,7 +157,6 @@ int main()
     const uint64_t frameStart = SDL_GetPerformanceCounter();
     // reseting the states to defaults
     renderer.resetClippingArrays();
-    fb.reset();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
@@ -233,8 +233,7 @@ void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
     }
 
     // early skip for preventing capturing mouse and keyboard inputs, while in EDITOR_2D engine mode
-    if (gameState.currentMode == EngineMode::EDITOR_2D
-        && ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP))) {
+    if (gameState.currentMode == EngineMode::EDITOR_2D && ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP))) {
       continue;
     }
 
