@@ -1,0 +1,151 @@
+#include "math_utils.h"
+
+
+#include <editor.h>
+#include <serialization.h>
+
+
+void EditorLineDef::serialize(FileWriter &fw) const
+{
+  fw.WriteRaw(start);
+  fw.WriteRaw(end);
+  const int32_t intType = static_cast<int32_t>(type);
+  fw.WriteRaw(intType);
+  fw.WriteRaw(frontSideDef);
+  fw.WriteRaw(backSideDef);
+}
+
+void EditorLineDef::deserialize(FileReader &fr)
+{
+  fr.ReadRaw(start);
+  fr.ReadRaw(end);
+  int32_t intType;
+  fr.ReadRaw(intType);
+  type = static_cast<LineDefType>(intType);
+  fr.ReadRaw(frontSideDef);
+  fr.ReadRaw(backSideDef);
+}
+
+void EditorSector::serialize(FileWriter &fw) const
+{
+  fw.WriteRaw(floorHeight);
+  fw.WriteRaw(ceilingHeight);
+  fw.WriteRaw(specialType);
+  fw.WriteRaw(lightLevel);
+  fw.WriteRaw(tag);
+}
+
+void EditorSector::deserialize(FileReader &fr)
+{
+  fr.ReadRaw(floorHeight);
+  fr.ReadRaw(ceilingHeight);
+  fr.ReadRaw(specialType);
+  fr.ReadRaw(lightLevel);
+  fr.ReadRaw(tag);
+}
+
+void EditorVertex::serialize(FileWriter &fw) const
+{
+  fw.WriteRaw(x);
+  fw.WriteRaw(y);
+}
+
+void EditorVertex::deserialize(FileReader &fr)
+{
+  fr.ReadRaw(x);
+  fr.ReadRaw(y);
+}
+
+void EditorSidedef::serialize(FileWriter &fw) const
+{
+  fw.WriteRaw(sectorId);
+  fw.WriteRaw(xOffset);
+  fw.WriteRaw(yOffset);
+  fw.WriteRaw(color);
+}
+
+void EditorSidedef::deserialize(FileReader &fr)
+{
+  fr.ReadRaw(sectorId);
+  fr.ReadRaw(xOffset);
+  fr.ReadRaw(yOffset);
+  fr.ReadRaw(color);
+}
+
+void EditorLevel::serialize(const std::filesystem::path &path) const
+{
+  FileWriter fw(path);
+
+  std::cout << "Saving level to saved_level.bin...\n";
+  std::cout << std::filesystem::current_path() << '\n';
+
+  if (!fw.IsStreamGood()) {
+    std::cerr << "Failed to open file for saving." << std::endl;
+    return;
+  }
+
+  // auto [x, y] = math_utils::toCenterCoordinates(Vertex{ v.x, v.y }, width, height);
+  // const EditorVertex canvasVertexInt{ y, x };
+
+  // write vertices
+  fw.WriteVector(vertices);
+
+  // write linedefs
+  fw.WriteVector(linedefs);
+
+  // write sidedefs
+  fw.WriteVector(sidedefs);
+
+  // write sectors
+  fw.WriteVector(sectors);
+}
+
+void EditorLevel::deserialize(const std::filesystem::path &path)
+{
+  FileReader fr(path);
+  if (!fr.IsStreamGood()) {
+    std::cerr << "Failed to open saved_level.bin for loading. Using hardcoded level data." << std::endl;
+    return;
+  }
+
+  fr.ReadVector(vertices);
+  std::cout << "Read vertices\n";
+
+  fr.ReadVector(linedefs);
+  std::cout << "Read linedefs\n";
+
+  fr.ReadVector(sidedefs);
+  std::cout << "Read sidedefs\n";
+
+  fr.ReadVector(sectors);
+  std::cout << "Read sectors\n";
+
+  std::cout << "Finished loading level from file.\n";
+}
+
+void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t height) const
+{
+  level.vertices.clear();
+  level.linedefs.clear();
+  level.sidedefs.clear();
+  level.sectors.clear();
+
+  level.vertices.reserve(vertices.size());
+  level.linedefs.reserve(linedefs.size());
+  level.sidedefs.reserve(sidedefs.size());
+  level.sectors.reserve(sectors.size());
+
+  for (auto &v : vertices) {
+    auto [x, y] = math_utils::toCenterCoordinates(v, width, height);
+    level.vertices.emplace_back(x, y);
+  }
+
+  for (auto &ld : linedefs) { level.linedefs.emplace_back(ld.start, ld.end, ld.type, ld.frontSideDef, ld.backSideDef); }
+
+  for (auto &sd : sidedefs) { level.sidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset, sd.color); }
+
+  for (auto &sector : sectors) {
+    level.sectors.emplace_back(
+      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag);
+  }
+}

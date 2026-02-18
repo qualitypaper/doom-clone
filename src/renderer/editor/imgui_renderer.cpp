@@ -1,6 +1,5 @@
 #include "imgui_renderer.h"
 
-#include "config.h"
 #include "editor.h"
 #include "editor_input_handler.h"
 
@@ -11,7 +10,6 @@
 #include "math_utils.h"
 
 #include <algorithm>
-#include <array>
 #include <fmt/core.h>
 #include <memory>
 #include <string>
@@ -156,7 +154,7 @@ void ImguiRenderer::drawSidedefsWindow() const
 
   if (ImGui::Button("Create sidedef")) {
     // create new sidedef
-    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0);
+    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0, 0);
   }
 
   for (size_t i = 0; i < m_editor->state->level->sidedefs.size(); i++) {
@@ -331,9 +329,7 @@ void ImguiRenderer::drawUnselectedVertices(const float_t vertexRadius, ImDrawLis
 {
   for (auto &v : m_editor->state->level->vertices) {
     // selected vertices are processed separately
-    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) {
-      continue;
-    }
+    if (v.selected || v.isAnyConnectedLineDefSelected(*m_editor->state)) { continue; }
 
     ImU32 color;
 
@@ -433,7 +429,7 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
   if (vertexCreation) {
     m_editor->addVertex(static_cast<int16_t>(mousePos.x), static_cast<int16_t>(mousePos.y));
     isOpen = false;
-  }else if (lineCreation) {
+  } else if (lineCreation) {
     // TODO:
   }
 
@@ -516,7 +512,7 @@ void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 }
 
 void ImguiRenderer::createSelect(const char *label,
-  const std::vector<SideDef> &sidedefs,
+  const std::vector<EditorSidedef> &sidedefs,
   int32_t &currentItem,
   const bool hasReset)
 {

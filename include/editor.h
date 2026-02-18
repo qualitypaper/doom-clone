@@ -4,11 +4,12 @@
 #include "imgui.h"
 
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <memory>
-#include <stacktrace>
+#include <serialization.h>
 #include <vector>
-#include <fstream>
+
 
 // forward declarations
 struct CommandHistory;
@@ -29,7 +30,7 @@ struct AABB
   { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
-enum class EditorObjectType { LINEDEF, VERTEX, SECTOR };
+enum class EditorObjectType { LINEDEF, VERTEX, SECTOR, SIDEDEF };
 
 // Encoded object id: top 2 bits store type, remaining bits store index
 constexpr uint32_t kObjectTypeShift = 30;
@@ -43,21 +44,19 @@ constexpr EditorObjectType getObjectType(uint32_t objectId)
 
 constexpr uint32_t getObjectIndex(uint32_t objectId) { return objectId & kObjectIndexMask; }
 
-struct EditorObject
+struct EditorObject : Serializable
 {
   explicit EditorObject(const EditorObjectType _type) : type(_type) {}
-  virtual ~EditorObject() = default;
+  ~EditorObject() override = default;
 
   EditorObjectType type;
   bool selected = false;
   bool hovered = false;
-
-  virtual void serialize(std::ofstream &file) const {}
-  virtual void deserialize(const std::ifstream &istream) const {}
 };
 
 struct EditorLineDef : EditorObject
 {
+  EditorLineDef() : EditorObject(EditorObjectType::LINEDEF) {}
   explicit EditorLineDef(const LineDef &_linedef)
     : EditorObject(EditorObjectType::LINEDEF), start(_linedef.start), end(_linedef.end), type(_linedef.type),
       frontSideDef(_linedef.frontSidedef), backSideDef(_linedef.backSidedef)
@@ -71,19 +70,21 @@ struct EditorLineDef : EditorObject
       backSideDef(_backSideDef)
   {}
 
-  uint32_t start;
-  uint32_t end;
-  LineDefType type;
-  int32_t frontSideDef;
-  int32_t backSideDef;
+  uint32_t start = 0;
+  uint32_t end = 0;
+  LineDefType type = LineDefType::REGULAR;
+  int32_t frontSideDef = -1;
+  int32_t backSideDef = -1;
 
   static void remove(const EditorState &state, uint32_t ldId);
-  void serialize(std::ofstream &file) const override;
-  void deserialize(const std::ifstream &ostream) const override;
+
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
 };
 
 struct EditorVertex : EditorObject
 {
+  EditorVertex() : EditorObject(EditorObjectType::VERTEX) {}
   EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
   explicit EditorVertex(const ImVec2 vec)
     : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
@@ -116,12 +117,32 @@ struct EditorVertex : EditorObject
   }
   static void remove(EditorState &state, uint32_t vertexId);
 
-  void serialize(std::ofstream &file) const override;
-  void deserialize(const std::ifstream &ostream) const override;
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
+};
+
+struct EditorSidedef : EditorObject
+{
+  EditorSidedef(int16_t _sectorId, int16_t _xOffset, int16_t _yOffset, uint32_t _color)
+    : EditorObject(EditorObjectType::SIDEDEF), sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset), color(_color)
+  {}
+  EditorSidedef() : EditorObject(EditorObjectType::SIDEDEF) {}
+
+  int16_t sectorId = -1;
+  int16_t xOffset = 0;
+  int16_t yOffset = 0;
+  uint32_t color = 0xFFFFFFFF;
+
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
 };
 
 struct EditorSector : EditorObject
 {
+  EditorSector(int16_t _floorHeight, int16_t _ceilingHeight, int16_t _specialType, int16_t _lightLevel, int16_t _tag)
+    : EditorObject(EditorObjectType::SECTOR), floorHeight(_floorHeight), ceilingHeight(_ceilingHeight),
+      specialType(_specialType), lightLevel(_lightLevel), tag(_tag)
+  {}
   EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
 
   int16_t floorHeight = 0;
@@ -132,27 +153,31 @@ struct EditorSector : EditorObject
   AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
 
-  void serialize(std::ofstream &file) const override;
-  void deserialize(const std::ifstream &ostream) const override;
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
 };
 
 struct EditorLevel
 {
+  EditorLevel() = default;
   EditorLevel(std::vector<EditorVertex> _vertices,
     std::vector<EditorLineDef> _lines,
     std::vector<EditorSector> _sectors,
-    std::vector<SideDef> &_sidedefs)
-    : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)), sidedefs(_sidedefs)
+    std::vector<EditorSidedef> _sidedefs)
+    : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)),
+      sidedefs(std::move(_sidedefs))
   {}
 
 
-  void serialize(const char *filename, uint16_t width, uint16_t height) const;
-  static void deserialize(Level &level, const char *filename);
+  void serialize(const std::filesystem::path &path) const;
+  void deserialize(const std::filesystem::path &path);
+
+  void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;
   std::vector<EditorSector> sectors;
-  std::vector<SideDef> &sidedefs;
+  std::vector<EditorSidedef> sidedefs;
 };
 
 struct EditorState

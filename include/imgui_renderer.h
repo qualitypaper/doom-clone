@@ -54,7 +54,7 @@ private:
     const EditorVertex &endVertex,
     ImU32 color);
   static void createSelect(const char *label,
-    const std::vector<SideDef> &sidedefs,
+    const std::vector<EditorSidedef> &sidedefs,
     int32_t &currentItem,
     bool hasReset = false);
   static constexpr ImVec2 scale(ImVec2 vec, float_t scaleFactor);

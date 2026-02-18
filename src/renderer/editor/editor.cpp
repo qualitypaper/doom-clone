@@ -5,10 +5,7 @@
 #include "gameloop.h"
 #include "math_utils.h"
 
-#include "algorithm"
-
-#include <filesystem>
-#include <fstream>
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <unordered_map>
@@ -20,170 +17,6 @@ AABB::AABB(const Vertex start, const Vertex end)
   this->minX = std::min(start.x, end.x);
   this->maxY = std::max(start.y, end.y);
   this->minY = std::min(start.y, end.y);
-}
-
-void EditorLineDef::serialize(std::ofstream &file) const
-{
-  const int16_t startVertex = static_cast<int16_t>(start);
-  const int16_t endVertex = static_cast<int16_t>(end);
-  const int32_t typeValue = static_cast<int32_t>(type);
-  const int16_t front = static_cast<int16_t>(frontSideDef);
-  const int16_t back = static_cast<int16_t>(backSideDef);
-
-  file.write(reinterpret_cast<const char *>(&startVertex), sizeof(startVertex));
-  file.write(reinterpret_cast<const char *>(&endVertex), sizeof(endVertex));
-  file.write(reinterpret_cast<const char *>(&typeValue), sizeof(typeValue));
-  file.write(reinterpret_cast<const char *>(&front), sizeof(front));
-  file.write(reinterpret_cast<const char *>(&back), sizeof(back));
-}
-
-void EditorLineDef::deserialize(const std::ifstream &ostream) const {}
-
-void EditorSector::serialize(std::ofstream &file) const
-{
-  file.write(reinterpret_cast<const char *>(&floorHeight), sizeof(floorHeight));
-  file.write(reinterpret_cast<const char *>(&ceilingHeight), sizeof(ceilingHeight));
-  file.write(reinterpret_cast<const char *>(&specialType), sizeof(specialType));
-  file.write(reinterpret_cast<const char *>(&lightLevel), sizeof(lightLevel));
-  file.write(reinterpret_cast<const char *>(&tag), sizeof(tag));
-}
-
-void EditorSector::deserialize(const std::ifstream &ostream) const {}
-
-void EditorLevel::serialize(const char *filename, uint16_t width, uint16_t height) const
-{
-  std::ofstream file(filename, std::ios::binary);
-
-  std::cout << "Saving level to saved_level.bin...\n";
-  std::cout << std::filesystem::current_path() << '\n';
-
-  if (!file || !file.is_open() || file.fail()) {
-    std::cerr << "Failed to open file for saving." << std::endl;
-    return;
-  }
-
-  // write vertices
-  uint64_t verticesCount = vertices.size();
-  uint64_t linedefsCount = linedefs.size();
-  uint64_t sidedefsCount = sidedefs.size();
-  uint64_t sectorsCount = sectors.size();
-  file.write(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
-  for (auto &v : vertices) {
-    auto [x, y] = math_utils::toCenterCoordinates(Vertex{ v.x, v.y }, width, height);
-    const EditorVertex canvasVertexInt{ y, x };
-
-    file.write(reinterpret_cast<const char *>(&canvasVertexInt.x), sizeof(canvasVertexInt.x));
-    file.write(reinterpret_cast<const char *>(&canvasVertexInt.y), sizeof(canvasVertexInt.y));
-  }
-
-  // write linedefs
-  file.write(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
-
-  for (auto &linedef : linedefs) {
-    linedef.serialize(file);
-  }
-
-  // write sidedefs
-  file.write(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
-  for (auto &[sectorId, xOffset, yOffset, color] : sidedefs) {
-    file.write(reinterpret_cast<const char *>(&sectorId), sizeof(sectorId));
-    file.write(reinterpret_cast<const char *>(&xOffset), sizeof(xOffset));
-    file.write(reinterpret_cast<const char *>(&yOffset), sizeof(yOffset));
-    file.write(reinterpret_cast<const char *>(&color), sizeof(color));
-  }
-
-  // write sectors
-  file.write(reinterpret_cast<const char *>(&sectorsCount), sizeof(sectorsCount));
-  for (const auto &sector : sectors) { sector.serialize(file); }
-
-  file.close();
-}
-
-void EditorLevel::deserialize(Level &level, const char *filename)
-{
-  std::ifstream in(filename, std::ios::binary);
-  if (!in || !in.is_open()) {
-    std::cerr << "Failed to open saved_level.bin for loading. Using hardcoded level data." << std::endl;
-    return;
-  }
-
-  level.vertices.clear();
-  level.linedefs.clear();
-  level.sidedefs.clear();
-  level.sectors.clear();
-
-  uint64_t verticesCount, linedefsCount, sidedefsCount, sectorsCount;
-
-  in.read(reinterpret_cast<char *>(&verticesCount), sizeof(verticesCount));
-  for (size_t i = 0; i < verticesCount; i++) {
-    Vertex v{};
-    in.read(reinterpret_cast<char *>(&v.x), sizeof(v.x));
-    in.read(reinterpret_cast<char *>(&v.y), sizeof(v.y));
-    level.vertices.emplace_back(v);
-  }
-  if (in.fail()) return;
-  std::cout << "Read vertices\n";
-
-  in.read(reinterpret_cast<char *>(&linedefsCount), sizeof(linedefsCount));
-  if (in.fail()) return;
-  for (size_t i = 0; i < linedefsCount; i++) {
-    if (linedefsCount == i) continue;
-
-    LineDef ld{};
-    int16_t start = 0;
-    int16_t end = 0;
-    int32_t typeValue = 0;
-    int16_t front = 0;
-    int16_t back = 0;
-
-    in.read(reinterpret_cast<char *>(&start), sizeof(start));
-    in.read(reinterpret_cast<char *>(&end), sizeof(end));
-    in.read(reinterpret_cast<char *>(&typeValue), sizeof(typeValue));
-    in.read(reinterpret_cast<char *>(&front), sizeof(front));
-    in.read(reinterpret_cast<char *>(&back), sizeof(back));
-
-    ld.start = start;
-    ld.end = end;
-    ld.type = static_cast<LineDefType>(typeValue);
-    ld.frontSidedef = front;
-    ld.backSidedef = back;
-
-    level.linedefs.emplace_back(ld);
-  }
-  if (in.fail()) return;
-  std::cout << "Read linedefs\n";
-
-  in.read(reinterpret_cast<char *>(&sidedefsCount), sizeof(sidedefsCount));
-  if (in.fail()) return;
-
-  for (size_t i = 0; i < sidedefsCount; i++) {
-    SideDef sd;
-    in.read(reinterpret_cast<char *>(&sd.sectorId), sizeof(sd.sectorId));
-    in.read(reinterpret_cast<char *>(&sd.xOffset), sizeof(sd.xOffset));
-    in.read(reinterpret_cast<char *>(&sd.yOffset), sizeof(sd.yOffset));
-    in.read(reinterpret_cast<char *>(&sd.color), sizeof(sd.color));
-    level.sidedefs.emplace_back(sd);
-  }
-  if (in.fail()) return;
-  std::cout << "Read sidedefs\n";
-
-  in.read(reinterpret_cast<char *>(&sectorsCount), sizeof(sectorsCount));
-  if (in.fail()) return;
-  for (size_t i = 0; i < sectorsCount; i++) {
-    Sector sec{};
-    in.read(reinterpret_cast<char *>(&sec.floorHeight), sizeof(sec.floorHeight));
-    in.read(reinterpret_cast<char *>(&sec.ceilingHeight), sizeof(sec.ceilingHeight));
-    in.read(reinterpret_cast<char *>(&sec.specialType), sizeof(sec.specialType));
-    in.read(reinterpret_cast<char *>(&sec.lightLevel), sizeof(sec.lightLevel));
-    in.read(reinterpret_cast<char *>(&sec.tag), sizeof(sec.tag));
-    level.sectors.emplace_back(sec);
-  }
-  if (in.fail()) {
-    std::cerr << "Failed to read sectors from file." << std::endl;
-    return;
-  }
-  std::cout << "Read sectors\n";
-  std::cout << "Finished loading level from file.\n";
 }
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
@@ -269,18 +102,18 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.selection.clear();
   state.level->vertices.pop_back();
 }
-void EditorVertex::serialize(std::ofstream &file) const { EditorObject::serialize(file); }
-void EditorVertex::deserialize(const std::ifstream &ostream) const { EditorObject::deserialize(ostream); }
 
 EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _height) : width(_width), height(_height)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
   std::vector<EditorSector> editorSectors;
+  std::vector<EditorSidedef> editorSidedefs;
 
   editorVertices.reserve(_level.vertices.size());
   editorLinedefs.reserve(_level.linedefs.size());
   editorSectors.reserve(_level.sectors.size());
+  editorSidedefs.reserve(_level.sidedefs.size());
 
   std::unordered_map<size_t, uint32_t> vertexIdMap;
   vertexIdMap.reserve(_level.vertices.size());
@@ -306,17 +139,15 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
 
   // process sectors
   for (const auto &[floorHeight, ceilingHeight, specialType, lightLevel, tag] : _level.sectors) {
-    editorSectors.emplace_back();
-    auto &sec = editorSectors.back();
-    sec.floorHeight = floorHeight;
-    sec.ceilingHeight = ceilingHeight;
-    sec.specialType = specialType;
-    sec.lightLevel = lightLevel;
-    sec.tag = tag;
+    editorSectors.emplace_back(floorHeight, ceilingHeight, specialType, lightLevel, tag);
   }
 
+  // process sidedefs
+  for (const auto &sd : _level.sidedefs) { editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset, sd.color); }
+
+
   this->level = std::make_unique<EditorLevel>(
-    std::move(editorVertices), std::move(editorLinedefs), std::move(editorSectors), _level.sidedefs);
+    std::move(editorVertices), std::move(editorLinedefs), std::move(editorSectors), std::move(editorSidedefs));
 }
 
 void EditorState::reset()

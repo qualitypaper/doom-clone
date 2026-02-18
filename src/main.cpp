@@ -118,7 +118,9 @@ int main()
 
   Level level;
   if (true) {
-    EditorLevel::deserialize(level, "saved_level.bin");
+    EditorLevel edLevel{};
+    edLevel.deserialize("saved_level.bin");
+    edLevel.toGameLevel(level, config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
   } else {
     level = { .vertices = vertices, .linedefs = linedefs, .sidedefs = sidedefs, .sectors = sectors };
   }

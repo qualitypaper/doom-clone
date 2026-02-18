@@ -72,7 +72,7 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
       // save the current level into a .bin file
       // vertices, linedefs, sidedefs, sectors
-      state.level->serialize("saved_level.bin", state.width, state.height);
+      state.level->serialize("saved_level.bin");
     }
 
     if (io.KeyCtrl && !io.WantCaptureMouse && io.MouseWheel != 0) {
