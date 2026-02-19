@@ -23,7 +23,14 @@ struct BspNode
   BspNode(int16_t _x, int16_t _y, int16_t _dx, int16_t _dy);
 
   int16_t x = 0, y = 0, dx = 0, dy = 0;
-  std::array<int16_t, 4> leftBoundingBox{}, rightBoundingBox{};
+  std::array<int16_t, 4> leftBoundingBox{ std::numeric_limits<int16_t>::max(),
+    std::numeric_limits<int16_t>::min(),
+    std::numeric_limits<int16_t>::min(),
+    std::numeric_limits<int16_t>::max() },
+    rightBoundingBox{ std::numeric_limits<int16_t>::max(),
+      std::numeric_limits<int16_t>::min(),
+      std::numeric_limits<int16_t>::min(),
+      std::numeric_limits<int16_t>::max() };
   int16_t leftChild = -1, rightChild = -1;
 };
 
@@ -61,6 +68,13 @@ private:
   [[nodiscard]] SegmentPosition DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const;
   [[nodiscard]] bool IsConvex(const std::vector<Seg> &segs) const;
 
+  void AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const;
+  void DrawSubsectors(const SdlWindow &sdlWindow) const;
+
+private:
+  static void DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root);
+  static void DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &root);
+
 public:
   std::unique_ptr<Level> level;
 
@@ -69,6 +83,6 @@ public:
 
   void BuildBSPTree();
   int BuildBSPTree(std::vector<Seg> &segs);
-  void printTree() const;
-  void visualize() const;
+  void PrintTree() const;
+  void Visualize() const;
 };

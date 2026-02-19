@@ -1,9 +1,6 @@
 #include "bsp.h"
 
 #include "config.h"
-#include "framebuffer.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_renderer.h"
 #include "math_utils.h"
 
 #include <queue>
@@ -21,12 +18,34 @@ BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_lev
   for (size_t i = 0; i < level->linedefs.size(); i++) {
     auto &ld = level->linedefs[i];
     segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0);
-    if (ld.backSidedef) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
+    if (ld.backSidedef != -1) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
   }
 }
 
 void BSPBuilder::BuildBSPTree() { BuildBSPTree(segments); }
 
+void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const
+{
+  for (const auto &seg : segs) {
+    const Vertex start = math_utils::fromCenterCoordinates(
+      level->vertices[seg.startVertex], config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    const Vertex end = math_utils::fromCenterCoordinates(
+      level->vertices[seg.endVertex], config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+
+
+    boundingBox[0] = std::min(boundingBox[0], static_cast<int16_t>(start.y));
+    boundingBox[0] = std::min(boundingBox[0], static_cast<int16_t>(end.y));
+
+    boundingBox[1] = std::max(boundingBox[1], static_cast<int16_t>(start.x));
+    boundingBox[1] = std::max(boundingBox[1], static_cast<int16_t>(end.x));
+
+    boundingBox[2] = std::max(boundingBox[2], static_cast<int16_t>(start.y));
+    boundingBox[2] = std::max(boundingBox[2], static_cast<int16_t>(end.y));
+
+    boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(end.x));
+    boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(end.x));
+  }
+}
 int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
   // base case
@@ -51,84 +70,18 @@ int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 
   const int id = static_cast<int>(nodes.size() - 1);
 
-  const int leftId = BuildBSPTree(split.front);
-  const int rightId = BuildBSPTree(split.back);
+  BspNode &currentNode = nodes[id];
 
-  nodes[id].leftChild = leftId;
-  nodes[id].rightChild = rightId;
+  AdjustBoundingBoxes(split.front, currentNode.rightBoundingBox);
+  AdjustBoundingBoxes(split.back, currentNode.leftBoundingBox);
+
+  const int rightId = BuildBSPTree(split.front);
+  const int leftId = BuildBSPTree(split.back);
+
+  nodes[id].rightChild = static_cast<int16_t>(rightId);
+  nodes[id].leftChild = static_cast<int16_t>(leftId);
 
   return id;
-}
-void BSPBuilder::printTree() const
-{
-  for (auto &node : nodes) { std::cout << node << '\n'; }
-}
-
-void BSPBuilder::visualize() const
-{
-  SdlWindow sdlWindow("BSP Builder", config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-  const imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, *level);
-
-  const time_t start = time(nullptr);
-  uint64_t prev = SDL_GetPerformanceCounter();
-  const double freq = static_cast<double>(SDL_GetPerformanceFrequency());
-  const double df = 1 / 144.0;
-  bool running = true;
-
-  while (running) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) { ImGui_ImplSDL2_ProcessEvent(&event); }
-
-    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
-    imguiRenderer.render();
-
-    const BspNode root = nodes[0];
-    ImVec2 rootVertex = math_utils::fromCenterCoordinates(
-      { static_cast<float>(root.x), static_cast<float>(root.y) }, sdlWindow.width, sdlWindow.height);
-
-    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 255, 0, 255);
-    SDL_RenderDrawLine(sdlWindow.getRenderer(),
-      rootVertex.x,
-      rootVertex.y,
-      static_cast<int>(static_cast<double>(root.dy) / static_cast<double>(root.dx + 0.001))
-        * (sdlWindow.width - root.x),
-      static_cast<int>(static_cast<double>(root.dx) / static_cast<double>(root.dy + 0.001))
-        * (sdlWindow.height - root.y));
-
-    SDL_RenderDrawLine(sdlWindow.getRenderer(),
-      static_cast<int>(static_cast<double>(root.dy) / static_cast<double>(root.dx) * rootVertex.x),
-      static_cast<int>(static_cast<double>(root.dx) / static_cast<double>(root.dy) * rootVertex.y),
-      rootVertex.x,
-      rootVertex.y);
-
-    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
-    for (const auto &subsector : subsectors) {
-      for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
-        const auto &seg = newSegments[i];
-        const auto &startVertex = level->vertices[seg.startVertex];
-        const auto &endVertex = level->vertices[seg.endVertex];
-
-        const auto mappedStart = math_utils::fromCenterCoordinates(
-          { static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) }, sdlWindow.width, sdlWindow.height);
-        const auto mappedEnd = math_utils::fromCenterCoordinates(
-          { static_cast<float>(endVertex.x), static_cast<float>(endVertex.y) }, sdlWindow.width, sdlWindow.height);
-
-        // SDL_Rect rect{(int) mappedStart.x, (int) mappedStart.y+1, (int) (mappedEnd.x - mappedStart.x), (int)
-        // (mappedEnd.y - mappedStart.y) + 1}; SDL_RenderFillRect(sdlWindow.getRenderer(), &rect);
-        SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
-      }
-    }
-
-    SDL_RenderPresent(sdlWindow.getRenderer());
-
-    const uint64_t now = SDL_GetPerformanceCounter();
-    double frameTime = static_cast<double>(now - prev) / freq;
-    prev = now;
-    if (frameTime > 0.25) frameTime = 0.25;
-
-    if (frameTime < df) { SDL_Delay(static_cast<uint64_t>((df - frameTime) * 1000.0)); }
-    running = time(nullptr) - start < 60 * 1000;
-  }
 }
 
 SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const
@@ -158,8 +111,9 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
       // check for seg == splitter
       if (diff.x == 0 && diff.y == 0) continue;
 
-      const double k = math_utils::findLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
-      const Vertex intersection = segStart + segDirection * k;
+      const std::pair<double, double> sol =
+        math_utils::findLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
+      const Vertex intersection = segStart + segDirection * sol.second;
       level->vertices.emplace_back(intersection);
       const int16_t newVertexId = static_cast<int16_t>(level->vertices.size() - 1);
 
@@ -264,13 +218,20 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
 
   // check for line intersection
   if ((splitterDirection.x != 0 || splitterDirection.y != 0) && (segDirection.x != 0 || segDirection.y != 0)) {
-    const double k =
+    const std::pair<double, double> sol =
       math_utils::findLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
 
-    if (k > 0 && k < 1) { return SegmentPosition::SPANNING; }
+    if (sol.second > 0.001 && sol.second < 1.001) {
+      const Vertex splitterIntersection = startSplitterVertex + splitterDirection * sol.first;
+      const Vertex segIntersection = startSegVertex + segDirection * sol.second;
+
+      if (splitterIntersection == segIntersection) {
+        return SegmentPosition::SPANNING;
+      }
+    }
   }
 
-  const int32_t length = math_utils::crossProductLength(splitterDirection, startSegVertex);
+  const int32_t length = math_utils::crossProductLength(splitterDirection, startSegVertex - startSplitterVertex);
 
   if (length <= 0) {
     // front (right), covers also lines that are collinear with the splitter
@@ -298,7 +259,7 @@ uint32_t BSPBuilder::EvaluateSplitter(const Seg &splitter) const
       spanning++;
   }
 
-  return std::abs(left - right) + spanning * 3;
+  return std::abs(left - right) + spanning * 8;
 }
 
 /*
@@ -315,4 +276,9 @@ bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
   }
 
   return true;
+}
+
+void BSPBuilder::PrintTree() const
+{
+  for (auto &node : nodes) { std::cout << node << '\n'; }
 }

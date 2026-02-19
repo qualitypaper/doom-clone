@@ -21,10 +21,17 @@ constexpr ImVec2 fromCenterCoordinates(const ImVec2 vec, const uint16_t width, c
     std::max(0.0f, std::min(static_cast<float>(height), static_cast<float>(height) / 2 - vec.y)) };
 }
 
+constexpr Vertex fromCenterCoordinates(const Vertex vec, const uint16_t width, const uint16_t height)
+{
+  return { std::max(0, std::min(static_cast<int>(width), width / 2 + vec.x)),
+    std::max(0, std::min(static_cast<int>(height), height / 2 - vec.y)) };
+}
+
 constexpr ImVec2 convertVertexIntoImVec2(const Vertex vertex)
 { return { static_cast<float>(vertex.x), static_cast<float>(vertex.y) }; }
 
-constexpr Vertex convertImVec2IntoVertex(const ImVec2 v) { return { static_cast<int16_t>(v.x), static_cast<int16_t>(v.y) }; };
+constexpr Vertex convertImVec2IntoVertex(const ImVec2 v)
+{ return { static_cast<int16_t>(v.x), static_cast<int16_t>(v.y) }; };
 
 constexpr float getDistanceSq(const float x1, const float y1, const float x2, const float y2)
 {
@@ -42,19 +49,29 @@ constexpr float getDistanceSq(ImVec2 a, ImVec2 b) { return getDistanceSq(a.x, a.
 constexpr float getDistanceSq(Vertex v1, Vertex v2) { return getDistanceSq(v1.x, v1.y, v2.x, v2.y); }
 constexpr float dotProduct(ImVec2 a, ImVec2 b) { return a.x * b.x + a.y * b.y; }
 
-// returns the parameter for the second line
-// so the solution will be: p2 + returnValue * d2
-constexpr double findLinesIntersection(const Vertex p1, const Vertex d1, const Vertex p2, const Vertex d2)
+
+/**
+ *
+ * @param p1 starting point of the first line
+ * @param d1 direction vector of the first line
+ * @param p2 starting point of the second line
+ * @param d2 direction vector of the second line
+ * @return null vector when d1 and d2 are collinear, otherwise a solution to LSE
+ */
+inline std::pair<double, double>
+  findLinesIntersection(const Vertex p1, const Vertex d1, const Vertex p2, const Vertex d2)
 {
-  if (d1.x != 0) {
-    const double temp = static_cast<double>(d1.y) / static_cast<double>(d1.x);
-    return (p2.y - p1.y - temp * (p2.x - p1.x)) / (temp * d2.x - d2.y);
-  } else if (d1.y != 0) {
-    return -(p2.x - p1.x) / static_cast<double>(p2.x);
-  } else {
-    throw std::runtime_error("Direction is a null vector.");
-  }
+  const glm::mat2x2 A{ d1.x, d1.y, -d2.x, -d2.y };
+
+  if (glm::determinant(A) == 0) { return std::pair(0, 0); }
+
+  const glm::vec2 b{ p2.x - p1.x, p2.y - p1.y };
+
+  glm::vec2 sol = glm::inverse(A) * b;
+
+  return std::pair(sol.x, sol.y);
 }
+
 
 constexpr Vertex rotateAroundX(const Vertex v, const double angleDegrees)
 {

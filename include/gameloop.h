@@ -34,7 +34,10 @@ struct Vertex
 
   Vertex operator+(const Vertex &other) const { return Vertex{ x + other.x, y + other.y }; }
   Vertex operator-(const Vertex &other) const { return Vertex{ x - other.x, y - other.y }; }
-  Vertex operator*(const double c) const { return Vertex{ static_cast<int32_t>(c * x), static_cast<int32_t>(c) * y }; }
+  Vertex operator*(const double c) const { return Vertex{ static_cast<int32_t>(c * x), static_cast<int32_t>(c * y) }; }
+  Vertex operator/(const double c) const { return Vertex{ static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
+
+  bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
 };
 
 struct SideDef

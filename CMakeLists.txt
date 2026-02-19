@@ -40,6 +40,7 @@ add_executable(${PROJECT_NAME}
         include/serialization.h
         src/core/serialization.cpp
         src/renderer/editor/editor_serialization.cpp
+        src/bsp/bsp_visualization.cpp
 )
 
 target_include_directories(${PROJECT_NAME}

@@ -127,9 +127,9 @@ int main()
 
   BSPBuilder builder(level);
   builder.BuildBSPTree();
-  builder.printTree();
-  builder.visualize();
-  // return 0;
+  builder.PrintTree();
+  builder.Visualize();
+  return 0;
 
   // setup sdl window
   SdlWindow sdlWindow("Doom Clone",
