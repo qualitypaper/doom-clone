@@ -43,7 +43,7 @@ constexpr float getDistanceSq(const float x1, const float y1, const float x2, co
 }
 
 // takes two vectors and returns the cross product (z component is always 0, since we are in 2D)
-constexpr int32_t crossProductLength(const Vertex v1, const Vertex v2) { return v1.x * v2.y - v1.y * v2.x; }
+constexpr int32_t crossProductLengthNDir(const Vertex v1, const Vertex v2) { return v1.x * v2.y - v1.y * v2.x; }
 
 constexpr float getDistanceSq(ImVec2 a, ImVec2 b) { return getDistanceSq(a.x, a.y, b.x, b.y); }
 constexpr float getDistanceSq(Vertex v1, Vertex v2) { return getDistanceSq(v1.x, v1.y, v2.x, v2.y); }

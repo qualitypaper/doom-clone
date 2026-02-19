@@ -10,13 +10,11 @@
 
 struct ImVec2;
 
-namespace imguirenderer {
-
-class ImguiRenderer
+class EditorRenderer
 {
 public:
-  ImguiRenderer(SdlWindow &sdlWindow, Level &level);
-  ~ImguiRenderer();
+  EditorRenderer(SdlWindow &sdlWindow, Level &level);
+  ~EditorRenderer();
 
   void render() const;
 
@@ -59,5 +57,3 @@ private:
     bool hasReset = false);
   static constexpr ImVec2 scale(ImVec2 vec, float_t scaleFactor);
 };
-
-}// namespace imguirenderer

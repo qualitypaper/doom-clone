@@ -1,9 +1,9 @@
 #include "bsp.h"
 #include "config.h"
 #include "editor.h"
+#include "editor_renderer.h"
 #include "framebuffer.h"
 #include "gameloop.h"
-#include "imgui_renderer.h"
 #include "renderer.h"
 #include "simulation.h"
 
@@ -129,7 +129,6 @@ int main()
   builder.BuildBSPTree();
   builder.PrintTree();
   builder.Visualize();
-  return 0;
 
   // setup sdl window
   SdlWindow sdlWindow("Doom Clone",
@@ -138,7 +137,7 @@ int main()
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
-  imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, level);
+  EditorRenderer imguiRenderer(sdlWindow, level);
 
   // setup the game renderer
   framebuffer::FrameBuffer fb(sdlWindow);

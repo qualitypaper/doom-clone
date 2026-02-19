@@ -1,7 +1,7 @@
 #include "bsp.h"
 #include "config.h"
+#include "editor_renderer.h"
 #include "imgui_impl_sdl2.h"
-#include "imgui_renderer.h"
 #include "math_utils.h"
 
 #include <imgui.h>
@@ -24,7 +24,7 @@ void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root
     static_cast<int>(rightMax.x - rightMin.x),
     static_cast<int>(rightMin.y - rightMax.y) };
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 0, 255, 255);
   SDL_RenderDrawRect(sdlWindow.getRenderer(), &left);
 
   SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 255, 255);
@@ -78,7 +78,7 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &ro
 void BSPBuilder::Visualize() const
 {
   SdlWindow sdlWindow("BSP Builder", config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-  const imguirenderer::ImguiRenderer imguiRenderer(sdlWindow, *level);
+  const EditorRenderer imguiRenderer(sdlWindow, *level);
 
   const time_t start = time(nullptr);
   uint64_t prev = SDL_GetPerformanceCounter();

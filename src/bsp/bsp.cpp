@@ -6,24 +6,6 @@
 #include <queue>
 #include <unordered_map>
 
-BspNode::BspNode(const int16_t _x, const int16_t _y, const int16_t _dx, const int16_t _dy)
-  : x(_x), y(_y), dx(_dx), dy(_dy)
-{}
-
-BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_level))
-{
-  segments.reserve(level->linedefs.size());
-  subsectors.reserve(level->linedefs.size() / 2);
-
-  for (size_t i = 0; i < level->linedefs.size(); i++) {
-    auto &ld = level->linedefs[i];
-    segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0);
-    if (ld.backSidedef != -1) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
-  }
-}
-
-void BSPBuilder::BuildBSPTree() { BuildBSPTree(segments); }
-
 void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const
 {
   for (const auto &seg : segs) {
@@ -42,10 +24,29 @@ void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<in
     boundingBox[2] = std::max(boundingBox[2], static_cast<int16_t>(start.y));
     boundingBox[2] = std::max(boundingBox[2], static_cast<int16_t>(end.y));
 
-    boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(end.x));
+    boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(start.x));
     boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(end.x));
   }
 }
+
+BspNode::BspNode(const int16_t _x, const int16_t _y, const int16_t _dx, const int16_t _dy)
+  : x(_x), y(_y), dx(_dx), dy(_dy)
+{}
+
+BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_level))
+{
+  segments.reserve(level->linedefs.size());
+  subsectors.reserve(level->linedefs.size() / 2);
+
+  for (size_t i = 0; i < level->linedefs.size(); i++) {
+    auto &ld = level->linedefs[i];
+    segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0);
+    if (ld.backSidedef != -1) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
+  }
+}
+
+void BSPBuilder::BuildBSPTree() { BuildBSPTree(segments); }
+
 int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
   // base case
@@ -185,7 +186,6 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
     if (!distanceToSegmentsMap.contains(distanceSq)) { minHeap.push(distanceSq); }
     distanceToSegmentsMap[distanceSq].push_back(i);
   }
-
   size_t bestSplitterIndex = 0;
   uint32_t bestScore = std::numeric_limits<uint32_t>::max();
 
@@ -194,7 +194,6 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
     minHeap.pop();
 
     for (const size_t segIndex : distanceToSegmentsMap[distanceSq]) {
-      if (segIndex == 10) { std::cout << ""; }
       const uint32_t score = EvaluateSplitter(segs[segIndex]);
 
       if (score < bestScore) {
@@ -211,44 +210,50 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
 {
   const Vertex startSplitterVertex = level->vertices[splitter.startVertex];
   const Vertex startSegVertex = level->vertices[seg.startVertex];
+  const Vertex endSegVertex = level->vertices[seg.endVertex];
 
   // cross product -> positive = left, negative = right, zero = collinear
   const Vertex splitterDirection = level->vertices[splitter.endVertex] - startSplitterVertex;
-  const Vertex segDirection = level->vertices[seg.endVertex] - startSegVertex;
 
-  // check for line intersection
-  if ((splitterDirection.x != 0 || splitterDirection.y != 0) && (segDirection.x != 0 || segDirection.y != 0)) {
-    const std::pair<double, double> sol =
-      math_utils::findLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
+  const int32_t startCross =
+    math_utils::crossProductLengthNDir(splitterDirection, startSegVertex - startSplitterVertex);
+  const int32_t endCross = math_utils::crossProductLengthNDir(splitterDirection, endSegVertex - startSplitterVertex);
 
-    if (sol.second > 0.001 && sol.second < 1.001) {
-      const Vertex splitterIntersection = startSplitterVertex + splitterDirection * sol.first;
-      const Vertex segIntersection = startSegVertex + segDirection * sol.second;
-
-      if (splitterIntersection == segIntersection) {
-        return SegmentPosition::SPANNING;
-      }
-    }
+  if (startCross == 0 && endCross == 0) {
+    // collinear
+    return SegmentPosition::FRONT;
   }
 
-  const int32_t length = math_utils::crossProductLength(splitterDirection, startSegVertex - startSplitterVertex);
+  // Check if segment spans the splitter (endpoints on opposite sides)
+  if ((startCross > 0 && endCross < 0) || (startCross < 0 && endCross > 0)) {
+    // Check if they actually intersect
+    const Vertex segDirection = endSegVertex - startSegVertex;
 
-  if (length <= 0) {
-    // front (right), covers also lines that are collinear with the splitter
+    const std::pair<double, double> sol =
+      math_utils::findLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
+    // If intersection parameter is strictly between 0 and 1 for segment to be splitted, the segments are spanning
+    if (sol.second > 0 && sol.second < 1) { return SegmentPosition::SPANNING; }
+  }
+
+  if (startCross <= 0 && endCross <= 0) {
     return SegmentPosition::FRONT;
-  } else {
-    // back(left)
+  } else if (startCross >= 0 && endCross >= 0) {
     return SegmentPosition::BACK;
+  } else {
+    return SegmentPosition::SPANNING;
   }
 }
 
-// returns a score of the segment, the smaller the better
+// returns a score of the segment; the smaller, the better
 uint32_t BSPBuilder::EvaluateSplitter(const Seg &splitter) const
 {
+  if (splitter.linedefIndex == 1) { std::cout << ""; }
   int left = 0, right = 0, spanning = 0;
 
   for (auto &seg : segments) {
     // 0 = front, 1 = back, 2 = spanning
+    if (seg.linedefIndex == splitter.linedefIndex) continue;
+
     const SegmentPosition position = DetermineSegmentPosition(splitter, seg);
 
     if (position == SegmentPosition::FRONT)

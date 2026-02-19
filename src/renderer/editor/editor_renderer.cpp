@@ -1,4 +1,4 @@
-#include "imgui_renderer.h"
+#include "editor_renderer.h"
 
 #include "editor.h"
 #include "editor_input_handler.h"
@@ -15,12 +15,11 @@
 #include <string>
 #include <vector>
 
-namespace imguirenderer {
 static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
 static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
 static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 
-ImguiRenderer::ImguiRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
+EditorRenderer::EditorRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
 {
   const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
@@ -48,21 +47,21 @@ ImguiRenderer::ImguiRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(s
   this->m_editorInputHandler = std::make_unique<EditorInputHandler>();
 }
 
-ImguiRenderer::~ImguiRenderer()
+EditorRenderer::~EditorRenderer()
 {
   ImGui_ImplSDLRenderer2_Shutdown();
   ImGui_ImplSDL2_Shutdown();
   ImGui::DestroyContext();
 }
 
-void ImguiRenderer::startFrame()
+void EditorRenderer::startFrame()
 {
   ImGui_ImplSDLRenderer2_NewFrame();
   ImGui_ImplSDL2_NewFrame();
   ImGui::NewFrame();
 }
 
-void ImguiRenderer::endFrame() const
+void EditorRenderer::endFrame() const
 {
   ImGui::Render();
   const ImGuiIO &currentIo = ImGui::GetIO();
@@ -74,7 +73,7 @@ void ImguiRenderer::endFrame() const
   SDL_RenderPresent(m_sdlWindow.getRenderer());
 }
 
-void ImguiRenderer::render() const
+void EditorRenderer::render() const
 {
   // Start the Dear ImGui frame
   startFrame();
@@ -148,7 +147,7 @@ void ImguiRenderer::render() const
 }
 
 
-void ImguiRenderer::drawSidedefsWindow() const
+void EditorRenderer::drawSidedefsWindow() const
 {
   ImGui::Begin("SideDefs");
 
@@ -199,7 +198,7 @@ void ImguiRenderer::drawSidedefsWindow() const
   ImGui::End();
 }// namespace imguirenderer
 
-void ImguiRenderer::drawSectorsWindow() const
+void EditorRenderer::drawSectorsWindow() const
 {
 
   ImGui::Begin("Sectors");
@@ -230,7 +229,7 @@ void ImguiRenderer::drawSectorsWindow() const
   ImGui::End();
 }
 
-void ImguiRenderer::drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,
+void EditorRenderer::drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,
   const EditorLineDef &ld,
   const ImVec2 startDragged,
   const ImVec2 endDragged,
@@ -257,7 +256,7 @@ void ImguiRenderer::drawConnectedLineDefs(const std::vector<uint32_t> &connected
   }
 }
 
-void ImguiRenderer::drawSelectedVertex(const uint32_t objectId,
+void EditorRenderer::drawSelectedVertex(const uint32_t objectId,
   const float_t vertexRadius,
   const float_t thickness,
   ImDrawList *drawList) const
@@ -280,7 +279,7 @@ void ImguiRenderer::drawSelectedVertex(const uint32_t objectId,
     }
   }
 }
-void ImguiRenderer::drawSelectedLineDef(const uint32_t objectId,
+void EditorRenderer::drawSelectedLineDef(const uint32_t objectId,
   const float_t vertexRadius,
   const float_t thickness,
   ImDrawList *drawList) const
@@ -304,7 +303,7 @@ void ImguiRenderer::drawSelectedLineDef(const uint32_t objectId,
   drawConnectedLineDefs(start.connectedLineDefs, ld, startDragged, endDragged, drawList, thickness);
   drawConnectedLineDefs(end.connectedLineDefs, ld, startDragged, endDragged, drawList, thickness);
 }
-void ImguiRenderer::drawSelection(const float_t vertexRadius, const float_t thickness, ImDrawList *drawList) const
+void EditorRenderer::drawSelection(const float_t vertexRadius, const float_t thickness, ImDrawList *drawList) const
 {
   for (const uint32_t objectId : m_editor->state->selection) {
     const auto object = m_editor->state->findObject(objectId);
@@ -325,7 +324,7 @@ void ImguiRenderer::drawSelection(const float_t vertexRadius, const float_t thic
   }
 }
 
-void ImguiRenderer::drawUnselectedVertices(const float_t vertexRadius, ImDrawList *drawList) const
+void EditorRenderer::drawUnselectedVertices(const float_t vertexRadius, ImDrawList *drawList) const
 {
   for (auto &v : m_editor->state->level->vertices) {
     // selected vertices are processed separately
@@ -342,7 +341,7 @@ void ImguiRenderer::drawUnselectedVertices(const float_t vertexRadius, ImDrawLis
     drawList->AddCircleFilled(v.toImVec2(), vertexRadius, color);
   }
 }
-void ImguiRenderer::drawArrowForLinedef(ImDrawList *drawList,
+void EditorRenderer::drawArrowForLinedef(ImDrawList *drawList,
   const float_t thickness,
   const EditorVertex &startVertex,
   const EditorVertex &endVertex,
@@ -366,7 +365,7 @@ void ImguiRenderer::drawArrowForLinedef(ImDrawList *drawList,
   drawList->AddLine(endVertex.toImVec2(), rightArrowEnd, color, thickness / 2.0f);
 }
 
-void ImguiRenderer::drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, const float_t thickness) const
+void EditorRenderer::drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, const float_t thickness) const
 {
   const EditorVertex startVertex = m_editor->state->findVertex(ld.start);
   const EditorVertex endVertex = m_editor->state->findVertex(ld.end);
@@ -388,9 +387,9 @@ void ImguiRenderer::drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, c
   drawList->AddLine(start, end, color, thickness);
 
   // draw a small arrow showing the direction of the linedef
-  // drawArrowForLinedef(drawList, thickness, startVertex, endVertex, color);
+  drawArrowForLinedef(drawList, thickness, startVertex, endVertex, color);
 }
-void ImguiRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *drawList) const
+void EditorRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *drawList) const
 {
   for (size_t i = 0; i < m_editor->state->level->linedefs.size(); i++) {
     const auto &ld = m_editor->state->level->linedefs[i];
@@ -407,7 +406,7 @@ void ImguiRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *
     drawLinedef(ld, drawList, thickness);
   }
 }
-void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
+void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
 {
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
@@ -419,7 +418,7 @@ void ImguiRenderer::drawMapOutlines(const float_t vertexRadius, const float_t th
   drawSelection(vertexRadius, thickness, drawList);
 }
 
-void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const
+void EditorRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const
 {
   ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
@@ -436,7 +435,7 @@ void ImguiRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen
   ImGui::End();
 }
 
-void ImguiRenderer::drawSelectedLinePopup(const uint32_t lineId) const
+void EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
 {
   const auto index = getObjectIndex(lineId);
   auto &ld = m_editor->state->findLinedef(index);
@@ -488,7 +487,7 @@ void ImguiRenderer::drawSelectedLinePopup(const uint32_t lineId) const
   ImGui::End();
 }
 
-void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
+void EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 {
   const uint32_t index = getObjectIndex(selectedId);
 
@@ -511,7 +510,7 @@ void ImguiRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
   ImGui::End();
 }
 
-void ImguiRenderer::createSelect(const char *label,
+void EditorRenderer::createSelect(const char *label,
   const std::vector<EditorSidedef> &sidedefs,
   int32_t &currentItem,
   const bool hasReset)
@@ -538,8 +537,5 @@ void ImguiRenderer::createSelect(const char *label,
   }
 }
 
-constexpr ImVec2 ImguiRenderer::scale(const ImVec2 vec, const float_t scaleFactor)
+constexpr ImVec2 scale(const ImVec2 vec, const float_t scaleFactor)
 { return { scaleFactor * vec.x, scaleFactor * vec.y }; }
-
-
-}// namespace imguirenderer
