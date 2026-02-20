@@ -3,6 +3,7 @@
 #include "config.h"
 #include "math_utils.h"
 
+#include <format>
 #include <queue>
 #include <unordered_map>
 
@@ -47,43 +48,6 @@ BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_lev
 
 void BSPBuilder::BuildBSPTree() { BuildBSPTree(segments); }
 
-int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
-{
-  // base case
-  if (segs.empty())
-    return -1;
-  else if (segs.size() <= 2 || IsConvex(segs)) {
-    const size_t firstIndex = newSegments.size();
-    for (auto &seg : segs) { newSegments.emplace_back(seg); }
-
-    subsectors.emplace_back(segs.size(), static_cast<int16_t>(firstIndex));
-    return -1;
-  }
-
-  nodes.reserve(level->linedefs.size());
-
-  // selecting a splitter line
-  const uint32_t bestSplitterIndex = SelectSplittingLine(segs);
-  // partitioning segments into two groups based on the splitter line
-  SplitResult split = SplitBySplitter(segs, segs[bestSplitterIndex]);
-  // recursively building the tree for each group a convex subsector is reached
-  nodes.push_back(split.node);
-
-  const int id = static_cast<int>(nodes.size() - 1);
-
-  BspNode &currentNode = nodes[id];
-
-  AdjustBoundingBoxes(split.front, currentNode.rightBoundingBox);
-  AdjustBoundingBoxes(split.back, currentNode.leftBoundingBox);
-
-  const int rightId = BuildBSPTree(split.front);
-  const int leftId = BuildBSPTree(split.back);
-
-  nodes[id].rightChild = static_cast<int16_t>(rightId);
-  nodes[id].leftChild = static_cast<int16_t>(leftId);
-
-  return id;
-}
 
 SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const
 {
@@ -152,6 +116,41 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
     static_cast<int16_t>(splitterDirection.y) };
 
   return res;
+}
+int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
+{
+  // base case
+  if (segs.empty())
+    return -1;
+  else if (segs.size() <= 2 || IsConvex(segs)) {
+    const size_t firstIndex = newSegments.size();
+    for (auto &seg : segs) { newSegments.emplace_back(seg); }
+
+    subsectors.emplace_back(segs.size(), static_cast<int16_t>(firstIndex));
+    return -1;
+  }
+
+  // selecting a splitter line
+  const uint32_t bestSplitterIndex = SelectSplittingLine(segs);
+  // partitioning segments into two groups based on the splitter line
+  SplitResult split = SplitBySplitter(segs, segs[bestSplitterIndex]);
+  // recursively building the tree for each group a convex subsector is reached
+  nodes.push_back(split.node);
+
+  const int id = static_cast<int>(nodes.size() - 1);
+
+  BspNode &currentNode = nodes[id];
+
+  AdjustBoundingBoxes(split.front, currentNode.rightBoundingBox);
+  AdjustBoundingBoxes(split.back, currentNode.leftBoundingBox);
+
+  const int rightId = BuildBSPTree(split.front);
+  const int leftId = BuildBSPTree(split.back);
+
+  nodes[id].leftChild = static_cast<int16_t>(leftId);
+  nodes[id].rightChild = static_cast<int16_t>(rightId);
+
+  return id;
 }
 
 uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
@@ -283,7 +282,84 @@ bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
   return true;
 }
 
+size_t BSPBuilder::MaxDepth() const { return MaxDepthRecursive(0); }
+
+size_t BSPBuilder::MaxDepthRecursive(const int16_t currentIndex) const
+{
+  const size_t left = nodes[currentIndex].leftChild == -1 ? 0 : MaxDepthRecursive(nodes[currentIndex].leftChild);
+  const size_t right = nodes[currentIndex].rightChild == -1 ? 0 : MaxDepthRecursive(nodes[currentIndex].rightChild);
+
+  return 1 + left + right;
+}
+
+std::vector<std::vector<int16_t>> BSPBuilder::BuildRows() const
+{
+  const size_t maxDepth = MaxDepth();
+  std::vector<std::vector<int16_t>> rows;
+
+  rows.resize(maxDepth);
+
+  rows[0].push_back(0);
+
+  BuildRowsRecursive(0, 1, rows);
+
+  return rows;
+}
+
+void BSPBuilder::BuildRowsRecursive(const int16_t index,
+  const size_t currentDepth,
+  std::vector<std::vector<int16_t>> &rows) const
+{
+  if (currentDepth >= rows.size()) return;
+
+  const int16_t left = nodes[index].leftChild;
+  const int16_t right = nodes[index].rightChild;
+  rows[currentDepth].push_back(left);
+  rows[currentDepth].push_back(right);
+
+  if (left != -1) { BuildRowsRecursive(left, currentDepth + 1, rows); }
+
+  if (right != -1) { BuildRowsRecursive(right, currentDepth + 1, rows); }
+}
+
+std::string BSPBuilder::FormatRows(const std::vector<std::vector<int16_t>> &rows)
+{
+  std::stringstream ss;
+
+  const size_t depth = rows.size();
+  const size_t width =
+    std::max_element(rows.begin(), rows.end(), [](const std::vector<int16_t> &v1, const std::vector<int16_t> &v2) {
+      return v1.size() < v2.size();
+    })->size();
+
+  for (size_t currDepth = 0; currDepth < depth; currDepth++) {
+    const size_t n = rows[currDepth].size();
+
+    for (const int16_t index : rows[currDepth]) {
+      if (static_cast<int64_t>(width / n) > 0) { ss << std::string(width / n, ' '); }
+      ss << index;
+    }
+
+    ss << '\n';
+
+    for (size_t i = 0; i < n; i++) {
+      if (rows[currDepth][i] != -1) {
+        if (static_cast<int64_t>(width / n) - 1 > 0) { ss << std::string(width / n - 1, ' '); }
+        ss << '/';
+        ss << '\\';
+      }
+    }
+
+    ss << '\n';
+  }
+
+  return ss.str();
+}
+
 void BSPBuilder::PrintTree() const
 {
-  for (auto &node : nodes) { std::cout << node << '\n'; }
+  const std::vector<std::vector<int16_t>> rows = BuildRows();
+  const std::string res = FormatRows(rows);
+
+  std::cout << res << '\n';
 }

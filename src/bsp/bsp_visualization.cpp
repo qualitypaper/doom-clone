@@ -1,7 +1,6 @@
 #include "bsp.h"
 #include "config.h"
 #include "editor_renderer.h"
-#include "imgui_impl_sdl2.h"
 #include "math_utils.h"
 
 #include <imgui.h>
@@ -80,6 +79,7 @@ void BSPBuilder::Visualize() const
   SdlWindow sdlWindow("BSP Builder", config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
   const EditorRenderer imguiRenderer(sdlWindow, *level);
 
+  size_t s_nodesIndex = 0;
   const time_t start = time(nullptr);
   uint64_t prev = SDL_GetPerformanceCounter();
   const double freq = static_cast<double>(SDL_GetPerformanceFrequency());
@@ -87,14 +87,34 @@ void BSPBuilder::Visualize() const
   bool running = true;
 
   while (running) {
+    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
+
+    SDL_RenderClear(sdlWindow.getRenderer());
     SDL_Event event;
-    while (SDL_PollEvent(&event)) { ImGui_ImplSDL2_ProcessEvent(&event); }
+    while (SDL_PollEvent(&event)) {}
 
     SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
 
     DrawSubsectors(sdlWindow);
 
-    const BspNode root = nodes[0];
+    const Uint8 *keys = SDL_GetKeyboardState(nullptr);
+    if (keys[SDL_SCANCODE_LEFT]) {
+      if (s_nodesIndex > 0) s_nodesIndex--;
+    } else if (keys[SDL_SCANCODE_RIGHT]) {
+      if (!nodes.empty() && s_nodesIndex < nodes.size() - 1) s_nodesIndex++;
+    }
+
+    if (nodes.empty()) {
+      SDL_RenderPresent(sdlWindow.getRenderer());
+      const uint64_t now = SDL_GetPerformanceCounter();
+      double frameTime = static_cast<double>(now - prev) / freq;
+      prev = now;
+      if (frameTime > 0.25) frameTime = 0.25;
+      if (frameTime < df) { SDL_Delay(static_cast<uint64_t>((df - frameTime) * 1000.0)); }
+      continue;
+    }
+
+    const BspNode &root = nodes[s_nodesIndex];
 
     DrawSplittingLine(sdlWindow, root);
     DrawBoundingBox(sdlWindow, root);

@@ -71,6 +71,12 @@ private:
   void AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const;
   void DrawSubsectors(const SdlWindow &sdlWindow) const;
 
+  [[nodiscard]] size_t MaxDepth() const;
+  [[nodiscard]] size_t MaxDepthRecursive(int16_t currentIndex) const;
+  [[nodiscard]] static std::string FormatRows(const std::vector<std::vector<int16_t>> &rows);
+  [[nodiscard]] std::vector<std::vector<int16_t>> BuildRows() const;
+  void BuildRowsRecursive(int16_t index, size_t currentDepth, std::vector<std::vector<int16_t>> &rows) const;
+
 private:
   static void DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root);
   static void DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &root);
