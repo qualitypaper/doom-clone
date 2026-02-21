@@ -5,10 +5,10 @@
 #include "math_utils.h"
 
 #include <algorithm>
-#include <ctime>
 #include <filesystem>
-#include <fstream>
 #include <limits>
+#include <set>
+#include <unordered_map>
 
 void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &history)
 {
@@ -25,13 +25,14 @@ void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &
   if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
     if (state.isDragging) {
       state.draggingOffset = { mousePos.x - state.draggingStart.x, mousePos.y - state.draggingStart.y };
+    } else if (state.isBlockSelecting) {
+      state.blockSelectionOffset = { mousePos.x - state.blockSelectionStart.x,
+        mousePos.y - state.blockSelectionStart.y };
     } else {
-
       if (state.selection.empty()) {
         // start block selection
         state.isBlockSelecting = true;
         state.blockSelectionStart = mousePos;
-
       } else {
         // state dragging
         state.isDragging = true;
@@ -47,6 +48,70 @@ void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &
     state.isDragging = false;
     state.draggingOffset = { 0, 0 };
     state.draggingStart = { 0, 0 };
+  } else if (state.isBlockSelecting && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+    // flush block selecting
+    flushBlockSelecting(state);
+
+    state.isBlockSelecting = false;
+    state.blockSelectionStart = { 0, 0 };
+    state.blockSelectionOffset = { 0, 0 };
+  }
+}
+
+void EditorInputHandler::flushBlockSelecting(EditorState &state)
+{
+  const AABB selectionBounds(
+    { static_cast<int32_t>(state.blockSelectionStart.x), static_cast<int32_t>(state.blockSelectionStart.y) },
+    { static_cast<int32_t>(state.blockSelectionStart.x + state.blockSelectionOffset.x),
+      static_cast<int32_t>(state.blockSelectionStart.y + state.blockSelectionOffset.y) });
+
+
+  for (size_t i = 0; i < state.level->vertices.size(); i++) {
+    auto &v = state.level->vertices[i];
+
+    if (selectionBounds.contains(static_cast<int16_t>(v.x), static_cast<int16_t>(v.y))) {
+      state.selection.emplace_back(makeObjectId(EditorObjectType::VERTEX, i));
+      v.selected = true;
+    }
+  }
+
+  for (size_t i = 0; i < state.level->linedefs.size(); i++) {
+    auto &ld = state.level->linedefs[i];
+
+    if (std::ranges::find(state.selection, makeObjectId(EditorObjectType::VERTEX, ld.end)) != state.selection.end()
+        || std::ranges::find(state.selection, makeObjectId(EditorObjectType::VERTEX, ld.start))
+             != state.selection.end()) {
+      state.selection.emplace_back(makeObjectId(EditorObjectType::LINEDEF, i));
+      ld.selected = true;
+    }
+  }
+}
+
+void EditorInputHandler::processKeyboardInputs(EditorState &state, CommandHistory &history)
+{
+  const ImGuiIO &io = ImGui::GetIO();
+
+  if (io.WantCaptureKeyboard) return;
+
+  // reset the state when pressing escape
+  if (ImGui::IsKeyPressed(ImGuiKey_Escape)) { state.reset(); }
+
+  if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+    if (io.KeyShift) {
+      history.redo(state);
+    } else {
+      history.undo(state);
+    }
+  }
+
+  if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+    // save the current level into a .bin file
+    // vertices, linedefs, sidedefs, sectors
+    state.level->serialize("saved_level.bin");
+  }
+
+  if (io.KeyCtrl && !io.WantCaptureMouse && io.MouseWheel != 0) {
+    state.canvasZoom = std::clamp(state.canvasZoom * (io.MouseWheel > 0 ? 1.1f : 0.9f), 0.5f, 3.0f);
   }
 }
 
@@ -55,38 +120,17 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
   static float_t s_vertexHoveringThresholdSq = 25.0f * 25.0f;
   static float_t s_lineHoveringThresholdSq = 25.0f * 25.0f;
 
-  const ImGuiIO &io = ImGui::GetIO();
-
-  if (!io.WantCaptureKeyboard) {
-    // reset the state when pressing escape
-    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) { state.reset(); }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
-      if (io.KeyShift) {
-        history.redo(state);
-      } else {
-        history.undo(state);
-      }
-    }
-
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
-      // save the current level into a .bin file
-      // vertices, linedefs, sidedefs, sectors
-      state.level->serialize("saved_level.bin");
-    }
-
-    if (io.KeyCtrl && !io.WantCaptureMouse && io.MouseWheel != 0) {
-      state.canvasZoom = std::clamp(state.canvasZoom * (io.MouseWheel > 0 ? 1.1f : 0.9f), 0.5f, 3.0f);
-    }
-  }
+  processKeyboardInputs(state, history);
 
   const ImVec2 mousePos = ImGui::GetMousePos();
-  const bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
 
   if (mousePos.x < 0 || mousePos.x > static_cast<float_t>(state.width) || mousePos.y < 0
       || mousePos.y > static_cast<float_t>(state.height)) {
     return;
   }
+
+  const ImGuiIO &io = ImGui::GetIO();
+  const bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
 
   processMouseInputs(state, history);
 
@@ -101,7 +145,7 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
     // reset to the initial state
     vertex.hovered = false;
 
-    const float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - vertexRadius*vertexRadius;
+    const float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - vertexRadius * vertexRadius;
 
     if (nodeDis < bestVertexDist) {
       bestVertexDist = nodeDis;
@@ -130,7 +174,6 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
   const bool hasLine = bestLineDist < s_lineHoveringThresholdSq;
 
   if (hasVertex || hasLine) {
-
     if (hasVertex && (!hasLine || bestVertexDist <= bestLineDist)) {
       auto &vertex = state.findVertex(bestVertexId);
 
@@ -164,9 +207,10 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
     }
   } else {
     // if clicking nothing, reset the selection
-    if (lmbClicked) { resetSelection(state); }
+    // if (lmbClicked) { resetSelection(state); }
   }
 }
+
 
 void EditorInputHandler::updateSelection(uint32_t id, const bool selected, EditorState &state)
 {
@@ -200,37 +244,65 @@ void EditorInputHandler::flushDragging(EditorState &state, CommandHistory &histo
   // early return if there is no dragging offset
   if (state.draggingOffset.x == 0 && state.draggingOffset.y == 0) return;
 
+  // Collect encoded vertex object IDs that will be moved by selected linedefs
+  std::unordered_map<uint32_t, bool> verticesMovedByLinedefs;
+
+  for (const uint32_t id : state.selection) {
+    if (getObjectType(id) == EditorObjectType::LINEDEF) {
+      const auto &ld = state.findLinedef(id);
+      verticesMovedByLinedefs[ld.start] = false;
+      verticesMovedByLinedefs[ld.end] = false;
+    }
+  }
+
   for (const uint32_t id : state.selection) {
     const auto object = state.findObject(id);
+    if (!object) continue;
 
-    uint32_t index = getObjectIndex(id);
     const EditorObjectType type = getObjectType(id);
 
-    if (object) {
-      switch (type) {
-      case EditorObjectType::VERTEX: {
-        auto &vertex = state.findVertex(index);
-        auto cmd = std::make_unique<MoveVertexCommand>(index,
-          vertex,
-          EditorVertex(static_cast<int32_t>(static_cast<float_t>(vertex.x) + state.draggingOffset.x),
-            static_cast<int32_t>(static_cast<float_t>(vertex.y) + state.draggingOffset.y)));
+    switch (type) {
+    case EditorObjectType::VERTEX: {
+      if (verticesMovedByLinedefs.contains(id)) continue;
 
-        history.execute(std::move(cmd), state);
-        break;
-      }
-      case EditorObjectType::LINEDEF: {
-        const auto &line = state.findLinedef(index);
-        auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
+      auto &vertex = state.findVertex(id);
+      auto cmd = std::make_unique<MoveVertexCommand>(id,
+        vertex,
+        EditorVertex(static_cast<int32_t>(static_cast<float_t>(vertex.x) + state.draggingOffset.x),
+          static_cast<int32_t>(static_cast<float_t>(vertex.y) + state.draggingOffset.y)));
 
-        auto cmd = std::make_unique<MoveLineDefCommand>(
-          index, start, end, start + state.draggingOffset, end + state.draggingOffset);
+      history.execute(std::move(cmd), state);
+      break;
+    }
+    case EditorObjectType::LINEDEF: {
+      const auto &line = state.findLinedef(id);
+      auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
 
-        history.execute(std::move(cmd), state);
-        break;
+      std::unique_ptr<MoveLineDefCommand> cmd;
+      if (!verticesMovedByLinedefs.at(line.start) && !verticesMovedByLinedefs.at(line.end)) {
+        verticesMovedByLinedefs.at(line.start) = true;
+        verticesMovedByLinedefs.at(line.end) = true;
+
+        cmd = std::make_unique<MoveLineDefCommand>(
+          id, start, end, start + state.draggingOffset, end + state.draggingOffset);
+      } else if (verticesMovedByLinedefs.at(line.start)) {
+        verticesMovedByLinedefs.at(line.end) = true;
+
+        cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start, end + state.draggingOffset);
+      } else if (verticesMovedByLinedefs.at(line.end) == 1) {
+        verticesMovedByLinedefs.at(line.start) = true;
+
+        cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start + state.draggingOffset, end);
+      } else {
+        // skip if those vertices were already moved by other linedefs
+        continue;
       }
-      default:
-        break;
-      }
+
+      history.execute(std::move(cmd), state);
+      break;
+    }
+    default:
+      break;
     }
   }
 }

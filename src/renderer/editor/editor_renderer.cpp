@@ -18,6 +18,7 @@
 static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
 static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
 static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
+static std::vector<bool> s_renderedLinedefs;
 
 EditorRenderer::EditorRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
 {
@@ -73,12 +74,38 @@ void EditorRenderer::endFrame() const
   SDL_RenderPresent(m_sdlWindow.getRenderer());
 }
 
+void EditorRenderer::drawLinePreview(const float_t thickness) const
+{
+  if (!m_editor->state->isCreatingLine) return;
+
+  const auto &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
+
+  const ImVec2 mousePos = ImGui::GetMousePos();
+
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  drawList->AddLine(startVertex.toImVec2(), mousePos, g_hoverColor, thickness);
+}
+void EditorRenderer::drawPopupsForSelectedObjects() const
+{
+  for (const auto &objectId : m_editor->state->selection) {
+    const auto object = m_editor->state->findObject(objectId);
+    if (!object) continue;
+
+    if (object->type == EditorObjectType::VERTEX) {
+      drawSelectedVertexPopup(objectId);
+    } else if (object->type == EditorObjectType::LINEDEF) {
+      drawSelectedLinePopup(objectId);
+    }
+  }
+}
 void EditorRenderer::render() const
 {
   SDL_SetRenderDrawColor(m_sdlWindow.getRenderer(), 0, 0, 0, 255);
 
   // Start the Dear ImGui frame
   startFrame();
+  s_renderedLinedefs.clear();
+  s_renderedLinedefs.resize(m_editor->state->level->linedefs.size());
 
   const ImGuiIO &io = ImGui::GetIO();
   ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -115,39 +142,35 @@ void EditorRenderer::render() const
   drawMapOutlines(vertexRadius, thickness);
 
   // draw popups for selected objects
-  for (const auto &objectId : m_editor->state->selection) {
-    const auto object = m_editor->state->findObject(objectId);
-    if (!object) continue;
-
-    if (object->type == EditorObjectType::VERTEX) {
-      drawSelectedVertexPopup(objectId);
-    } else if (object->type == EditorObjectType::LINEDEF) {
-      drawSelectedLinePopup(objectId);
-    }
-  }
+  drawPopupsForSelectedObjects();
 
   // draw line creation preview
+  drawLinePreview(thickness);
 
-  if (m_editor->state->isCreatingLine) {
-    const auto &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
-
-    const ImVec2 mousePos = ImGui::GetMousePos();
-
-    if (mousePos.x < 0 || mousePos.x > io.DisplaySize.x || mousePos.y < 0 || mousePos.y > io.DisplaySize.y) {
-      ImGui::End();
-      endFrame();
-      return;
-    }
-
-    ImDrawList *drawList = ImGui::GetWindowDrawList();
-    drawList->AddLine(startVertex.toImVec2(), mousePos, g_hoverColor, thickness);
-  }
+  // draw block selection indication
+  drawBlockSelection();
 
   ImGui::End();
 
   endFrame();
 }
 
+void EditorRenderer::drawBlockSelection() const
+{
+  if (!m_editor->state->isBlockSelecting) return;
+
+  const auto drawList = ImGui::GetWindowDrawList();
+  const ImVec2 blockSelectionStart = m_editor->state->blockSelectionStart;
+  const ImVec2 blockSelectionEnd = { blockSelectionStart.x + m_editor->state->blockSelectionOffset.x,
+    blockSelectionStart.y + m_editor->state->blockSelectionOffset.y };
+
+  const float minX = std::min(blockSelectionStart.x, blockSelectionEnd.x);
+  const float maxX = std::max(blockSelectionStart.x, blockSelectionEnd.x);
+  const float minY = std::min(blockSelectionStart.y, blockSelectionEnd.y);
+  const float maxY = std::max(blockSelectionStart.y, blockSelectionEnd.y);
+
+  drawList->AddRectFilled({ minX, maxY }, { maxX, minY }, IM_COL32(100, 100, 0, 150));
+}
 
 void EditorRenderer::drawSidedefsWindow() const
 {
@@ -198,7 +221,7 @@ void EditorRenderer::drawSidedefsWindow() const
   }
 
   ImGui::End();
-}// namespace imguirenderer
+}
 
 void EditorRenderer::drawSectorsWindow() const
 {
@@ -240,20 +263,46 @@ void EditorRenderer::drawConnectedLineDefs(const std::vector<uint32_t> &connecte
 {
   for (auto &otherLdObjectId : connectedLineDefs) {
     const auto otherLdIndex = getObjectIndex(otherLdObjectId);
-    const auto &otherLd = m_editor->state->level->linedefs[otherLdIndex];
-    if (otherLd.selected) continue;
+    if (s_renderedLinedefs[otherLdIndex]) continue;
+
+    const auto &otherLd = m_editor->state->findLinedef(otherLdObjectId);
+    if (otherLd.selected || (otherLd.start == ld.start && otherLd.end == ld.end)) continue;
 
     auto otherStart = m_editor->state->findVertex(otherLd.start);
     auto otherEnd = m_editor->state->findVertex(otherLd.end);
 
+    auto otherStartDragged = otherStart + m_editor->state->draggingOffset;
+    auto otherEndDragged = otherEnd + m_editor->state->draggingOffset;
+
+    s_renderedLinedefs[otherLdIndex] = true;
+
+    const bool bothSelected = (otherStart.selected || otherStart.isAnyConnectedLineDefSelected(*m_editor->state))
+                        && (otherEnd.selected || otherEnd.isAnyConnectedLineDefSelected(*m_editor->state));
+
     if (otherLd.start == ld.start) {
-      drawList->AddLine(startDragged, otherEnd.toImVec2(), g_defaultColor, thickness);
+      if (bothSelected) {
+        drawList->AddLine(startDragged, otherEndDragged.toImVec2(), g_defaultColor, thickness);
+      } else {
+        drawList->AddLine(startDragged, otherEnd.toImVec2(), g_defaultColor, thickness);
+      }
     } else if (otherLd.end == ld.start) {
-      drawList->AddLine(startDragged, otherStart.toImVec2(), g_defaultColor, thickness);
+      if (bothSelected) {
+        drawList->AddLine(startDragged, otherStartDragged.toImVec2(), g_defaultColor, thickness);
+      } else {
+        drawList->AddLine(startDragged, otherStart.toImVec2(), g_defaultColor, thickness);
+      }
     } else if (otherLd.start == ld.end) {
-      drawList->AddLine(endDragged, otherEnd.toImVec2(), g_defaultColor, thickness);
+      if (bothSelected) {
+        drawList->AddLine(endDragged, otherEndDragged.toImVec2(), g_defaultColor, thickness);
+      } else {
+        drawList->AddLine(endDragged, otherEnd.toImVec2(), g_defaultColor, thickness);
+      }
     } else if (otherLd.end == ld.end) {
-      drawList->AddLine(endDragged, otherStart.toImVec2(), g_defaultColor, thickness);
+      if (bothSelected) {
+        drawList->AddLine(endDragged, otherStartDragged.toImVec2(), g_defaultColor, thickness);
+      } else {
+        drawList->AddLine(endDragged, otherStart.toImVec2(), g_defaultColor, thickness);
+      }
     }
   }
 }
@@ -263,8 +312,7 @@ void EditorRenderer::drawSelectedVertex(const uint32_t objectId,
   const float_t thickness,
   ImDrawList *drawList) const
 {
-  const auto index = getObjectIndex(objectId);
-  const auto &v = m_editor->state->findVertex(index);
+  const auto &v = m_editor->state->findVertex(objectId);
 
   const ImVec2 dragged(static_cast<float_t>(v.x) + m_editor->state->draggingOffset.x,
     static_cast<float_t>(v.y) + m_editor->state->draggingOffset.y);
@@ -272,13 +320,14 @@ void EditorRenderer::drawSelectedVertex(const uint32_t objectId,
   drawList->AddCircleFilled(dragged, vertexRadius, g_selectedColor);
 
   // draw every linedef connected to this vertex
-  for (auto &ld : m_editor->state->level->linedefs) {
-    if (ld.start == index || ld.end == index) {
-      const auto otherVertexIndex = ld.start == index ? ld.end : ld.start;
-      auto &otherVertex = m_editor->state->findVertex(otherVertexIndex);
+  for (const uint32_t ldId : v.connectedLineDefs) {
+    auto &ld = m_editor->state->findLinedef(ldId);
+    if (ld.selected) continue;
 
-      drawList->AddLine(dragged, otherVertex.toImVec2(), g_selectedColor, thickness);
-    }
+    const auto otherVertexId = ld.start == objectId ? ld.end : ld.start;
+    auto &otherVertex = m_editor->state->findVertex(otherVertexId);
+
+    drawList->AddLine(dragged, otherVertex.toImVec2(), g_selectedColor, thickness);
   }
 }
 void EditorRenderer::drawSelectedLineDef(const uint32_t objectId,
@@ -287,7 +336,9 @@ void EditorRenderer::drawSelectedLineDef(const uint32_t objectId,
   ImDrawList *drawList) const
 {
   const auto index = getObjectIndex(objectId);
-  const auto &ld = m_editor->state->findLinedef(index);
+  if (s_renderedLinedefs[index]) return;
+
+  const auto &ld = m_editor->state->findLinedef(objectId);
   const auto start = m_editor->state->findVertex(ld.start);
   const auto end = m_editor->state->findVertex(ld.end);
 
@@ -301,6 +352,8 @@ void EditorRenderer::drawSelectedLineDef(const uint32_t objectId,
   drawList->AddCircleFilled(startDragged, vertexRadius, g_defaultColor);
   drawList->AddCircleFilled(endDragged, vertexRadius, g_defaultColor);
 
+  s_renderedLinedefs[index] = true;
+
   // find all the linedefs connected to end/start and draw them to this line
   drawConnectedLineDefs(start.connectedLineDefs, ld, startDragged, endDragged, drawList, thickness);
   drawConnectedLineDefs(end.connectedLineDefs, ld, startDragged, endDragged, drawList, thickness);
@@ -308,10 +361,9 @@ void EditorRenderer::drawSelectedLineDef(const uint32_t objectId,
 void EditorRenderer::drawSelection(const float_t vertexRadius, const float_t thickness, ImDrawList *drawList) const
 {
   for (const uint32_t objectId : m_editor->state->selection) {
-    const auto object = m_editor->state->findObject(objectId);
-    if (!object) continue;
+    const EditorObjectType type = getObjectType(objectId);
 
-    switch (object->type) {
+    switch (type) {
     case EditorObjectType::LINEDEF: {
       drawSelectedLineDef(objectId, vertexRadius, thickness, drawList);
       break;
@@ -394,9 +446,11 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, 
 void EditorRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *drawList) const
 {
   for (size_t i = 0; i < m_editor->state->level->linedefs.size(); i++) {
+    if (s_renderedLinedefs[i]) continue;
+
     const auto &ld = m_editor->state->level->linedefs[i];
-    auto startVertex = m_editor->state->findVertex(ld.start);
-    auto endVertex = m_editor->state->findVertex(ld.end);
+    const auto startVertex = m_editor->state->findVertex(ld.start);
+    const auto endVertex = m_editor->state->findVertex(ld.end);
 
     // selected linedefs are processed separately
     if (startVertex.selected || endVertex.selected || ld.selected
@@ -405,6 +459,7 @@ void EditorRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList 
       continue;
     }
 
+    s_renderedLinedefs[i] = true;
     drawLinedef(ld, drawList, thickness);
   }
 }
@@ -412,12 +467,12 @@ void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t t
 {
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
+  // draw selected vertices/linedefs
+  drawSelection(vertexRadius, thickness, drawList);
   // draw outlines
   drawUnselectedLineDefs(thickness, drawList);
   // draw vertices
   drawUnselectedVertices(vertexRadius, drawList);
-  // draw selected vertices/linedefs
-  drawSelection(vertexRadius, thickness, drawList);
 }
 
 void EditorRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const

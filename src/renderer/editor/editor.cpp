@@ -124,16 +124,16 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
 
     auto convertedImvec2 = math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
     editorVertices.emplace_back(convertedImvec2.x, convertedImvec2.y);
-    vertexIdMap[i] = editorVertices.size() - 1;
+    vertexIdMap[i] = makeObjectId(EditorObjectType::VERTEX, editorVertices.size() - 1);
   }
 
   // process linedefs
   for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
     editorLinedefs.emplace_back(vertexIdMap[start], vertexIdMap[end], type, frontSidedef, backSidedef);
 
-    editorVertices[vertexIdMap[start]].connectedLineDefs.emplace_back(
+    editorVertices[start].connectedLineDefs.emplace_back(
       makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
-    editorVertices[vertexIdMap[end]].connectedLineDefs.emplace_back(
+    editorVertices[end].connectedLineDefs.emplace_back(
       makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
   }
 

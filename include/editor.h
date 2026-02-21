@@ -198,6 +198,7 @@ struct EditorState
   // block selection state
   bool isBlockSelecting = false;
   ImVec2 blockSelectionStart = { 0, 0 };
+  ImVec2 blockSelectionOffset = { 0, 0 };
 
   // line creation state
   bool isCreatingLine = false;
@@ -215,25 +216,30 @@ struct EditorState
 
   [[nodiscard]] EditorVertex &findVertex(const uint32_t id) const
   {
-    if (id >= level->vertices.size()) {
-      throw std::runtime_error("Index is bigger than the vertices array. Index: " + std::to_string(id));
+    const uint32_t index = getObjectIndex(id);
+
+    if (index >= level->vertices.size()) {
+      throw std::runtime_error("Index is bigger than the sectors array");
     }
 
-    return level->vertices[id];
+    return level->vertices[index];
   }
 
   [[nodiscard]] EditorSector &findSector(const uint32_t id) const
   {
-    if (id >= level->sectors.size()) { throw std::runtime_error("Index is bigger than the sectors array."); }
+    const uint32_t index = getObjectIndex(id);
+    if (index >= level->sectors.size()) { throw std::runtime_error("Index is bigger than the sectors array."); }
 
-    return level->sectors[id];
+    return level->sectors[index];
   }
 
   [[nodiscard]] EditorLineDef &findLinedef(const uint32_t id) const
   {
-    if (id >= level->linedefs.size()) { throw std::runtime_error("Index is bigger than the linedefs array."); }
+    uint32_t index = getObjectIndex(id);
 
-    return level->linedefs[id];
+    if (index >= level->linedefs.size()) { throw std::runtime_error("Index is bigger than the linedefs array."); }
+
+    return level->linedefs[index];
   }
 
   [[nodiscard]] EditorObject *findObject(const uint32_t objectId) const

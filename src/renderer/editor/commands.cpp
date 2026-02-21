@@ -48,8 +48,8 @@ void MoveLineDefCommand::execute(EditorState &state)
 {
   const auto &lineDef = state.findLinedef(lineDefId);
 
-  auto &startVertex = state.findVertex(getObjectIndex(lineDef.start));
-  auto &endVertex = state.findVertex(getObjectIndex(lineDef.end));
+  auto &startVertex = state.findVertex(lineDef.start);
+  auto &endVertex = state.findVertex(lineDef.end);
 
   startVertex.x = newStart.x;
   startVertex.y = newStart.y;
@@ -61,8 +61,8 @@ void MoveLineDefCommand::execute(EditorState &state)
 void MoveLineDefCommand::undo(EditorState &state)
 {
   const auto &lineDef = state.findLinedef(lineDefId);
-  auto &startVertex = state.findVertex(getObjectIndex(lineDef.start));
-  auto &endVertex = state.findVertex(getObjectIndex(lineDef.end));
+  auto &startVertex = state.findVertex(lineDef.start);
+  auto &endVertex = state.findVertex(lineDef.end);
 
   startVertex.x = oldStart.x;
   startVertex.y = oldStart.y;

@@ -26,6 +26,9 @@ private:
   static void startFrame();
   void endFrame() const;
 
+  void drawLinePreview(float_t thickness) const;
+  void drawPopupsForSelectedObjects() const;
+  void drawBlockSelection() const;
   void drawSidedefsWindow() const;
   void drawSectorsWindow() const;
   void drawSelectedLinePopup(uint32_t lineId) const;
@@ -55,5 +58,4 @@ private:
     const std::vector<EditorSidedef> &sidedefs,
     int32_t &currentItem,
     bool hasReset = false);
-  static constexpr ImVec2 scale(ImVec2 vec, float_t scaleFactor);
 };
