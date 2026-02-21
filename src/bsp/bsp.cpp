@@ -42,7 +42,7 @@ BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_lev
   for (size_t i = 0; i < level->linedefs.size(); i++) {
     auto &ld = level->linedefs[i];
     segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0);
-    if (ld.backSidedef != -1) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
+    if (ld.backSidedef != -1) { segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 1); }
   }
 }
 
@@ -286,20 +286,22 @@ size_t BSPBuilder::MaxDepth() const { return MaxDepthRecursive(0); }
 
 size_t BSPBuilder::MaxDepthRecursive(const int16_t currentIndex) const
 {
-  const size_t left = nodes[currentIndex].leftChild == -1 ? 0 : MaxDepthRecursive(nodes[currentIndex].leftChild);
-  const size_t right = nodes[currentIndex].rightChild == -1 ? 0 : MaxDepthRecursive(nodes[currentIndex].rightChild);
+  if (currentIndex == -1) return 0;
 
-  return 1 + left + right;
+  const size_t left = MaxDepthRecursive(nodes[currentIndex].leftChild);
+  const size_t right = MaxDepthRecursive(nodes[currentIndex].rightChild);
+
+  return 1 + std::max(left, right);
 }
 
-std::vector<std::vector<int16_t>> BSPBuilder::BuildRows() const
+std::vector<std::vector<std::string>> BSPBuilder::BuildRows() const
 {
   const size_t maxDepth = MaxDepth();
-  std::vector<std::vector<int16_t>> rows;
+  std::vector<std::vector<std::string>> rows;
 
   rows.resize(maxDepth);
 
-  rows[0].push_back(0);
+  rows[0].emplace_back("0");
 
   BuildRowsRecursive(0, 1, rows);
 
@@ -308,58 +310,128 @@ std::vector<std::vector<int16_t>> BSPBuilder::BuildRows() const
 
 void BSPBuilder::BuildRowsRecursive(const int16_t index,
   const size_t currentDepth,
-  std::vector<std::vector<int16_t>> &rows) const
+  std::vector<std::vector<std::string>> &rows) const
 {
   if (currentDepth >= rows.size()) return;
 
   const int16_t left = nodes[index].leftChild;
   const int16_t right = nodes[index].rightChild;
-  rows[currentDepth].push_back(left);
-  rows[currentDepth].push_back(right);
+  rows[currentDepth].push_back(std::to_string(left));
+  rows[currentDepth].push_back(std::to_string(right));
 
   if (left != -1) { BuildRowsRecursive(left, currentDepth + 1, rows); }
 
   if (right != -1) { BuildRowsRecursive(right, currentDepth + 1, rows); }
 }
 
-std::string BSPBuilder::FormatRows(const std::vector<std::vector<int16_t>> &rows)
+std::vector<std::string> BSPBuilder::FormatRows(const std::vector<std::vector<std::string>> &rows)
 {
-  std::stringstream ss;
+  using s_t = std::string::size_type;
 
-  const size_t depth = rows.size();
-  const size_t width =
-    std::max_element(rows.begin(), rows.end(), [](const std::vector<int16_t> &v1, const std::vector<int16_t> &v2) {
-      return v1.size() < v2.size();
-    })->size();
+  // First find the maximum value string length and put it in cell_width
+  s_t cell_width = 0;
 
-  for (size_t currDepth = 0; currDepth < depth; currDepth++) {
-    const size_t n = rows[currDepth].size();
-
-    for (const int16_t index : rows[currDepth]) {
-      if (static_cast<int64_t>(width / n) > 0) { ss << std::string(width / n, ' '); }
-      ss << index;
+  for (const auto &row_disp : rows) {
+    for (const auto &cell : row_disp) {
+      if (!cell.empty() && cell.length() > cell_width) { cell_width = cell.length(); }
     }
-
-    ss << '\n';
-
-    for (size_t i = 0; i < n; i++) {
-      if (rows[currDepth][i] != -1) {
-        if (static_cast<int64_t>(width / n) - 1 > 0) { ss << std::string(width / n - 1, ' '); }
-        ss << '/';
-        ss << '\\';
-      }
-    }
-
-    ss << '\n';
   }
 
-  return ss.str();
+  // make sure the cell_width is an odd number
+  if (cell_width % 2 == 0) ++cell_width;
+
+  // allows leaf nodes to be connected when they are all with size of a single character
+  if (cell_width < 3) cell_width = 3;
+
+  // formatted_rows will hold the results
+  std::vector<std::string> formatted_rows;
+
+  // some of these counting variables are related,
+  // so its should be possible to eliminate some of them.
+  s_t row_count = rows.size();
+
+  // this row's element count, a power of two
+  s_t row_elem_count = 1 << (row_count - 1);
+
+  // left_pad holds the number of space charactes at the beginning of the bottom row
+  s_t left_pad = 0;
+
+  // Work from the level of maximum depth, up to the root
+  // ("formatted_rows" will need to be reversed when done)
+  for (s_t r = 0; r < row_count; ++r) {
+    const auto &cd_row = rows[row_count - r - 1];// r reverse-indexes the row
+    // "space" will be the number of rows of slashes needed to get
+    // from this row to the next.  It is also used to determine other
+    // text offsets.
+    s_t space = (s_t(1) << r) * (cell_width + 1) / 2 - 1;
+    // "row" holds the line of text currently being assembled
+    std::string row;
+    // iterate over each element in this row
+    for (s_t c = 0; c < cd_row.size(); ++c) {
+      // add padding, more when this is not the leftmost element
+      row += std::string(c ? left_pad * 2 + 1 : left_pad, ' ');
+
+      if (!cd_row[c].empty()) {
+        // This position corresponds to an existing Node
+        const std::string &valstr = cd_row[c];
+        // Try to pad the left and right sides of the value string
+        // with the same number of spaces.  If padding requires an
+        // odd number of spaces, right-sided children get the longer
+        // padding on the right side, while left-sided children
+        // get it on the left side.
+        s_t long_padding = cell_width - valstr.length();
+        s_t short_padding = long_padding / 2;
+        long_padding -= short_padding;
+        row += std::string(c % 2 ? short_padding : long_padding, ' ');
+        row += valstr;
+        row += std::string(c % 2 ? long_padding : short_padding, ' ');
+      } else {
+        // This position is empty, Nodeless...
+        row += std::string(cell_width, ' ');
+      }
+    }
+    // A row of spaced-apart value strings is ready, add it to the result vector
+    formatted_rows.push_back(row);
+
+    // The root has been added, so this loop is finished
+    if (row_elem_count == 1) break;
+
+    // Add rows of forward- and back- slash characters, spaced apart
+    // to "connect" two rows' Node value strings.
+    // The "space" variable counts the number of rows needed here.
+    s_t left_space = space + 1;
+    s_t right_space = space - 1;
+    for (s_t sr = 0; sr < space; ++sr) {
+      std::string row;
+
+      for (s_t c = 0; c < cd_row.size(); ++c) {
+        if (c % 2 == 0) {
+          row += std::string(c ? left_space * 2 + 1 : left_space, ' ');
+          row += !cd_row[c].empty() ? '/' : ' ';
+          row += std::string(right_space + 1, ' ');
+        } else {
+          row += std::string(right_space, ' ');
+          row += !cd_row[c].empty() ? '\\' : ' ';
+        }
+      }
+      formatted_rows.push_back(row);
+      ++left_space;
+      --right_space;
+    }
+    left_pad += space + 1;
+    row_elem_count /= 2;
+  }
+
+  // Reverse the result, placing the root node at the beginning (top)
+  std::reverse(formatted_rows.begin(), formatted_rows.end());
+
+  return formatted_rows;
 }
 
 void BSPBuilder::PrintTree() const
 {
-  const std::vector<std::vector<int16_t>> rows = BuildRows();
-  const std::string res = FormatRows(rows);
+  const std::vector<std::vector<std::string>> rows = BuildRows();
+  const std::vector<std::string> formattedRows = FormatRows(rows);
 
-  std::cout << res << '\n';
+  for (const auto &row : formattedRows) { std::cout << ' ' << row << '\n'; }
 }

@@ -9,7 +9,7 @@
  Z - vertical plane,
 */
 
-enum class EngineMode { GAMEPLAY_3D, EDITOR_2D };
+enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
 
 struct WorldState
 {

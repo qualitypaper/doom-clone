@@ -75,6 +75,8 @@ void EditorRenderer::endFrame() const
 
 void EditorRenderer::render() const
 {
+  SDL_SetRenderDrawColor(m_sdlWindow.getRenderer(), 0, 0, 0, 255);
+
   // Start the Dear ImGui frame
   startFrame();
 

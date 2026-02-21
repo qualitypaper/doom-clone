@@ -73,9 +73,9 @@ private:
 
   [[nodiscard]] size_t MaxDepth() const;
   [[nodiscard]] size_t MaxDepthRecursive(int16_t currentIndex) const;
-  [[nodiscard]] static std::string FormatRows(const std::vector<std::vector<int16_t>> &rows);
-  [[nodiscard]] std::vector<std::vector<int16_t>> BuildRows() const;
-  void BuildRowsRecursive(int16_t index, size_t currentDepth, std::vector<std::vector<int16_t>> &rows) const;
+  [[nodiscard]] static std::vector<std::string> FormatRows(const std::vector<std::vector<std::string>> &rows);
+  [[nodiscard]] std::vector<std::vector<std::string>> BuildRows() const;
+  void BuildRowsRecursive(int16_t index, size_t currentDepth, std::vector<std::vector<std::string>> &rows) const;
 
 private:
   static void DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root);
@@ -90,5 +90,5 @@ public:
   void BuildBSPTree();
   int BuildBSPTree(std::vector<Seg> &segs);
   void PrintTree() const;
-  void Visualize() const;
+  void Visualize(const SdlWindow &sdlWindow, const InputState &input) const;
 };

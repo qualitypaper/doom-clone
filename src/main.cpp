@@ -125,10 +125,9 @@ int main()
     level = { .vertices = vertices, .linedefs = linedefs, .sidedefs = sidedefs, .sectors = sectors };
   }
 
-  BSPBuilder builder(level);
-  builder.BuildBSPTree();
-  builder.PrintTree();
-  builder.Visualize();
+  BSPBuilder bspBuilder(level);
+  bspBuilder.BuildBSPTree();
+  bspBuilder.PrintTree();
 
   // setup sdl window
   SdlWindow sdlWindow("Doom Clone",
@@ -165,6 +164,13 @@ int main()
 
     if (gameState.currentMode == EngineMode::EDITOR_2D) {
       imguiRenderer.render();
+
+      const uint64_t frameEnd = SDL_GetPerformanceCounter();
+      const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
+      if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
+      continue;
+    } else if (gameState.currentMode == EngineMode::BSP_VIEWER) {
+      bspBuilder.Visualize(sdlWindow, input);
 
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
@@ -222,14 +228,20 @@ void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
     // early handle of the mode change key
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_F1) {
-        std::cout << "Changing mode\n";
-        if (gameState.currentMode == EngineMode::GAMEPLAY_3D) {
-          setEngineMode(gameState, input, EngineMode::EDITOR_2D, window);
-        } else {
+        if (gameState.currentMode != EngineMode::GAMEPLAY_3D) {
           setEngineMode(gameState, input, EngineMode::GAMEPLAY_3D, window);
         }
 
+
         continue;
+      } else if (event.key.keysym.sym == SDLK_F2) {
+        if (gameState.currentMode != EngineMode::EDITOR_2D) {
+          setEngineMode(gameState, input, EngineMode::EDITOR_2D, window);
+        }
+      } else if (event.key.keysym.sym == SDLK_F3) {
+        if (gameState.currentMode != EngineMode::BSP_VIEWER) {
+          setEngineMode(gameState, input, EngineMode::BSP_VIEWER, window);
+        }
       }
     }
 

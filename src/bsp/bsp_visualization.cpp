@@ -1,5 +1,4 @@
 #include "bsp.h"
-#include "config.h"
 #include "editor_renderer.h"
 #include "math_utils.h"
 
@@ -74,59 +73,31 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &ro
     static_cast<int>(lineEnd.y));
 }
 
-void BSPBuilder::Visualize() const
+void BSPBuilder::Visualize(const SdlWindow &sdlWindow, const InputState &input) const
 {
-  SdlWindow sdlWindow("BSP Builder", config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-  const EditorRenderer imguiRenderer(sdlWindow, *level);
+  static size_t s_nodesIndex = 0;
 
-  size_t s_nodesIndex = 0;
-  const time_t start = time(nullptr);
-  uint64_t prev = SDL_GetPerformanceCounter();
-  const double freq = static_cast<double>(SDL_GetPerformanceFrequency());
-  constexpr double df = 1 / 144.0;
-  bool running = true;
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
+  SDL_RenderClear(sdlWindow.getRenderer());
 
-  while (running) {
-    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
+  DrawSubsectors(sdlWindow);
 
-    SDL_RenderClear(sdlWindow.getRenderer());
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {}
-
-    SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
-
-    DrawSubsectors(sdlWindow);
-
-    const Uint8 *keys = SDL_GetKeyboardState(nullptr);
-    if (keys[SDL_SCANCODE_LEFT]) {
-      if (s_nodesIndex > 0) s_nodesIndex--;
-    } else if (keys[SDL_SCANCODE_RIGHT]) {
-      if (!nodes.empty() && s_nodesIndex < nodes.size() - 1) s_nodesIndex++;
-    }
-
-    if (nodes.empty()) {
-      SDL_RenderPresent(sdlWindow.getRenderer());
-      const uint64_t now = SDL_GetPerformanceCounter();
-      double frameTime = static_cast<double>(now - prev) / freq;
-      prev = now;
-      if (frameTime > 0.25) frameTime = 0.25;
-      if (frameTime < df) { SDL_Delay(static_cast<uint64_t>((df - frameTime) * 1000.0)); }
-      continue;
-    }
-
-    const BspNode &root = nodes[s_nodesIndex];
-
-    DrawSplittingLine(sdlWindow, root);
-    DrawBoundingBox(sdlWindow, root);
-
-    SDL_RenderPresent(sdlWindow.getRenderer());
-
-    const uint64_t now = SDL_GetPerformanceCounter();
-    double frameTime = static_cast<double>(now - prev) / freq;
-    prev = now;
-    if (frameTime > 0.25) frameTime = 0.25;
-
-    if (frameTime < df) { SDL_Delay(static_cast<uint64_t>((df - frameTime) * 1000.0)); }
-    running = time(nullptr) - start < 60 * 1000;
+  if (input.keys[SDL_SCANCODE_LEFT]) {
+    if (s_nodesIndex > 0) s_nodesIndex--;
+  } else if (input.keys[SDL_SCANCODE_RIGHT]) {
+    if (!nodes.empty() && s_nodesIndex < nodes.size() - 1) s_nodesIndex++;
   }
+
+  if (nodes.empty()) {
+    SDL_RenderPresent(sdlWindow.getRenderer());
+    return;
+  }
+
+  const BspNode &root = nodes[s_nodesIndex];
+
+  DrawSplittingLine(sdlWindow, root);
+  DrawBoundingBox(sdlWindow, root);
+
+  SDL_RenderPresent(sdlWindow.getRenderer());
 }

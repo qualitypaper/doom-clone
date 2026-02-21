@@ -38,7 +38,7 @@ void setEngineMode(GameState &state, InputState &input, const EngineMode newMode
     // in order to use mouse cursor
     SDL_SetRelativeMouseMode(SDL_FALSE);
     SDL_SetWindowSize(sdlWindow.getWindow(), config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-    SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
+    // SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
 
     // wiping clean the state, in order to prevent unexpected key and mouse inputs
     memset(input.keys, false, sizeof(input.keys));
