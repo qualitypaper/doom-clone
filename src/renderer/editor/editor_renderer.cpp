@@ -277,7 +277,7 @@ void EditorRenderer::drawConnectedLineDefs(const std::vector<uint32_t> &connecte
     s_renderedLinedefs[otherLdIndex] = true;
 
     const bool bothSelected = (otherStart.selected || otherStart.isAnyConnectedLineDefSelected(*m_editor->state))
-                        && (otherEnd.selected || otherEnd.isAnyConnectedLineDefSelected(*m_editor->state));
+                              && (otherEnd.selected || otherEnd.isAnyConnectedLineDefSelected(*m_editor->state));
 
     if (otherLd.start == ld.start) {
       if (bothSelected) {
@@ -446,7 +446,7 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, 
 void EditorRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList *drawList) const
 {
   for (size_t i = 0; i < m_editor->state->level->linedefs.size(); i++) {
-    if (s_renderedLinedefs[i]) continue;
+    if (i < s_renderedLinedefs.size() && s_renderedLinedefs[i]) continue;
 
     const auto &ld = m_editor->state->level->linedefs[i];
     const auto startVertex = m_editor->state->findVertex(ld.start);
@@ -459,7 +459,7 @@ void EditorRenderer::drawUnselectedLineDefs(const float_t thickness, ImDrawList 
       continue;
     }
 
-    s_renderedLinedefs[i] = true;
+    if (i < s_renderedLinedefs.size()) { s_renderedLinedefs[i] = true; }
     drawLinedef(ld, drawList, thickness);
   }
 }

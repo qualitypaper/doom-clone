@@ -15,6 +15,9 @@ struct Seg
   int16_t linedefIndex;
   int8_t side;// 0 for front, 1 for back
   int16_t offset;
+
+  bool operator==(const Seg &other) const
+  { return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex; }
 };
 
 struct BspNode
@@ -63,8 +66,9 @@ private:
 
 private:
   SplitResult SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const;
+  void CreateSubsector(std::vector<Seg> &segs);
   [[nodiscard]] uint32_t SelectSplittingLine(const std::vector<Seg> &segs) const;
-  [[nodiscard]] uint32_t EvaluateSplitter(const Seg &seg) const;
+  [[nodiscard]] uint32_t EvaluateSplitter(size_t splitterIndex, const std::vector<Seg> &segs) const;
   [[nodiscard]] SegmentPosition DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const;
   [[nodiscard]] bool IsConvex(const std::vector<Seg> &segs) const;
 
@@ -90,5 +94,5 @@ public:
   void BuildBSPTree();
   int BuildBSPTree(std::vector<Seg> &segs);
   void PrintTree() const;
-  void Visualize(const SdlWindow &sdlWindow, const InputState &input) const;
+  void Visualize(const SdlWindow &sdlWindow, InputState &input) const;
 };

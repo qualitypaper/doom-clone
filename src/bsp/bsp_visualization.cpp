@@ -31,6 +31,8 @@ void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root
 
 void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow) const
 {
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
+
   for (const auto &subsector : subsectors) {
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
       const auto &seg = newSegments[i];
@@ -73,20 +75,20 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &ro
     static_cast<int>(lineEnd.y));
 }
 
-void BSPBuilder::Visualize(const SdlWindow &sdlWindow, const InputState &input) const
+void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input) const
 {
   static size_t s_nodesIndex = 0;
 
   SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
   SDL_RenderClear(sdlWindow.getRenderer());
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
   DrawSubsectors(sdlWindow);
 
   if (input.keys[SDL_SCANCODE_LEFT]) {
     if (s_nodesIndex > 0) s_nodesIndex--;
   } else if (input.keys[SDL_SCANCODE_RIGHT]) {
     if (!nodes.empty() && s_nodesIndex < nodes.size() - 1) s_nodesIndex++;
+    input.keys[SDL_SCANCODE_RIGHT] = false;
   }
 
   if (nodes.empty()) {
