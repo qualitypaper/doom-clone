@@ -250,8 +250,8 @@ void EditorInputHandler::flushDragging(EditorState &state, CommandHistory &histo
   for (const uint32_t id : state.selection) {
     if (getObjectType(id) == EditorObjectType::LINEDEF) {
       const auto &ld = state.findLinedef(id);
-      verticesMovedByLinedefs[ld.start] = false;
-      verticesMovedByLinedefs[ld.end] = false;
+      verticesMovedByLinedefs.emplace(ld.start, false);
+      verticesMovedByLinedefs.emplace(ld.end, false);
     }
   }
 
@@ -279,17 +279,18 @@ void EditorInputHandler::flushDragging(EditorState &state, CommandHistory &histo
       auto &start = state.findVertex(line.start), &end = state.findVertex(line.end);
 
       std::unique_ptr<MoveLineDefCommand> cmd;
+
       if (!verticesMovedByLinedefs.at(line.start) && !verticesMovedByLinedefs.at(line.end)) {
         verticesMovedByLinedefs.at(line.start) = true;
         verticesMovedByLinedefs.at(line.end) = true;
 
         cmd = std::make_unique<MoveLineDefCommand>(
           id, start, end, start + state.draggingOffset, end + state.draggingOffset);
-      } else if (verticesMovedByLinedefs.at(line.start)) {
+      } else if (verticesMovedByLinedefs.at(line.start) && !verticesMovedByLinedefs.at(line.end)) {
         verticesMovedByLinedefs.at(line.end) = true;
 
         cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start, end + state.draggingOffset);
-      } else if (verticesMovedByLinedefs.at(line.end) == 1) {
+      } else if (!verticesMovedByLinedefs.at(line.start) && verticesMovedByLinedefs.at(line.end)) {
         verticesMovedByLinedefs.at(line.start) = true;
 
         cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start + state.draggingOffset, end);
