@@ -3,7 +3,7 @@
 namespace framebuffer {
 bool isOutOfBounds(uint16_t y) { return (y >= config::WINDOW_HEIGHT); }
 
-FrameBuffer::FrameBuffer(SdlWindow &sdlWindow) : sdlWindow(sdlWindow), width(sdlWindow.width), height(sdlWindow.height)
+FrameBuffer(SdlWindow &sdlWindow) : sdlWindow(sdlWindow), width(sdlWindow.width), height(sdlWindow.height)
 {
   const uint32_t n = width * height;
   this->pixels = new uint32_t[n];
@@ -12,17 +12,17 @@ FrameBuffer::FrameBuffer(SdlWindow &sdlWindow) : sdlWindow(sdlWindow), width(sdl
   update();
 }
 
-FrameBuffer::~FrameBuffer() {
+~FrameBuffer() {
   delete[] pixels;
 }
 
-void FrameBuffer::update() const
+void update() const
 {
   sdlWindow.updatePixels(this->pixels);
   sdlWindow.updateScreen();
 }
 
-void FrameBuffer::reset() const {
+void reset() const {
     memset(this->pixels, 0, width * height * sizeof(uint32_t));
 }
 

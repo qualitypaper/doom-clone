@@ -1,43 +1,44 @@
 #pragma once
 
+#include "bsp.h"
 #include "gameloop.h"
 
 #include <vector>
 
 // Forward declaration
-namespace framebuffer {
 class FrameBuffer;
-}
-
-namespace renderer {
 
 class Renderer
 {
 public:
-  Renderer(framebuffer::FrameBuffer &fb, uint16_t canvasWidth, uint16_t canvasHeight);
-  void render(const GameState &gameState, const Level &level);
-  void resetClippingArrays();
+  Renderer(FrameBuffer &fb, std::shared_ptr<Level> _level, uint16_t canvasWidth, uint16_t canvasHeight);
+  void Render(const GameState &gameState);
+  void RenderSegment(const Seg &seg);
+  void RenderBSPNode(const entity::Player &player, int16_t nodeIndex);
+  void ResetClippingArrays();
 
 private:
-  void drawColumn(int32_t x, int32_t y0, int32_t y1, uint32_t color);
-  void drawSolidWall(int x, int32_t &projectedCeilingZ, int32_t &projectedFloorZ);
-  void drawCeiling(int32_t x, int32_t projectedCeilingY, uint32_t color);
-  void drawFloor(int32_t x, int32_t projectedFloorY, uint32_t color);
-  void drawDefaultPortal(int32_t x,
+  void DrawColumn(int32_t x, int32_t y0, int32_t y1, uint32_t color) const;
+  void DrawSolidWall(int32_t x, int32_t projectedCeilingZ, int32_t projectedFloorZ);
+  void DrawCeiling(int32_t x, int32_t projectedCeilingY, uint32_t color);
+  void DrawFloor(int32_t x, int32_t projectedFloorY, uint32_t color);
+  void DrawDefaultPortal(int32_t x,
     int32_t projectedFloorY,
     int32_t projectedCeilingY,
     int32_t nextFloorY,
     int32_t nextCeilY);
 
-  [[nodiscard]] int32_t projectZ(double_t z, double_t inv_y) const;
-  [[nodiscard]] int32_t projectX(double_t x, double_t inv_y) const;
+  static bool PointOnSide(Vertex v, const BspNode &node);
+
+  [[nodiscard]] int32_t ProjectZ(double_t z, double_t inv_y) const;
+  [[nodiscard]] int32_t ProjectX(double_t x, double_t inv_y) const;
 
   std::vector<int32_t> floorClipping;
   std::vector<int32_t> ceilingClipping;
 
-  framebuffer::FrameBuffer &fb;
+  FrameBuffer &fb;
+  std::shared_ptr<Level> level;
 
   uint16_t canvasWidth;
   uint16_t canvasHeight;
 };
-}// namespace renderer

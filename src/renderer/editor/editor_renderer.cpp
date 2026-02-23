@@ -181,6 +181,7 @@ void EditorRenderer::drawSidedefsWindow() const
     m_editor->state->level->sidedefs.emplace_back(-1, 0, 0, 0);
   }
 
+  /*
   for (size_t i = 0; i < m_editor->state->level->sidedefs.size(); i++) {
     auto &sideDef = m_editor->state->level->sidedefs[i];
     ImGui::PushID(i);
@@ -218,6 +219,91 @@ void EditorRenderer::drawSidedefsWindow() const
 
     ImGui::NewLine();
     ImGui::PopID();
+  }
+  */
+
+  constexpr ImGuiTableFlags tableFlags =
+    ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg
+    | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
+
+  if (ImGui::BeginTable("PropertyTable", 1, tableFlags)) {
+    ImGui::TableSetupColumn("Sidedefs table", ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableHeadersRow();
+
+    // Setup columns: The right column stretches to fill available space
+    // ---------------------------------------------------------
+    // Property Category 1: Transform (Closed by default)
+    // ---------------------------------------------------------
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+
+    // Flags for the parent category
+    // - SpanFullWidth: Allows clicking anywhere on the row to open/close
+    // - We omit ImGuiTreeNodeFlags_DefaultOpen so it stays closed initially
+    constexpr ImGuiTreeNodeFlags categoryFlags = ImGuiTreeNodeFlags_SpanFullWidth;
+
+    for (size_t i = 0; i < m_editor->state->level->sidedefs.size(); i++) {
+      auto &sd = m_editor->state->level->sidedefs[i];
+      std::string label = "Sidedef " + std::to_string(i) + "##Sidedef";
+      ImGui::PushID(i);
+      const bool isTransformOpen = ImGui::TreeNodeEx(label.c_str(), categoryFlags);
+
+      if (isTransformOpen) {
+        // Sub-property: Position
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+
+        int sectorId = sd.sectorId;
+        int xOffset = sd.xOffset;
+        int yOffset = sd.yOffset;
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputInt("Sector id", &sectorId)) {
+          // update sector id
+          sd.sectorId = static_cast<int16_t>(sectorId);
+        }
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputInt("Texture offset x", &xOffset)) {
+          // update texture offset x
+          sd.xOffset = static_cast<int16_t>(xOffset);
+        }
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputInt("Texture offset y", &yOffset)) {
+          // update texture offset y
+          sd.yOffset = static_cast<int16_t>(yOffset);
+        }
+        float color[3] = { ImGui::ColorConvertU32ToFloat4(sd.color).x,
+          ImGui::ColorConvertU32ToFloat4(sd.color).y,
+          ImGui::ColorConvertU32ToFloat4(sd.color).z };
+
+        if (ImGui::ColorPicker3("Sidedef color", color)) {
+          // update sidedef color
+          sd.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+        }
+
+        if (ImGui::Button("Delete")) {
+          for (auto &linedef : m_editor->state->level->linedefs) {
+            if (linedef.backSideDef == static_cast<int32_t>(i)) {
+              linedef.backSideDef = -1;
+            } else if (linedef.frontSideDef == static_cast<int32_t>(i)) {
+              linedef.frontSideDef = -1;
+            }
+          }
+
+          m_editor->state->level->sidedefs.erase(m_editor->state->level->sidedefs.begin() + i);
+        }
+
+        ImGui::NewLine();
+
+        // Pop the parent node
+        ImGui::TreePop();
+      }
+
+      ImGui::PopID();
+    }
+
+    ImGui::EndTable();
   }
 
   ImGui::End();

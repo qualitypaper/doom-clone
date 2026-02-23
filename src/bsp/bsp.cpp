@@ -113,14 +113,20 @@ void BSPBuilder::CreateSubsector(std::vector<Seg> &segs)
 
   subsectors.emplace_back(segs.size(), static_cast<int16_t>(firstIndex));
 }
-int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
+
+int32_t BSPBuilder::CreateLeafIndex() const
+{
+  return (1 << 31) | (static_cast<int32_t>(subsectors.size() - 1) & 0x7FFFFFFF);
+}
+
+int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
   // base cases
   if (segs.empty())
-    return -1;
+    return 1 << 31;
   else if (segs.size() <= 2 || IsConvex(segs)) {
     CreateSubsector(segs);
-    return -1;
+    return CreateLeafIndex();
   }
 
   // selecting a splitter line
@@ -139,7 +145,7 @@ int BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 
   if (split.front.size() == segs.size() || split.back.size() == segs.size()) {
     CreateSubsector(segs);
-    return -1;
+    return CreateLeafIndex();
   }
 
   const int rightId = BuildBSPTree(split.front);
@@ -251,9 +257,7 @@ uint32_t BSPBuilder::EvaluateSplitter(const size_t splitterIndex, const std::vec
   // If a splitter leaves one side completely empty, it does not partition the space.
   // It will immediately trigger the recursion safety valve and halt the builder.
   // Apply a massive penalty so it is never chosen over a line that actually splits space.
-  if (left == 0 || right == 0) {
-    return 999999;
-  }
+  if (left == 0 || right == 0) { return 999999; }
   return std::abs(left - right) + spanning * 8;
 }
 

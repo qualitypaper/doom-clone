@@ -116,16 +116,18 @@ int main()
     .x = 0, .y = 0, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
-  Level level;
+  std::shared_ptr<Level> level;
   if (true) {
     EditorLevel edLevel{};
     edLevel.deserialize("saved_level.bin");
-    edLevel.toGameLevel(level, config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    Level tempLevel;
+    edLevel.toGameLevel(tempLevel, config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    level = std::make_shared<Level>(tempLevel);
   } else {
-    level = { .vertices = vertices, .linedefs = linedefs, .sidedefs = sidedefs, .sectors = sectors };
+    level = std::make_shared<Level>(vertices, linedefs, sidedefs, sectors);
   }
 
-  BSPBuilder bspBuilder(level);
+  BSPBuilder bspBuilder(*level);
   bspBuilder.BuildBSPTree();
   bspBuilder.PrintTree();
 
@@ -136,11 +138,11 @@ int main()
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
-  EditorRenderer imguiRenderer(sdlWindow, level);
+  EditorRenderer imguiRenderer(sdlWindow, *level);
 
   // setup the game renderer
-  framebuffer::FrameBuffer fb(sdlWindow);
-  renderer::Renderer renderer(fb, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
+  FrameBuffer fb(sdlWindow);
+  Renderer renderer(fb, level, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
 
   running = true;
   // game loop
@@ -156,7 +158,7 @@ int main()
   while (running) {
     const uint64_t frameStart = SDL_GetPerformanceCounter();
     // reseting the states to defaults
-    renderer.resetClippingArrays();
+    renderer.ResetClippingArrays();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
 
@@ -189,7 +191,7 @@ int main()
       acc -= dt;
     }
 
-    renderer.render(gameState, level);
+    renderer.Render(gameState);
 
     // FPS tracking
     frameCount++;

@@ -67,6 +67,7 @@ private:
 private:
   SplitResult SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const;
   void CreateSubsector(std::vector<Seg> &segs);
+  int32_t CreateLeafIndex() const;
   [[nodiscard]] uint32_t SelectSplittingLine(const std::vector<Seg> &segs) const;
   [[nodiscard]] uint32_t EvaluateSplitter(size_t splitterIndex, const std::vector<Seg> &segs) const;
   [[nodiscard]] SegmentPosition DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const;

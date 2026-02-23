@@ -9,6 +9,10 @@
  Z - vertical plane,
 */
 
+
+struct Seg;
+struct SubSector;
+struct BspNode;
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
 
 struct WorldState
@@ -76,6 +80,9 @@ struct Level
   std::vector<LineDef> linedefs;
   std::vector<SideDef> sidedefs;
   std::vector<Sector> sectors;
+  std::vector<BspNode> nodes;
+  std::vector<SubSector> subsectors;
+  std::vector<Seg> segments;
 
   void serialize(const char *filename);
   bool deserialize(const char *filename);

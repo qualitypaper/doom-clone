@@ -1,13 +1,6 @@
 #pragma once
 
-#include <iostream>
-
-#include <glm/glm.hpp>
-
-#include "config.h"
 #include "sdl_window.h"
-
-namespace framebuffer {
 
 class FrameBuffer
 {
@@ -26,4 +19,3 @@ public:
   void update() const;
   void reset() const;
 };
-}// namespace framebuffer
