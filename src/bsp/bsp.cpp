@@ -114,10 +114,8 @@ void BSPBuilder::CreateSubsector(std::vector<Seg> &segs)
   subsectors.emplace_back(segs.size(), static_cast<int16_t>(firstIndex));
 }
 
-int32_t BSPBuilder::CreateLeafIndex() const
-{
-  return (1 << 31) | (static_cast<int32_t>(subsectors.size() - 1) & 0x7FFFFFFF);
-}
+int16_t BSPBuilder::CreateLeafIndex() const
+{ return (1 << 15) | (static_cast<int16_t>(subsectors.size() - 1) & 0x7FFF); }
 
 int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
@@ -277,11 +275,19 @@ bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
   return true;
 }
 
+
+std::unique_ptr<Level> BSPBuilder::GetConstructedLevel()
+{
+  return std::make_unique<Level>(
+    level->vertices, level->linedefs, level->sidedefs, level->sectors, nodes, subsectors, newSegments);
+}
+
+
 size_t BSPBuilder::MaxDepth() const { return MaxDepthRecursive(0); }
 
 size_t BSPBuilder::MaxDepthRecursive(const int16_t currentIndex) const
 {
-  if (currentIndex == -1) return 0;
+  if (currentIndex & 0x8000 || static_cast<size_t>(currentIndex) >= nodes.size() || currentIndex < 0) return 0;
 
   const size_t left = MaxDepthRecursive(nodes[currentIndex].leftChild);
   const size_t right = MaxDepthRecursive(nodes[currentIndex].rightChild);

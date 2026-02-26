@@ -13,8 +13,8 @@ class Renderer
 public:
   Renderer(FrameBuffer &fb, std::shared_ptr<Level> _level, uint16_t canvasWidth, uint16_t canvasHeight);
   void Render(const GameState &gameState);
-  void RenderSegment(const Seg &seg);
-  void RenderBSPNode(const entity::Player &player, int16_t nodeIndex);
+  void RenderSegment(const Seg &seg, const GameState &gameState);
+  void RenderBSPNode(const GameState &gameState, int16_t nodeIndex);
   void ResetClippingArrays();
 
 private:
@@ -33,12 +33,15 @@ private:
   [[nodiscard]] int32_t ProjectZ(double_t z, double_t inv_y) const;
   [[nodiscard]] int32_t ProjectX(double_t x, double_t inv_y) const;
 
-  std::vector<int32_t> floorClipping;
-  std::vector<int32_t> ceilingClipping;
+private:
+  std::vector<int32_t> m_floorClipping;
+  std::vector<int32_t> m_ceilingClipping;
+  std::vector<bool> m_solidSegs;
 
-  FrameBuffer &fb;
-  std::shared_ptr<Level> level;
 
-  uint16_t canvasWidth;
-  uint16_t canvasHeight;
+  FrameBuffer &m_fb;
+  std::shared_ptr<Level> m_level;
+
+  uint16_t m_canvasWidth;
+  uint16_t m_canvasHeight;
 };

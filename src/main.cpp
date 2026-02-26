@@ -131,6 +131,8 @@ int main()
   bspBuilder.BuildBSPTree();
   bspBuilder.PrintTree();
 
+  level = std::make_shared<Level>(*bspBuilder.GetConstructedLevel());
+
   // setup sdl window
   SdlWindow sdlWindow("Doom Clone",
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
