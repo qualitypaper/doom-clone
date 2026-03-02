@@ -9,7 +9,7 @@
 
 #include <algorithm>
 
-static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (3.14159265 / 180.0));
+static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (M_PI / 180.0));
 static double_t FOCAL_LENGTH;
 
 static constexpr uint32_t mapColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t alpha)
@@ -130,15 +130,27 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
 {
   const LineDef &ld = m_level->linedefs[seg.linedefIndex];
 
-  const SideDef &sidedef = m_level->sidedefs[ld.frontSidedef];
+  bool isBackSide = false;
+
+  if (ld.end == seg.startVertex) { isBackSide = true; }
+
+  if (isBackSide && ld.backSidedef == -1) {
+    throw std::runtime_error(
+      "backSidedefIndex == -1 -> When the segment is on the back side, the backSidedef mustn't be empty.");
+  }
+
+  const int16_t frontSidedefId = isBackSide ? ld.backSidedef : ld.frontSidedef;
+  const int16_t backSidedefId = isBackSide ? ld.frontSidedef : ld.backSidedef;
+
+  const SideDef &sidedef = m_level->sidedefs[frontSidedefId];
   const Sector &sector = m_level->sectors[sidedef.sectorId];
 
   double_t viewX1 = 0, viewY1 = 0, viewX2 = 0, viewY2 = 0;
   int16_t floorZ = 0, ceilingZ = 0;
 
   applyTransformations(gameState.playerState,
-    m_level->vertices[ld.start],
-    m_level->vertices[ld.end],
+    m_level->vertices[seg.startVertex],
+    m_level->vertices[seg.endVertex],
     sector,
     viewX1,
     viewY1,
@@ -176,21 +188,9 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
 
   if (start < 0 && end < 0) return;
 
-  int realStart = 0, realEnd = m_canvasWidth - 1;
-  {
-    int startTemp = std::ranges::clamp(start, 0, static_cast<int32_t>(m_canvasWidth - 1));
-    int endTemp = std::ranges::clamp(end, 0, static_cast<int32_t>(m_canvasWidth - 1));
+  for (int32_t i = std::max(0, start); i < std::min(m_canvasWidth - 1, end); i++) {
+    if (m_solidSegs[i]) continue;
 
-    while (startTemp < m_solidSegs.size() && m_solidSegs[startTemp]) { startTemp++; }
-
-    while (endTemp >= 0 && m_solidSegs[endTemp]) { endTemp--; }
-
-    if (startTemp >= m_solidSegs.size() || endTemp < 0) return;
-    realStart = startTemp;
-    realEnd = endTemp;
-  }
-
-  for (int32_t i = std::max(realStart, start); i < std::min(realEnd, end); i++) {
     const double_t t = static_cast<double>(i - start) / (end - start);
     const double_t inv_y = lerp(inv_y1, inv_y2, t);
 
@@ -198,16 +198,17 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     const int32_t projectedFloorY = ProjectZ(floorZ, inv_y);
     const int32_t projectedCeilingY = std::max(0, ProjectZ(ceilingZ, inv_y));
 
-    DrawFloor(i, projectedFloorY, sidedef.color);
-    DrawCeiling(i, projectedCeilingY, sidedef.color);
-
-    if (ld.backSidedef == -1) {
+    if (backSidedefId == -1) {
       // solid wall
-      this->DrawSolidWall(i, projectedCeilingY, projectedFloorY);
-      for (int j = realStart; j <= realEnd; j++) { m_solidSegs[j] = true; }
+      DrawFloor(i, projectedFloorY, sidedef.color);
+      DrawCeiling(i, projectedCeilingY, sidedef.color);
+
+      DrawSolidWall(i, projectedCeilingY, projectedFloorY);
+
+      m_solidSegs[i] = true;
     } else {
       // portal
-      const SideDef backSidedef = m_level->sidedefs[ld.backSidedef];
+      const SideDef backSidedef = m_level->sidedefs[backSidedefId];
       const Sector nextSector = m_level->sectors[backSidedef.sectorId];
 
       const int16_t nextCeilZ =
@@ -219,10 +220,17 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
       const int32_t nextCeilY = ProjectZ(nextCeilZ, inv_y);
       const int32_t nextFloorY = ProjectZ(nextFloorZ, inv_y);
 
+      DrawFloor(i, projectedFloorY, sidedef.color);
+      DrawCeiling(i, projectedCeilingY, sidedef.color);
+
       if (ld.type == LineDefType::REGULAR) {
         DrawDefaultPortal(i, projectedFloorY, projectedCeilingY, nextFloorY, nextCeilY);
       } else if (ld.type == LineDefType::DOOR) {
         // TODO: create a drawing function for door portal
+      }
+
+      if (m_ceilingClipping[i] >= m_floorClipping[i]) {
+        m_solidSegs[i] = true;
       }
     }
   }
@@ -265,9 +273,14 @@ void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex
  */
 bool Renderer::PointOnSide(const Vertex v, const BspNode &node)
 {
-  // checks whether a point is located in the leftBoundingBox of the node
-  return node.leftBoundingBox[0] > v.y && node.leftBoundingBox[2] < v.y && node.leftBoundingBox[1] > v.x
-         && node.leftBoundingBox[3] < v.x;
+  // Calculate vector from the partition line's origin to the player
+  const double_t dx = v.x - node.x;
+  const double_t dy = v.y - node.y;
+
+  // 2D Cross Product
+  const double_t leftSide = (node.dx * dy) - (node.dy * dx);
+
+  return leftSide > 0;
 }
 
 
