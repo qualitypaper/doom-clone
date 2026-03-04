@@ -12,8 +12,12 @@ constexpr double toRadians(const double angle) { return PI * angle / 180; }
 
 constexpr Vertex toCenterCoordinates(const Vertex vec, const uint16_t width, const uint16_t height)
 { return Vertex(vec.x - width / 2, height / 2 - vec.y); }
-constexpr Vertex toCenterCoordinates(const EditorVertex &vec, const uint16_t width, const uint16_t height)
-{ return Vertex(vec.x - width / 2, height / 2 - vec.y); }
+
+constexpr ImVec2 toCenterCoordinates(const ImVec2 vec, const uint16_t width, const uint16_t height)
+{ return {vec.x - width / 2, height / 2 - vec.y}; }
+
+constexpr ImVec2 toCenterCoordinates(const EditorVertex &vec, const uint16_t width, const uint16_t height)
+{ return {(float) vec.x - width / 2, (float) height / 2 - vec.y}; }
 
 constexpr ImVec2 fromCenterCoordinates(const ImVec2 vec, const uint16_t width, const uint16_t height)
 {

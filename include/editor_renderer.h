@@ -26,34 +26,37 @@ private:
   static void startFrame();
   void endFrame() const;
 
-  void drawLinePreview(float_t thickness) const;
-  void drawPopupsForSelectedObjects() const;
-  void drawBlockSelection() const;
-  void drawSidedefsWindow() const;
-  void drawSectorsWindow() const;
-  void drawSelectedLinePopup(uint32_t lineId) const;
-  void drawSelectedVertexPopup(uint32_t selectedId) const;
+  // map drawing methods
   void drawMapOutlines(float_t vertexRadius, float_t thickness) const;
+
+  void drawLinePreview(float_t thickness) const;
   void drawConnectedLineDefs(const std::vector<uint32_t> &connectedLineDefs,
     const EditorLineDef &ld,
     ImVec2 startDragged,
     ImVec2 endDragged,
-    ImDrawList *drawList,
     float_t thickness) const;
-  void drawSelectedVertex(uint32_t objectId, float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
-  void drawSelectedLineDef(uint32_t objectId, float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
-  void drawSelection(float_t vertexRadius, float_t thickness, ImDrawList *drawList) const;
-  void drawUnselectedVertices(float_t vertexRadius, ImDrawList *drawList) const;
-  void drawLinedef(const EditorLineDef &ld, ImDrawList *drawList, float_t thickness) const;
-  void drawUnselectedLineDefs(float_t thickness, ImDrawList *drawList) const;
+  void drawSelectedVertex(uint32_t objectId, float_t vertexRadius, float_t thickness) const;
+  void drawSelectedLineDef(uint32_t objectId, float_t vertexRadius, float_t thickness) const;
+  void drawSelection(float_t vertexRadius, float_t thickness) const;
+  void drawUnselectedVertices(float_t vertexRadius) const;
+  void drawLinedef(const EditorLineDef &ld, float_t thickness) const;
+  void drawLineWithZoom(const ImVec2 &start, const ImVec2 &end, ImU32 color, float thickness) const;
+  void drawUnselectedLineDefs(float_t thickness) const;
+  void drawBlockSelection() const;
 
+  // popups
+  void drawSidedefsWindow() const;
+  void drawSectorsWindow() const;
+  void drawSelectedLinePopup(uint32_t lineId) const;
+  void drawSelectedVertexPopup(uint32_t selectedId) const;
+  void drawPopupsForSelectedObjects() const;
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const;
 
-  static void drawArrowForLinedef(ImDrawList *drawList,
-    float_t thickness,
-    const EditorVertex &startVertex,
-    const EditorVertex &endVertex,
-    ImU32 color);
+  // static methods
+  void drawVertex(const EditorVertex &vertex, float vertexRadius) const;
+  static void
+    drawArrowForLinedef(float_t thickness, const EditorVertex &startVertex, const EditorVertex &endVertex, ImU32 color);
+
   static void createSelect(const char *label,
     const std::vector<EditorSidedef> &sidedefs,
     int32_t &currentItem,

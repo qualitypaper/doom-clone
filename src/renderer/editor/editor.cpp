@@ -59,6 +59,9 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
   state.level->linedefs.pop_back();
 }
 
+ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
+{ return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height); }
+
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 {
   auto &vertex = state.level->vertices[vertexId];
@@ -122,8 +125,9 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   for (size_t i = 0; i < _level.vertices.size(); ++i) {
     const auto &v = _level.vertices[i];
 
-    auto convertedImvec2 = math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
-    editorVertices.emplace_back(convertedImvec2.x, convertedImvec2.y);
+    const ImVec2 convertedVec =
+      math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
+    editorVertices.emplace_back(convertedVec);
     vertexIdMap[i] = makeObjectId(EditorObjectType::VERTEX, editorVertices.size() - 1);
   }
 

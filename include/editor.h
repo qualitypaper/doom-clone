@@ -91,7 +91,7 @@ struct EditorVertex : EditorObject
   {}
 
   int32_t x = 0, y = 0;
-  std::vector<uint32_t> connectedLineDefs;// Linedef object IDs (EditorObjectType::LINEDEF).
+  std::vector<uint32_t> connectedLineDefs = {};// Linedef object IDs (EditorObjectType::LINEDEF).
 
   EditorVertex operator+(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
   EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
@@ -107,14 +107,16 @@ struct EditorVertex : EditorObject
   [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
   [[nodiscard]] constexpr ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
   [[nodiscard]] constexpr double length() const { return std::sqrt(x * x + y * y); }
+  [[nodiscard]] ImVec2 fromCenterCoords(const SdlWindow &sdlWindow) const;
 
   void normalize()
   {
     const double len = length();
 
-    x = std::round(static_cast<double>(x) / len);
-    y = std::round(static_cast<double>(y) / len);
+    x = static_cast<int32_t>(std::round(static_cast<double>(x) / len));
+    y = static_cast<int32_t>(std::round(static_cast<double>(y) / len));
   }
+
   static void remove(EditorState &state, uint32_t vertexId);
 
   void serialize(FileWriter &fw) const override;
@@ -138,7 +140,12 @@ struct EditorSidedef : EditorObject
 
 struct EditorSector : EditorObject
 {
-  EditorSector(int16_t _floorHeight, int16_t _ceilingHeight, int16_t _specialType, int16_t _lightLevel, int16_t _tag, uint32_t _color = 0)
+  EditorSector(int16_t _floorHeight,
+    int16_t _ceilingHeight,
+    int16_t _specialType,
+    int16_t _lightLevel,
+    int16_t _tag,
+    uint32_t _color = 0)
     : EditorObject(EditorObjectType::SECTOR), floorHeight(_floorHeight), ceilingHeight(_ceilingHeight),
       specialType(_specialType), lightLevel(_lightLevel), tag(_tag), color(_color)
   {}
@@ -212,15 +219,14 @@ struct EditorState
 
   ImVec2 canvasOrigin = { 0.0, 0.0 };
   ImVec2 canvasScroll = { 0.0, 0.0 };
+
   float canvasZoom = 1.0f;
 
   [[nodiscard]] EditorVertex &findVertex(const uint32_t id) const
   {
     const uint32_t index = getObjectIndex(id);
 
-    if (index >= level->vertices.size()) {
-      throw std::runtime_error("Index is bigger than the sectors array");
-    }
+    if (index >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the sectors array"); }
 
     return level->vertices[index];
   }
@@ -272,7 +278,6 @@ private:
   std::unique_ptr<CommandHistory> m_history;
 
 private:
-  void addToSector(uint16_t i, LineDef &linedef, SideDef &sidedef);
   void updateAABB(uint32_t sectorID) const;
 
 public:
@@ -283,7 +288,6 @@ public:
 
   void processInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<Command> cmd) const;
-  void addLineDef(Vertex start, Vertex end);
   void addLineDef(int32_t sectorId, LineDef &linedef) const;
   void addVertex(int16_t x, int16_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
