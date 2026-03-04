@@ -210,8 +210,8 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     const int32_t projectedFloorY = std::min(m_canvasHeight - 1, ProjectZ(floorZ, inv_y));
     const int32_t projectedCeilingY = std::max(0, ProjectZ(ceilingZ, inv_y));
 
-    DrawFloor(i, projectedFloorY, sidedef.color);
-    DrawCeiling(i, projectedCeilingY, sidedef.color);
+    DrawFloor(i, projectedFloorY, sector.color);
+    DrawCeiling(i, projectedCeilingY, sector.color);
 
     if (backSidedefId == -1) {
       // solid wall

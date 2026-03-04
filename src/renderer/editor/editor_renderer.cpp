@@ -178,49 +178,8 @@ void EditorRenderer::drawSidedefsWindow() const
 
   if (ImGui::Button("Create sidedef")) {
     // create new sidedef
-    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0, 0);
+    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0);
   }
-
-  /*
-  for (size_t i = 0; i < m_editor->state->level->sidedefs.size(); i++) {
-    auto &sideDef = m_editor->state->level->sidedefs[i];
-    ImGui::PushID(i);
-
-    ImGui::Text("Sidedef: %d", i);
-
-    int sectorId = sideDef.sectorId;
-    int xOffset = sideDef.xOffset;
-    int yOffset = sideDef.yOffset;
-
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::InputInt("Sector id", &sectorId)) {
-      // update sector id
-      sideDef.sectorId = static_cast<int16_t>(sectorId);
-    }
-
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::InputInt("Texture offset x", &xOffset)) {
-      // update texture offset x
-      sideDef.xOffset = static_cast<int16_t>(xOffset);
-    }
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::InputInt("Texture offset y", &yOffset)) {
-      // update texture offset y
-      sideDef.yOffset = static_cast<int16_t>(yOffset);
-    }
-    float color[3] = { ImGui::ColorConvertU32ToFloat4(sideDef.color).x,
-      ImGui::ColorConvertU32ToFloat4(sideDef.color).y,
-      ImGui::ColorConvertU32ToFloat4(sideDef.color).z };
-
-    if (ImGui::ColorPicker3("Sidedef color", color)) {
-      // update sidedef color
-      sideDef.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
-    }
-
-    ImGui::NewLine();
-    ImGui::PopID();
-  }
-  */
 
   constexpr ImGuiTableFlags tableFlags =
     ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg
@@ -273,14 +232,6 @@ void EditorRenderer::drawSidedefsWindow() const
           // update texture offset y
           sd.yOffset = static_cast<int16_t>(yOffset);
         }
-        float color[3] = { ImGui::ColorConvertU32ToFloat4(sd.color).x,
-          ImGui::ColorConvertU32ToFloat4(sd.color).y,
-          ImGui::ColorConvertU32ToFloat4(sd.color).z };
-
-        if (ImGui::ColorPicker3("Sidedef color", color)) {
-          // update sidedef color
-          sd.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
-        }
 
         if (ImGui::Button("Delete")) {
           for (auto &linedef : m_editor->state->level->linedefs) {
@@ -315,26 +266,123 @@ void EditorRenderer::drawSectorsWindow() const
   ImGui::Begin("Sectors");
 
   if (ImGui::Button("Create sector")) { m_editor->state->level->sectors.emplace_back(); }
+  //
+  // for (uint32_t sectorId = 0; sectorId < m_editor->state->level->sectors.size(); sectorId++) {
+  //   auto &sector = m_editor->state->findSector(sectorId);
+  //   ImGui::PushID(sectorId);
+  //
+  //   ImGui::Text("Sector: %d", sectorId);
+  //   ImGui::SetNextItemWidth(100);
+  //   int floorHeight = sector.floorHeight;
+  //   int ceilingHeight = sector.ceilingHeight;
+  //   if (ImGui::InputInt("Sector floor height", &floorHeight)) {
+  //     sector.floorHeight = static_cast<int16_t>(floorHeight);
+  //   }
+  //   ImGui::SetNextItemWidth(100);
+  //   if (ImGui::InputInt("Sector ceiling height", &ceilingHeight)) {
+  //     sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
+  //   }
+  //
+  //   float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
+  //     ImGui::ColorConvertU32ToFloat4(sector.color).y,
+  //     ImGui::ColorConvertU32ToFloat4(sector.color).z };
+  //
+  //   if (ImGui::ColorPicker3("Sector color", color)) {
+  //     // update sidedef color
+  //     sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+  //   }
+  //
+  //   ImGui::NewLine();
+  //   ImGui::PopID();
+  // }
 
-  for (uint32_t sectorId = 0; sectorId < m_editor->state->level->sectors.size(); sectorId++) {
-    auto &sector = m_editor->state->findSector(sectorId);
-    ImGui::PushID(sectorId);
+  constexpr ImGuiTableFlags tableFlags =
+    ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg
+    | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
 
-    ImGui::Text("Sector: %d", sectorId);
-    ImGui::SetNextItemWidth(100);
-    int floorHeight = sector.floorHeight;
-    int ceilingHeight = sector.ceilingHeight;
-    if (ImGui::InputInt("Sector floor height", &floorHeight)) {
-      sector.floorHeight = static_cast<int16_t>(floorHeight);
+  if (ImGui::BeginTable("PropertyTable", 1, tableFlags)) {
+    ImGui::TableSetupColumn("Sectors table", ImGuiTableColumnFlags_WidthStretch);
+    ImGui::TableHeadersRow();
+
+    // Setup columns: The right column stretches to fill available space
+    // ---------------------------------------------------------
+    // Property Category 1: Transform (Closed by default)
+    // ---------------------------------------------------------
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
+
+    // Flags for the parent category
+    // - SpanFullWidth: Allows clicking anywhere on the row to open/close
+    // - We omit ImGuiTreeNodeFlags_DefaultOpen so it stays closed initially
+    constexpr ImGuiTreeNodeFlags categoryFlags = ImGuiTreeNodeFlags_SpanFullWidth;
+
+    for (size_t i = 0; i < m_editor->state->level->sectors.size(); i++) {
+      EditorSector &sector = m_editor->state->level->sectors[i];
+      std::string label = "Sector " + std::to_string(i) + "##Sector";
+      ImGui::PushID(i);
+      const bool isTransformOpen = ImGui::TreeNodeEx(label.c_str(), categoryFlags);
+
+      if (isTransformOpen) {
+        // Sub-property: Position
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+
+
+        int floorHeight = sector.floorHeight;
+        int ceilingHeight = sector.ceilingHeight;
+        int lightLevel = sector.lightLevel;
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputInt("Floor Height", &floorHeight)) {
+          // update sector id
+          sector.floorHeight = static_cast<int16_t>(floorHeight);
+        }
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputInt("Ceiling height", &ceilingHeight)) {
+          // update texture offset x
+          sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
+        }
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputInt("Light level", &lightLevel)) {
+          // update texture offset y
+          sector.lightLevel = static_cast<int16_t>(lightLevel);
+        }
+
+        ImGui::SetNextItemWidth(200);
+
+        float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
+          ImGui::ColorConvertU32ToFloat4(sector.color).y,
+          ImGui::ColorConvertU32ToFloat4(sector.color).z };
+
+        if (ImGui::ColorPicker3("Sector color", color)) {
+          // update sector color
+          sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+        }
+
+        if (ImGui::Button("Delete")) {
+          for (auto &linedef : m_editor->state->level->linedefs) {
+            if (linedef.backSideDef == static_cast<int32_t>(i)) {
+              linedef.backSideDef = -1;
+            } else if (linedef.frontSideDef == static_cast<int32_t>(i)) {
+              linedef.frontSideDef = -1;
+            }
+          }
+
+          m_editor->state->level->sidedefs.erase(m_editor->state->level->sidedefs.begin() + i);
+        }
+
+        ImGui::NewLine();
+
+        // Pop the parent node
+        ImGui::TreePop();
+      }
+
+      ImGui::PopID();
     }
-    ImGui::SetNextItemWidth(100);
-    if (ImGui::InputInt("Sector ceiling height", &ceilingHeight)) {
-      sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
-    }
 
-
-    ImGui::NewLine();
-    ImGui::PopID();
+    ImGui::EndTable();
   }
 
   ImGui::End();

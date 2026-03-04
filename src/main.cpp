@@ -129,7 +129,7 @@ int main()
 
   BSPBuilder bspBuilder(*level);
   bspBuilder.BuildBSPTree();
-  bspBuilder.PrintTree();
+  // bspBuilder.PrintTree();
 
   level = std::make_shared<Level>(*bspBuilder.GetConstructedLevel());
 
@@ -233,18 +233,18 @@ void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_F1) {
         if (gameState.currentMode != EngineMode::GAMEPLAY_3D) {
-          setEngineMode(gameState, input, EngineMode::GAMEPLAY_3D, window);
+          SetEngineMode(gameState, input, EngineMode::GAMEPLAY_3D, window);
         }
 
 
         continue;
       } else if (event.key.keysym.sym == SDLK_F2) {
         if (gameState.currentMode != EngineMode::EDITOR_2D) {
-          setEngineMode(gameState, input, EngineMode::EDITOR_2D, window);
+          SetEngineMode(gameState, input, EngineMode::EDITOR_2D, window);
         }
       } else if (event.key.keysym.sym == SDLK_F3) {
         if (gameState.currentMode != EngineMode::BSP_VIEWER) {
-          setEngineMode(gameState, input, EngineMode::BSP_VIEWER, window);
+          SetEngineMode(gameState, input, EngineMode::BSP_VIEWER, window);
         }
       }
     }
@@ -257,10 +257,10 @@ void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
     switch (event.type) {
     case SDL_KEYDOWN:
     case SDL_KEYUP:
-      handleKeyInput(event, input);
+      HandleKeyInput(event, input);
       break;
     case SDL_MOUSEMOTION:
-      handleMouseMovement(event, input);
+      HandleMouseMovement(event, input);
       break;
     }
   }

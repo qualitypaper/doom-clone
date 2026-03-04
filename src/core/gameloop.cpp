@@ -8,20 +8,20 @@
 
 struct InputState;
 
-void handleMouseMovement(const SDL_Event &event, InputState &input)
+void HandleMouseMovement(const SDL_Event &event, InputState &input)
 {
   input.mouse_dx = event.motion.xrel;
   input.mouse_dy = event.motion.yrel;
 }
 
-void handleKeyInput(const SDL_Event &event, InputState &input)
+void HandleKeyInput(const SDL_Event &event, InputState &input)
 {
   const bool pressed = (event.type == SDL_KEYDOWN);
   const SDL_Scancode scancode = event.key.keysym.scancode;
   input.keys[scancode] = pressed;
 }
 
-void setEngineMode(GameState &state, InputState &input, const EngineMode newMode, const SdlWindow &sdlWindow)
+void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode, const SdlWindow &sdlWindow)
 {
   // nothing to change
   if (state.currentMode == newMode) return;

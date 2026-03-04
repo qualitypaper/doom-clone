@@ -36,6 +36,7 @@ void EditorSector::serialize(FileWriter &fw) const
   fw.WriteRaw(specialType);
   fw.WriteRaw(lightLevel);
   fw.WriteRaw(tag);
+  fw.WriteRaw(color);
 }
 
 void EditorSector::deserialize(FileReader &fr)
@@ -45,6 +46,7 @@ void EditorSector::deserialize(FileReader &fr)
   fr.ReadRaw(specialType);
   fr.ReadRaw(lightLevel);
   fr.ReadRaw(tag);
+  fr.ReadRaw(color);
 }
 
 void EditorVertex::serialize(FileWriter &fw) const
@@ -64,7 +66,6 @@ void EditorSidedef::serialize(FileWriter &fw) const
   fw.WriteRaw(sectorId);
   fw.WriteRaw(xOffset);
   fw.WriteRaw(yOffset);
-  fw.WriteRaw(color);
 }
 
 void EditorSidedef::deserialize(FileReader &fr)
@@ -72,7 +73,6 @@ void EditorSidedef::deserialize(FileReader &fr)
   fr.ReadRaw(sectorId);
   fr.ReadRaw(xOffset);
   fr.ReadRaw(yOffset);
-  fr.ReadRaw(color);
 }
 
 void EditorLevel::serialize(const std::filesystem::path &path) const
@@ -86,9 +86,6 @@ void EditorLevel::serialize(const std::filesystem::path &path) const
     std::cerr << "Failed to open file for saving." << std::endl;
     return;
   }
-
-  // auto [x, y] = math_utils::toCenterCoordinates(Vertex{ v.x, v.y }, width, height);
-  // const EditorVertex canvasVertexInt{ y, x };
 
   // write vertices
   fw.WriteVector(vertices);
@@ -148,10 +145,10 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
       getObjectIndex(ld.start), getObjectIndex(ld.end), ld.type, ld.frontSideDef, ld.backSideDef);
   }
 
-  for (auto &sd : sidedefs) { level.sidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset, sd.color); }
+  for (auto &sd : sidedefs) { level.sidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset); }
 
   for (auto &sector : sectors) {
     level.sectors.emplace_back(
-      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag);
+      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag, sector.color);
   }
 }

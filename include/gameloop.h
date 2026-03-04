@@ -51,7 +51,6 @@ struct SideDef
   int16_t sectorId = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
-  uint32_t color = 0xFFFFFFFF;// RGBA format
 };
 
 enum class LineDefType { REGULAR, DOOR };
@@ -72,6 +71,10 @@ struct Sector
   int16_t specialType;
   int16_t lightLevel;
   int16_t tag;
+
+  // temporary, till textures will be added, RGBA format
+  // default - BLACK
+  uint32_t color;
 };
 
 struct Level
@@ -88,6 +91,6 @@ struct Level
   bool deserialize(const char *filename);
 };
 
-void handleMouseMovement(const SDL_Event &event, InputState &input);
-void handleKeyInput(const SDL_Event &event, InputState &input);
-void setEngineMode(GameState &gameState, InputState &input, EngineMode newMode, const SdlWindow &sdlWindow);
+void HandleMouseMovement(const SDL_Event &event, InputState &input);
+void HandleKeyInput(const SDL_Event &event, InputState &input);
+void SetEngineMode(GameState &gameState, InputState &input, EngineMode newMode, const SdlWindow &sdlWindow);

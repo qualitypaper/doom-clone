@@ -138,12 +138,12 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   }
 
   // process sectors
-  for (const auto &[floorHeight, ceilingHeight, specialType, lightLevel, tag] : _level.sectors) {
-    editorSectors.emplace_back(floorHeight, ceilingHeight, specialType, lightLevel, tag);
+  for (const auto &[floorHeight, ceilingHeight, specialType, lightLevel, tag, color] : _level.sectors) {
+    editorSectors.emplace_back(floorHeight, ceilingHeight, specialType, lightLevel, tag, color);
   }
 
   // process sidedefs
-  for (const auto &sd : _level.sidedefs) { editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset, sd.color); }
+  for (const auto &sd : _level.sidedefs) { editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset); }
 
 
   this->level = std::make_unique<EditorLevel>(

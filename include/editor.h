@@ -123,15 +123,14 @@ struct EditorVertex : EditorObject
 
 struct EditorSidedef : EditorObject
 {
-  EditorSidedef(int16_t _sectorId, int16_t _xOffset, int16_t _yOffset, uint32_t _color)
-    : EditorObject(EditorObjectType::SIDEDEF), sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset), color(_color)
+  EditorSidedef(int16_t _sectorId, int16_t _xOffset, int16_t _yOffset)
+    : EditorObject(EditorObjectType::SIDEDEF), sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset)
   {}
   EditorSidedef() : EditorObject(EditorObjectType::SIDEDEF) {}
 
   int16_t sectorId = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
-  uint32_t color = 0xFFFFFFFF;
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
@@ -139,9 +138,9 @@ struct EditorSidedef : EditorObject
 
 struct EditorSector : EditorObject
 {
-  EditorSector(int16_t _floorHeight, int16_t _ceilingHeight, int16_t _specialType, int16_t _lightLevel, int16_t _tag)
+  EditorSector(int16_t _floorHeight, int16_t _ceilingHeight, int16_t _specialType, int16_t _lightLevel, int16_t _tag, uint32_t _color = 0)
     : EditorObject(EditorObjectType::SECTOR), floorHeight(_floorHeight), ceilingHeight(_ceilingHeight),
-      specialType(_specialType), lightLevel(_lightLevel), tag(_tag)
+      specialType(_specialType), lightLevel(_lightLevel), tag(_tag), color(_color)
   {}
   EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
 
@@ -150,6 +149,7 @@ struct EditorSector : EditorObject
   int16_t specialType = 0;
   int16_t lightLevel = 0;
   int16_t tag = 0;
+  uint32_t color = 0;
   AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
 
