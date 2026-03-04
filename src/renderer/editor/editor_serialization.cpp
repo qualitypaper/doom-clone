@@ -7,8 +7,8 @@
 
 void EditorLineDef::serialize(FileWriter &fw) const
 {
-  fw.WriteRaw(start);
-  fw.WriteRaw(end);
+  fw.WriteRaw(getObjectIndex(start));
+  fw.WriteRaw(getObjectIndex(end));
   const int32_t intType = static_cast<int32_t>(type);
   fw.WriteRaw(intType);
   fw.WriteRaw(frontSideDef);
@@ -18,7 +18,10 @@ void EditorLineDef::serialize(FileWriter &fw) const
 void EditorLineDef::deserialize(FileReader &fr)
 {
   fr.ReadRaw(start);
+  start = makeObjectId(EditorObjectType::VERTEX, start);
   fr.ReadRaw(end);
+  end = makeObjectId(EditorObjectType::VERTEX, end);
+
   int32_t intType;
   fr.ReadRaw(intType);
   type = static_cast<LineDefType>(intType);
@@ -140,7 +143,10 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
     level.vertices.emplace_back(x, y);
   }
 
-  for (auto &ld : linedefs) { level.linedefs.emplace_back(ld.start, ld.end, ld.type, ld.frontSideDef, ld.backSideDef); }
+  for (auto &ld : linedefs) {
+    level.linedefs.emplace_back(
+      getObjectIndex(ld.start), getObjectIndex(ld.end), ld.type, ld.frontSideDef, ld.backSideDef);
+  }
 
   for (auto &sd : sidedefs) { level.sidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset, sd.color); }
 

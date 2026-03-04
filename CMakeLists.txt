@@ -7,7 +7,7 @@ project(
 )
 
 # ---- C++ standard ----
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -33,7 +33,7 @@ find_package(SDL2 REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME}
-    ${SOURCES}
+        ${SOURCES}
         src/renderer/editor/commands.cpp
         src/bsp/bsp.cpp
         include/bsp.h

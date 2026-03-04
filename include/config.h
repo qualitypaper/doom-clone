@@ -3,14 +3,14 @@
 #include <cstdint>
 
 namespace config {
-constexpr uint16_t WINDOW_WIDTH = 800;
-constexpr uint16_t WINDOW_HEIGHT = 600;
+constexpr uint16_t WINDOW_WIDTH = 1200;
+constexpr uint16_t WINDOW_HEIGHT = 900;
 
 constexpr uint16_t EDITOR_WINDOW_WIDTH = 1500;
 constexpr uint16_t EDITOR_WINDOW_HEIGHT = 1200;
 
-constexpr uint16_t CANVAS_WIDTH = 320;
-constexpr uint16_t CANVAS_HEIGHT = 200;
+constexpr uint16_t CANVAS_WIDTH = 800;
+constexpr uint16_t CANVAS_HEIGHT = 600;
 
 constexpr double SCALE_X = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(CANVAS_WIDTH);
 constexpr double SCALE_Y = static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(CANVAS_HEIGHT);

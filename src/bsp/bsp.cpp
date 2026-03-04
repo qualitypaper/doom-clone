@@ -14,7 +14,6 @@ void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<in
     const Vertex end = math_utils::fromCenterCoordinates(
       level->vertices[seg.endVertex], config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
 
-
     boundingBox[0] = std::min(boundingBox[0], static_cast<int16_t>(start.y));
     boundingBox[0] = std::min(boundingBox[0], static_cast<int16_t>(end.y));
 
@@ -78,14 +77,14 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
       const int16_t newVertexId = static_cast<int16_t>(level->vertices.size() - 1);
 
       const LineDef segLd = level->linedefs[seg.linedefIndex];
-      LineDef startLd{ segLd.start, newVertexId, segLd.type, segLd.frontSidedef, segLd.backSidedef };
-      LineDef endLd{ newVertexId, segLd.end, segLd.type, segLd.frontSidedef, segLd.backSidedef };
+      LineDef startLd{ seg.startVertex, newVertexId, segLd.type, segLd.frontSidedef, segLd.backSidedef };
+      LineDef endLd{ newVertexId, seg.endVertex, segLd.type, segLd.frontSidedef, segLd.backSidedef };
 
       level->linedefs.emplace_back(startLd);
       level->linedefs.emplace_back(endLd);
 
-      Seg newSeg{ segLd.start, newVertexId, 0, static_cast<int16_t>(level->linedefs.size() - 2), seg.side, 0 };
-      Seg newOtherSeg{ newVertexId, segLd.end, 0, static_cast<int16_t>(level->linedefs.size() - 1), seg.side, 0 };
+      Seg newSeg{ seg.startVertex, newVertexId, 0, static_cast<int16_t>(level->linedefs.size() - 2), seg.side, 0 };
+      Seg newOtherSeg{ newVertexId, seg.endVertex, 0, static_cast<int16_t>(level->linedefs.size() - 1), seg.side, 0 };
 
       const SegmentPosition newSegPos = DetermineSegmentPosition(splitter, newSeg);
 
@@ -142,11 +141,17 @@ int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
   AdjustBoundingBoxes(split.back, currentNode.leftBoundingBox);
 
   if (split.front.size() == segs.size() || split.back.size() == segs.size()) {
+    // The chosen splitter didn't actually partition the space.
+    // Remove the orphan node we already pushed (it has no valid children).
+    nodes.pop_back();
     CreateSubsector(segs);
     return CreateLeafIndex();
   }
 
   const int rightId = BuildBSPTree(split.front);
+  if (split.back.size() == 3) {
+    std::printf("");
+  }
   const int leftId = BuildBSPTree(split.back);
 
   nodes[id].leftChild = static_cast<int16_t>(leftId);
@@ -190,7 +195,13 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 
 SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const
 {
-  if (seg == splitter) return SegmentPosition::FRONT;
+  if (seg == splitter)
+    return SegmentPosition::FRONT;
+  else if (seg.linedefIndex == splitter.linedefIndex && seg.startVertex == splitter.endVertex
+           && seg.endVertex == splitter.startVertex) {
+    // the opposite side of the portal
+    return SegmentPosition::BACK;
+  }
 
   const Vertex startSplitterVertex = level->vertices[splitter.startVertex];
   const Vertex startSegVertex = level->vertices[seg.startVertex];
@@ -224,15 +235,21 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
       math_utils::findLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
     // If intersection parameter is strictly between 0 and 1 for segment to be splitted, the segments are spanning
     if (sol.second > 0 && sol.second < 1) { return SegmentPosition::SPANNING; }
+
+    // Intersection falls outside the segment — classify by whichever endpoint
+    // is farther from the splitter line (larger absolute cross product).
+    const int32_t dominant = (std::abs(startCross) >= std::abs(endCross)) ? startCross : endCross;
+    return (dominant <= 0) ? SegmentPosition::FRONT : SegmentPosition::BACK;
   }
 
   if (startCross <= 0 && endCross <= 0) {
     return SegmentPosition::FRONT;
   } else if (startCross >= 0 && endCross >= 0) {
     return SegmentPosition::BACK;
-  } else {
-    return SegmentPosition::SPANNING;
   }
+
+  // Should not be reached — all cases are handled above
+  return SegmentPosition::SPANNING;
 }
 
 // returns a score of the segment; the smaller, the better
@@ -260,15 +277,17 @@ uint32_t BSPBuilder::EvaluateSplitter(const size_t splitterIndex, const std::vec
 }
 
 /*
- checks whether a set of segments forms a convex shape. A subsector (list of segments) forms a convex region,
- when any line drawn through the subsector crosses at most 2 other lines
+ checks whether a set of segments forms a convex shape. A subsector is convex
+ when no segment straddles (spans) any other segment's line — i.e. no further
+ splitting is necessary.
 */
 bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
 {
   for (auto &seg : segs) {
     for (auto &other : segs) {
+      if (seg == other) continue;
       const SegmentPosition pos = DetermineSegmentPosition(seg, other);
-      if (pos != SegmentPosition::FRONT) return false;
+      if (pos == SegmentPosition::SPANNING) return false;
     }
   }
 

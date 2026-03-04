@@ -8,6 +8,7 @@
 #include "gameloop.h"
 
 #include <algorithm>
+#include <fmt/core.h>
 
 static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (M_PI / 180.0));
 static double_t FOCAL_LENGTH;
@@ -75,8 +76,8 @@ void Renderer::DrawSolidWall(const int32_t x, const int32_t projectedCeilingZ, c
   if (drawTop <= drawBottom) {
     this->DrawColumn(x, drawTop, drawBottom, mapColor(0, 255, 255, 255));
 
-    m_ceilingClipping[x] = drawTop;
-    m_floorClipping[x] = drawBottom;
+    m_ceilingClipping[x] = drawBottom;
+    m_floorClipping[x] = drawTop;
   }
 }
 
@@ -97,7 +98,7 @@ void rotate(const float_t x, const float_t y, const double_t angle, double_t &xR
 void applyTransformations(const entity::Player &playerState,
   const Vertex start,
   const Vertex end,
-  const Sector &sector,
+  const Sector &floorCeilingSector,
   double_t &viewX1,
   double_t &viewY1,
   double_t &viewX2,
@@ -111,8 +112,8 @@ void applyTransformations(const entity::Player &playerState,
   const float_t endX = end.x - playerState.x;
   const float_t endY = end.y - playerState.y;
 
-  floorZ = sector.floorHeight - playerState.z;
-  ceilingZ = sector.ceilingHeight - playerState.z;
+  floorZ = floorCeilingSector.floorHeight - playerState.z;
+  ceilingZ = floorCeilingSector.ceilingHeight - playerState.z;
 
   rotate(startX, startY, playerState.angle, viewX1, viewY1);
   rotate(endX, endY, playerState.angle, viewX2, viewY2);
@@ -121,7 +122,17 @@ void applyTransformations(const entity::Player &playerState,
 
 void Renderer::Render(const GameState &gameState)
 {
-  RenderBSPNode(gameState, 0);
+  if (m_level->nodes.empty()) {
+    // Entire level is a single subsector (no BSP splits were needed)
+    if (!m_level->subsectors.empty()) {
+      const SubSector &subsector = m_level->subsectors[0];
+      for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
+        RenderSegment(m_level->segments[i], gameState);
+      }
+    }
+  } else {
+    RenderBSPNode(gameState, 0);
+  }
 
   m_fb.update();
 }
@@ -130,13 +141,14 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
 {
   const LineDef &ld = m_level->linedefs[seg.linedefIndex];
 
-  bool isBackSide = false;
-
-  if (ld.end == seg.startVertex) { isBackSide = true; }
+  const bool isBackSide = seg.side;
 
   if (isBackSide && ld.backSidedef == -1) {
-    throw std::runtime_error(
+    std::printf(
       "backSidedefIndex == -1 -> When the segment is on the back side, the backSidedef mustn't be empty.");
+
+    fmt::println("Some number");
+    return;
   }
 
   const int16_t frontSidedefId = isBackSide ? ld.backSidedef : ld.frontSidedef;
@@ -188,21 +200,21 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
 
   if (start < 0 && end < 0) return;
 
-  for (int32_t i = std::max(0, start); i < std::min(m_canvasWidth - 1, end); i++) {
+  for (int32_t i = std::max(0, start); i <= std::min(m_canvasWidth - 1, end); i++) {
     if (m_solidSegs[i]) continue;
 
     const double_t t = static_cast<double>(i - start) / (end - start);
     const double_t inv_y = lerp(inv_y1, inv_y2, t);
 
     // represent ceiling and floor in screen coordinates
-    const int32_t projectedFloorY = ProjectZ(floorZ, inv_y);
+    const int32_t projectedFloorY = std::min(m_canvasHeight - 1, ProjectZ(floorZ, inv_y));
     const int32_t projectedCeilingY = std::max(0, ProjectZ(ceilingZ, inv_y));
+
+    DrawFloor(i, projectedFloorY, sidedef.color);
+    DrawCeiling(i, projectedCeilingY, sidedef.color);
 
     if (backSidedefId == -1) {
       // solid wall
-      DrawFloor(i, projectedFloorY, sidedef.color);
-      DrawCeiling(i, projectedCeilingY, sidedef.color);
-
       DrawSolidWall(i, projectedCeilingY, projectedFloorY);
 
       m_solidSegs[i] = true;
@@ -217,11 +229,8 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
         static_cast<int16_t>(static_cast<float>(nextSector.floorHeight) - gameState.playerState.z);
 
       // screen Y coordinates
-      const int32_t nextCeilY = ProjectZ(nextCeilZ, inv_y);
-      const int32_t nextFloorY = ProjectZ(nextFloorZ, inv_y);
-
-      DrawFloor(i, projectedFloorY, sidedef.color);
-      DrawCeiling(i, projectedCeilingY, sidedef.color);
+      const int32_t nextCeilY = std::max(0, ProjectZ(nextCeilZ, inv_y));
+      const int32_t nextFloorY = std::min(m_canvasHeight - 1, ProjectZ(nextFloorZ, inv_y));
 
       if (ld.type == LineDefType::REGULAR) {
         DrawDefaultPortal(i, projectedFloorY, projectedCeilingY, nextFloorY, nextCeilY);
@@ -229,9 +238,7 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
         // TODO: create a drawing function for door portal
       }
 
-      if (m_ceilingClipping[i] >= m_floorClipping[i]) {
-        m_solidSegs[i] = true;
-      }
+      if (m_ceilingClipping[i] >= m_floorClipping[i]) { m_solidSegs[i] = true; }
     }
   }
 }
@@ -298,15 +305,14 @@ void Renderer::DrawDefaultPortal(const int32_t x,
 {
   // Render upper wall only if the neighbor ceiling is lower
   if (nextCeilY > projectedCeilingY) {
+    const int32_t upperWallBottom = std::max(projectedCeilingY, m_ceilingClipping[x]);
+    const int32_t upperWallTop = std::min(nextCeilY, m_floorClipping[x]);
 
-    const int32_t upperWallTop = std::max(projectedCeilingY, m_ceilingClipping[x]);
-    const int32_t upperWallBottom = std::min(nextCeilY, m_floorClipping[x]);
-
-    if (upperWallTop < upperWallBottom) {
-      this->DrawColumn(x, upperWallTop, upperWallBottom, mapColor(0, 255, 0, 255));
-      m_ceilingClipping[x] = upperWallBottom;
-    } else {
+    if (upperWallBottom < upperWallTop) {
+      this->DrawColumn(x, upperWallBottom, upperWallTop, mapColor(0, 255, 0, 255));
       m_ceilingClipping[x] = upperWallTop;
+    } else {
+      m_ceilingClipping[x] = upperWallBottom;
     }
   }
 
