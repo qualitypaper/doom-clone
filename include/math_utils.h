@@ -1,59 +1,45 @@
 #pragma once
 
-#include "editor.h"
-#include "gameloop.h"
-#include "imgui.h"
+#include <glm/glm.hpp>
+#include <concepts>
+#include <cmath>
+#include <cstdint>
+
+template<typename T>
+concept HasXY = requires(T t) {
+  { t.x } -> std::convertible_to<float>;
+  { t.y } -> std::convertible_to<float>;
+};
 
 namespace math_utils {
 
-constexpr double PI = 3.141592653589793;
+constexpr double toRadians(const double angle) { return M_PI * angle / 180; }
 
-constexpr double toRadians(const double angle) { return PI * angle / 180; }
+template<HasXY T> constexpr T toCenterCoordinates(const T &vec, const uint16_t width, const uint16_t height)
+{ return { vec.x - width / 2, height / 2 - vec.y }; }
 
-constexpr Vertex toCenterCoordinates(const Vertex vec, const uint16_t width, const uint16_t height)
-{ return Vertex(vec.x - width / 2, height / 2 - vec.y); }
 
-constexpr ImVec2 toCenterCoordinates(const ImVec2 vec, const uint16_t width, const uint16_t height)
-{ return {vec.x - width / 2, height / 2 - vec.y}; }
-
-constexpr ImVec2 toCenterCoordinates(const EditorVertex &vec, const uint16_t width, const uint16_t height)
-{ return {(float) vec.x - width / 2, (float) height / 2 - vec.y}; }
-
-constexpr ImVec2 fromCenterCoordinates(const ImVec2 vec, const uint16_t width, const uint16_t height)
+template<HasXY T> constexpr T fromCenterCoordinates(const T &vec, const uint16_t width, const uint16_t height)
 {
-  return { std::max(0.0f, std::min(static_cast<float>(width), static_cast<float>(width) / 2 + vec.x)),
-    std::max(0.0f, std::min(static_cast<float>(height), static_cast<float>(height) / 2 - vec.y)) };
+  return { decltype(vec.x)(std::max(0.0f, std::min(static_cast<float>(width), static_cast<float>(width) / 2 + vec.x))),
+    decltype(vec.y)(std::max(0.0f, std::min(static_cast<float>(height), static_cast<float>(height) / 2 - vec.y))) };
 }
 
-constexpr Vertex fromCenterCoordinates(const Vertex vec, const uint16_t width, const uint16_t height)
+// takes two vectors and returns the cross product (z component is always 0, since we are in 2D)
+template<HasXY T>
+constexpr int32_t crossProductLengthNDir(const T v1, const T v2) { return v1.x * v2.y - v1.y * v2.x; }
+
+template<typename T>
+constexpr float getDistanceSq(T v1, T v2)
 {
-  return { std::max(0, std::min(static_cast<int>(width), width / 2 + vec.x)),
-    std::max(0, std::min(static_cast<int>(height), height / 2 - vec.y)) };
-}
-
-constexpr ImVec2 convertVertexIntoImVec2(const Vertex vertex)
-{ return { static_cast<float>(vertex.x), static_cast<float>(vertex.y) }; }
-
-constexpr Vertex convertImVec2IntoVertex(const ImVec2 v)
-{ return { static_cast<int16_t>(v.x), static_cast<int16_t>(v.y) }; };
-
-constexpr float getDistanceSq(const float x1, const float y1, const float x2, const float y2)
-{
-
-  const float x = x2 - x1;
-  const float y = y1 - y2;
+  const float x = v2.x - v1.x;
+  const float y = v1.y - v2.y;
 
   return x * x + y * y;
 }
 
-// takes two vectors and returns the cross product (z component is always 0, since we are in 2D)
-constexpr int32_t crossProductLengthNDir(const Vertex v1, const Vertex v2) { return v1.x * v2.y - v1.y * v2.x; }
-
-constexpr float getDistanceSq(ImVec2 a, ImVec2 b) { return getDistanceSq(a.x, a.y, b.x, b.y); }
-constexpr float getDistanceSq(Vertex v1, Vertex v2) { return getDistanceSq(v1.x, v1.y, v2.x, v2.y); }
-constexpr float dotProduct(ImVec2 a, ImVec2 b) { return a.x * b.x + a.y * b.y; }
-
-
+template<HasXY T>
+constexpr float dotProduct(T a, T b) { return a.x * b.x + a.y * b.y; }
 /**
  *
  * @param p1 starting point of the first line
@@ -62,8 +48,10 @@ constexpr float dotProduct(ImVec2 a, ImVec2 b) { return a.x * b.x + a.y * b.y; }
  * @param d2 direction vector of the second line
  * @return null vector when d1 and d2 are collinear, otherwise a solution to LSE
  */
+
+template<HasXY T>
 inline std::pair<double, double>
-  findLinesIntersection(const Vertex p1, const Vertex d1, const Vertex p2, const Vertex d2)
+  findLinesIntersection(const T p1, const T d1, const T p2, const T d2)
 {
   const glm::mat2x2 A{ d1.x, d1.y, -d2.x, -d2.y };
 
@@ -77,20 +65,12 @@ inline std::pair<double, double>
 }
 
 
-constexpr Vertex rotateAroundX(const Vertex v, const double angleDegrees)
+template<HasXY T> T rotateAroundX(const T v, const double angleDegrees)
 {
   const double cos = std::cos(toRadians(angleDegrees));
   const double sin = std::sin(toRadians(angleDegrees));
 
-  return { static_cast<int32_t>(cos * v.x - sin * v.y), static_cast<int32_t>(sin * v.x + cos * v.y) };
+  return { decltype(v.x)(cos * v.x - sin * v.y), decltype(v.y)(sin * v.x + cos * v.y) };
 }
 
-inline ImVec2 rotateAroundX(const EditorVertex &v, const double angleDegrees)
-{
-  const double cos = std::cos(toRadians(angleDegrees));
-  const double sin = std::sin(toRadians(angleDegrees));
-
-  return { static_cast<float>(cos * v.x) - static_cast<float>(sin * v.y),
-    static_cast<float>(sin * v.x) + static_cast<float>(cos * v.y) };
-}
 }// namespace math_utils

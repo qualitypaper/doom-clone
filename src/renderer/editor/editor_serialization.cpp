@@ -136,8 +136,8 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
   level.sectors.reserve(sectors.size());
 
   for (auto &v : vertices) {
-    auto [x, y] = math_utils::toCenterCoordinates(v, width, height);
-    level.vertices.emplace_back(x, y);
+    EditorVertex res = math_utils::toCenterCoordinates(v, width, height);
+    level.vertices.emplace_back(res.x, res.y);
   }
 
   for (auto &ld : linedefs) {

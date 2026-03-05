@@ -56,6 +56,18 @@ void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &
     state.blockSelectionStart = { 0, 0 };
     state.blockSelectionOffset = { 0, 0 };
   }
+
+
+  // scrolling behavior
+  if (ImGui::IsMouseDown(ImGuiMouseButton_Middle) && ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Middle)) {
+    const ImVec2 &dragDelta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle, io.MouseDragThreshold);
+    if (state.isScrolling) {
+      state.scrollingOffset.x += dragDelta.x;
+      state.scrollingOffset.y += dragDelta.y;
+    } else {
+      state.scrollingStart = mousePos;
+    }
+  }
 }
 
 void EditorInputHandler::flushBlockSelecting(EditorState &state)
@@ -139,13 +151,13 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
   float_t bestVertexDist = std::numeric_limits<float_t>::max();
   float_t bestLineDist = std::numeric_limits<float_t>::max();
 
-  // fill the array of distances with distances to the vertices
   for (size_t i = 0; i < state.level->vertices.size(); i++) {
-    auto &vertex = state.findVertex(i);
+    auto &vertex = state.level->vertices[i];
+    const ImVec2 vec = state.transformedVertices[i];
     // reset to the initial state
     vertex.hovered = false;
 
-    const float_t nodeDis = math_utils::getDistanceSq(vertex.toImVec2(), mousePos) - vertexRadius * vertexRadius;
+    const float_t nodeDis = math_utils::getDistanceSq(vec, mousePos) - vertexRadius * vertexRadius;
 
     if (nodeDis < bestVertexDist) {
       bestVertexDist = nodeDis;
@@ -155,14 +167,14 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
 
   // finding the nearest lines which can be hovered/selected
   for (size_t i = 0; i < state.level->linedefs.size(); i++) {
-    auto &ld = state.findLinedef(i);
+    auto &ld = state.level->linedefs[i];
     // reset to the initial state
     ld.hovered = false;
 
-    auto &start = state.findVertex(ld.start);
-    auto &end = state.findVertex(ld.end);
+    const ImVec2 start = state.findTransformedVertex(ld.start);
+    const ImVec2 end = state.findTransformedVertex(ld.end);
 
-    const float_t distance = getDistanceToSegmentSq(start.toImVec2(), end.toImVec2(), mousePos);
+    const float_t distance = getDistanceToSegmentSq(start, end, mousePos);
 
     if (distance < bestLineDist) {
       bestLineDist = distance;
@@ -311,8 +323,6 @@ void EditorInputHandler::flushDragging(EditorState &state, CommandHistory &histo
 // @param origin is the base point from which the distance will be calculated
 float_t EditorInputHandler::getDistanceToSegmentSq(const ImVec2 start, const ImVec2 end, const ImVec2 origin)
 {
-  // assert(!(start.x == end.x && start.y == end.y));
-
   const ImVec2 startToOrigin(origin.x - start.x, origin.y - start.y);
   const ImVec2 startToEnd(end.x - start.x, end.y - start.y);
 

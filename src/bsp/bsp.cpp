@@ -3,6 +3,7 @@
 #include "config.h"
 #include "math_utils.h"
 
+#include <iostream>
 #include <format>
 #include <queue>
 

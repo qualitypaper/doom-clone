@@ -2,12 +2,14 @@
 
 #include "commands.h"
 #include "editor_input_handler.h"
+#include "editor_renderer.h"
 #include "gameloop.h"
 #include "math_utils.h"
 
 #include <algorithm>
 #include <limits>
 #include <memory>
+#include <ranges>
 #include <unordered_map>
 #include <vector>
 
@@ -114,9 +116,12 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   std::vector<EditorSidedef> editorSidedefs;
 
   editorVertices.reserve(_level.vertices.size());
+  transformedVertices.resize(_level.vertices.size());
+
   editorLinedefs.reserve(_level.linedefs.size());
   editorSectors.reserve(_level.sectors.size());
   editorSidedefs.reserve(_level.sidedefs.size());
+
 
   std::unordered_map<size_t, uint32_t> vertexIdMap;
   vertexIdMap.reserve(_level.vertices.size());
@@ -125,9 +130,8 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   for (size_t i = 0; i < _level.vertices.size(); ++i) {
     const auto &v = _level.vertices[i];
 
-    const ImVec2 convertedVec =
-      math_utils::fromCenterCoordinates(math_utils::convertVertexIntoImVec2(v), _width, _height);
-    editorVertices.emplace_back(convertedVec);
+    const auto [x, y] = math_utils::fromCenterCoordinates(v, _width, _height);
+    editorVertices.emplace_back(x, y);
     vertexIdMap[i] = makeObjectId(EditorObjectType::VERTEX, editorVertices.size() - 1);
   }
 
@@ -186,8 +190,8 @@ void EditorState::reset()
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
 
-  canvasOrigin = { 0.0f, 0.0f };
-  canvasScroll = { 0.0f, 0.0f };
+  scrollingStart = {0.0f, 0.0f};
+  scrollingOffset = { 0.0f, 0.0f };
   canvasZoom = 1.0f;
 }
 
@@ -253,4 +257,64 @@ void Editor::drawConnectedLine(const uint32_t vertexIndex) const
 {
   state->isCreatingLine = true;
   state->lineStartVertexId = vertexIndex;
+}
+
+
+template<HasXY T> constexpr T Editor::scale(const T &vec, const float_t scaleFactor) const
+{
+  return { decltype(vec.x)(scaleFactor * static_cast<float>(vec.x)),
+    decltype(vec.y)(scaleFactor * static_cast<float>(vec.y)) };
+}
+
+template<HasXY T> ImVec2 Editor::zoomVertex(const T &vertex) const
+{
+  const float zoom = state->canvasZoom;
+  T centered = math_utils::toCenterCoordinates(vertex, state->width, state->height);
+
+  centered = scale(centered, zoom);
+  T from_center_coordinates = math_utils::fromCenterCoordinates(centered, state->width, state->height);
+
+  return { static_cast<float>(from_center_coordinates.x), static_cast<float>(from_center_coordinates.y) };
+}
+
+/**
+ * applies transformations to all vertices like zoom, drag, scroll
+ * only if one of this parameters change the method will recalculate the vector
+ */
+void Editor::TransformVertices() const
+{
+  static float prevZoom = -1;
+  static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
+
+  // check for state updates
+  if (prevZoom == state->canvasZoom && draggingOffset.x == state->draggingOffset.x
+      && draggingOffset.y == state->draggingOffset.y && scrollingOffset.x == state->scrollingOffset.x
+      && scrollingOffset.y == state->scrollingOffset.y) {
+    return;
+  }
+
+  prevZoom = state->canvasZoom;
+  draggingOffset = state->draggingOffset;
+  scrollingOffset = state->scrollingOffset;
+
+  const std::vector<EditorVertex> &vertices = state->level->vertices;
+
+  if (state->transformedVertices.size() != vertices.size()) { state->transformedVertices.resize(vertices.size()); }
+
+  // editor vertex contains a vector, so copy is unacceptable
+  for (auto [i, v] : std::ranges::views::enumerate(vertices)) {
+    ImVec2 transformed = zoomVertex(v);
+
+    // apply dragging
+    if (v.selected || v.isAnyConnectedLineDefSelected(*state)) {
+      transformed.x = transformed.x + draggingOffset.x;
+      transformed.y = transformed.y + draggingOffset.y;
+    }
+
+    // apply scrolling
+    transformed.x = transformed.x + scrollingOffset.x;
+    transformed.y = transformed.y + scrollingOffset.y;
+
+    state->transformedVertices[i] = transformed;
+  }
 }

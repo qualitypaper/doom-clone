@@ -2,14 +2,13 @@
 
 #include "gameloop.h"
 #include "imgui.h"
+#include "math_utils.h"
 
-#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <serialization.h>
 #include <vector>
-
 
 // forward declarations
 struct CommandHistory;
@@ -36,13 +35,13 @@ enum class EditorObjectType { LINEDEF, VERTEX, SECTOR, SIDEDEF };
 constexpr uint32_t kObjectTypeShift = 30;
 constexpr uint32_t kObjectIndexMask = (1u << kObjectTypeShift) - 1u;
 
-constexpr uint32_t makeObjectId(EditorObjectType type, uint32_t index)
+constexpr uint32_t makeObjectId(EditorObjectType type, const uint32_t index)
 { return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask); }
 
-constexpr EditorObjectType getObjectType(uint32_t objectId)
+constexpr EditorObjectType getObjectType(const uint32_t objectId)
 { return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u); }
 
-constexpr uint32_t getObjectIndex(uint32_t objectId) { return objectId & kObjectIndexMask; }
+constexpr uint32_t getObjectIndex(const uint32_t objectId) { return objectId & kObjectIndexMask; }
 
 struct EditorObject : Serializable
 {
@@ -86,6 +85,9 @@ struct EditorVertex : EditorObject
 {
   EditorVertex() : EditorObject(EditorObjectType::VERTEX) {}
   EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
+  explicit EditorVertex(const ImVec2 &vec)
+    : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
+  {}
   explicit EditorVertex(const ImVec2 vec)
     : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
   {}
@@ -216,9 +218,11 @@ struct EditorState
   ImVec2 optionsWindowPos = { 0, 0 };
 
   std::vector<uint32_t> selection;
+  std::vector<ImVec2> transformedVertices;
 
-  ImVec2 canvasOrigin = { 0.0, 0.0 };
-  ImVec2 canvasScroll = { 0.0, 0.0 };
+  bool isScrolling = false;
+  ImVec2 scrollingStart = { 0.0, 0.0 };
+  ImVec2 scrollingOffset = { 0.0, 0.0 };
 
   float canvasZoom = 1.0f;
 
@@ -229,6 +233,15 @@ struct EditorState
     if (index >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the sectors array"); }
 
     return level->vertices[index];
+  }
+
+  [[nodiscard]] ImVec2 findTransformedVertex(const uint32_t id) const
+  {
+    const uint32_t index = getObjectIndex(id);
+
+    if (index >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the sectors array"); }
+
+    return transformedVertices[index];
   }
 
   [[nodiscard]] EditorSector &findSector(const uint32_t id) const
@@ -291,4 +304,9 @@ public:
   void addLineDef(int32_t sectorId, LineDef &linedef) const;
   void addVertex(int16_t x, int16_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
+
+  void TransformVertices() const;
+
+  template<HasXY T> constexpr T scale(const T &vec, float_t scaleFactor) const;
+  template<HasXY T> ImVec2 zoomVertex(const T &vertex) const;
 };
