@@ -283,19 +283,25 @@ template<HasXY T> ImVec2 Editor::zoomVertex(const T &vertex) const
  */
 void Editor::TransformVertices() const
 {
+  if (state->level->vertices.size() == 7) {
+    std::cout << "";
+  }
   static float prevZoom = -1;
+  static size_t undoStackSize = 0;
   static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
 
   // check for state updates
   if (prevZoom == state->canvasZoom && draggingOffset.x == state->draggingOffset.x
       && draggingOffset.y == state->draggingOffset.y && scrollingOffset.x == state->scrollingOffset.x
-      && scrollingOffset.y == state->scrollingOffset.y) {
+      && scrollingOffset.y == state->scrollingOffset.y && undoStackSize == m_history->undoStack.size()
+      && state->transformedVertices.size() == state->level->vertices.size()) {
     return;
   }
 
   prevZoom = state->canvasZoom;
   draggingOffset = state->draggingOffset;
   scrollingOffset = state->scrollingOffset;
+  undoStackSize = m_history->undoStack.size();
 
   const std::vector<EditorVertex> &vertices = state->level->vertices;
 

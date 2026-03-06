@@ -7,10 +7,27 @@
 #include <algorithm>
 #include <filesystem>
 #include <limits>
+#include <ranges>
 #include <set>
 #include <unordered_map>
 
-void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &history)
+void EditorInputHandler::captureMouseDragging(EditorState &state)
+{
+  const ImVec2 mousePos = ImGui::GetMousePos();
+
+  if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left, 0)) {
+    if (state.selection.empty() && !state.isBlockSelecting) {
+      state.isBlockSelecting = true;
+      state.blockSelectionStart = mousePos;
+    } else if (!state.isDragging) {
+      state.isDragging = true;
+      state.draggingOffset = { 0, 0 };
+      state.draggingStart = mousePos;
+    }
+  }
+}
+
+void EditorInputHandler::processMouseRelatedInput(EditorState &state, CommandHistory &history)
 {
   const ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse) return;
@@ -22,51 +39,126 @@ void EditorInputHandler::processMouseInputs(EditorState &state, CommandHistory &
     state.optionsWindowPos = mousePos;
   }
 
-  if (ImGui::IsMouseDown(ImGuiMouseButton_Left) && ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left)) {
-    if (state.isDragging) {
-      state.draggingOffset = { mousePos.x - state.draggingStart.x, mousePos.y - state.draggingStart.y };
-    } else if (state.isBlockSelecting) {
-      state.blockSelectionOffset = { mousePos.x - state.blockSelectionStart.x,
-        mousePos.y - state.blockSelectionStart.y };
-    } else {
-      if (state.selection.empty()) {
-        // start block selection
-        state.isBlockSelecting = true;
-        state.blockSelectionStart = mousePos;
-      } else {
-        // state dragging
-        state.isDragging = true;
-        state.draggingOffset = { 0, 0 };
-        state.draggingStart = mousePos;
+  captureMouseDragging(state);
+
+  if (state.isDragging) {
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) || ImGui::IsKeyReleased(ImGuiKey_LeftShift)) {
+      flushDragging(state, history);
+
+      state.isDragging = false;
+      state.isShiftDragging = false;
+
+      state.draggingOffset = { 0, 0 };
+      state.draggingStart = { 0, 0 };
+      state.shiftDraggingStart = { 0, 0 };
+      state.shiftDraggingAxis = 0;
+    } else if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
+      if (!state.isShiftDragging) {
+        state.isShiftDragging = true;
+        state.shiftDraggingStart = mousePos;
+        state.shiftDraggingAxis = 0;
       }
+
+      if (state.shiftDraggingAxis == 0) {
+        if (std::abs(io.MouseDelta.x) > std::abs(io.MouseDelta.y)) {
+          state.shiftDraggingAxis = 1;
+        } else if (std::abs(io.MouseDelta.y) > std::abs(io.MouseDelta.x)) {
+          state.shiftDraggingAxis = 2;
+        }
+      }
+
+      if (state.shiftDraggingAxis == 1) {
+        state.draggingOffset.x = mousePos.x - state.shiftDraggingStart.x;
+      } else if (state.shiftDraggingAxis == 2) {
+        state.draggingOffset.y = mousePos.y - state.shiftDraggingStart.y;
+      } else {
+        state.draggingOffset = { mousePos.x - state.draggingStart.x, mousePos.y - state.draggingStart.y };
+      }
+    } else {
+      state.draggingOffset = { mousePos.x - state.draggingStart.x, mousePos.y - state.draggingStart.y };
     }
+  } else if (state.isBlockSelecting) {
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+      // flush block selecting
+      flushBlockSelecting(state);
 
-  } else if (state.isDragging && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-    // flush and reset the dragging state when the mouse button is released
-    flushDragging(state, history);
-
-    state.isDragging = false;
-    state.draggingOffset = { 0, 0 };
-    state.draggingStart = { 0, 0 };
-  } else if (state.isBlockSelecting && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-    // flush block selecting
-    flushBlockSelecting(state);
-
-    state.isBlockSelecting = false;
-    state.blockSelectionStart = { 0, 0 };
-    state.blockSelectionOffset = { 0, 0 };
+      state.isBlockSelecting = false;
+      state.blockSelectionStart = { 0, 0 };
+      state.blockSelectionOffset = { 0, 0 };
+    } else {
+      state.blockSelectionOffset = { mousePos.x - state.blockSelectionStart.x, mousePos.y - state.blockSelectionStart.y };
+    }
   }
-
 
   // scrolling behavior
   if (ImGui::IsMouseDown(ImGuiMouseButton_Middle) && ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Middle)) {
-    const ImVec2 &dragDelta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle, io.MouseDragThreshold);
     if (state.isScrolling) {
-      state.scrollingOffset.x += dragDelta.x;
-      state.scrollingOffset.y += dragDelta.y;
+      state.scrollingOffset = { mousePos.x - state.scrollingStart.x, mousePos.y - state.scrollingStart.y };
     } else {
+      // state scrolling
+      state.isScrolling = true;
+      state.scrollingOffset = { 0, 0 };
       state.scrollingStart = mousePos;
     }
+  } else if (state.isScrolling && ImGui::IsMouseReleased(ImGuiMouseButton_Middle)) {
+    // flush and reset the scrolling state when the middle mouse button is released
+    flushScrolling(state, history);
+
+    state.isScrolling = false;
+    state.scrollingOffset = { 0, 0 };
+    state.scrollingStart = { 0, 0 };
+  }
+}
+
+void EditorInputHandler::flushScrolling(EditorState &state, CommandHistory &history)
+{
+  // early return if there is no dragging offset
+  if (state.scrollingOffset.x == 0 && state.scrollingOffset.y == 0) return;
+
+  // Collect encoded vertex object IDs that will be moved by selected linedefs
+  std::unordered_map<uint32_t, bool> verticesMovedByLinedefs;
+
+  for (const auto [index, ld] : std::views::enumerate(state.level->linedefs)) {
+    verticesMovedByLinedefs.emplace(ld.start, false);
+    verticesMovedByLinedefs.emplace(ld.end, false);
+
+    const uint32_t id = makeObjectId(EditorObjectType::LINEDEF, index);
+    auto &start = state.findVertex(ld.start), &end = state.findVertex(ld.end);
+
+    std::unique_ptr<MoveLineDefCommand> cmd;
+
+    if (!verticesMovedByLinedefs.at(ld.start) && !verticesMovedByLinedefs.at(ld.end)) {
+      verticesMovedByLinedefs.at(ld.start) = true;
+      verticesMovedByLinedefs.at(ld.end) = true;
+
+      cmd = std::make_unique<MoveLineDefCommand>(
+        id, start, end, start + state.scrollingOffset, end + state.scrollingOffset);
+    } else if (verticesMovedByLinedefs.at(ld.start) && !verticesMovedByLinedefs.at(ld.end)) {
+      verticesMovedByLinedefs.at(ld.end) = true;
+
+      cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start, end + state.scrollingOffset);
+    } else if (!verticesMovedByLinedefs.at(ld.start) && verticesMovedByLinedefs.at(ld.end)) {
+      verticesMovedByLinedefs.at(ld.start) = true;
+
+      cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start + state.scrollingOffset, end);
+    } else {
+      // skip if those vertices were already moved by other linedefs
+      continue;
+    }
+
+    history.execute(std::move(cmd), state);
+  }
+
+  for (const auto [index, vertex] : std::views::enumerate(state.level->vertices)) {
+    const uint32_t id = makeObjectId(EditorObjectType::VERTEX, index);
+    if (verticesMovedByLinedefs.contains(id)) continue;
+
+    auto cmd = std::make_unique<MoveVertexCommand>(id,
+      vertex,
+      EditorVertex(static_cast<int32_t>(static_cast<float_t>(vertex.x) + state.scrollingOffset.x),
+        static_cast<int32_t>(static_cast<float_t>(vertex.y) + state.scrollingOffset.y)));
+
+    history.execute(std::move(cmd), state);
   }
 }
 
@@ -144,7 +236,7 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
   const ImGuiIO &io = ImGui::GetIO();
   const bool lmbClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.WantCaptureMouse;
 
-  processMouseInputs(state, history);
+  processMouseRelatedInput(state, history);
 
   uint32_t bestVertexId = 0;
   uint32_t bestLineId = 0;
@@ -185,41 +277,39 @@ void EditorInputHandler::processInput(EditorState &state, CommandHistory &histor
   const bool hasVertex = bestVertexDist < s_vertexHoveringThresholdSq;
   const bool hasLine = bestLineDist < s_lineHoveringThresholdSq;
 
-  if (hasVertex || hasLine) {
-    if (hasVertex && (!hasLine || bestVertexDist <= bestLineDist)) {
-      auto &vertex = state.findVertex(bestVertexId);
+  if (!hasVertex && !hasLine) return;
 
-      if (lmbClicked) {
-        if (state.isCreatingLine) {
-          // draw a line between the start vertex and the hovered vertex
-          const EditorLineDef lineDef(state.lineStartVertexId, bestVertexId, LineDefType::REGULAR, -1, -1);
+  // select vertex
+  if (hasVertex && (!hasLine || bestVertexDist <= bestLineDist)) {
+    auto &vertex = state.findVertex(bestVertexId);
 
-          auto cmd = std::make_unique<AddLineDefCommand>(lineDef);
-          history.execute(std::move(cmd), state);
-          state.isCreatingLine = false;
-          state.lineStartVertexId = 0;
-        } else {
-          vertex.selected = !vertex.selected;
-          const uint32_t objectId = makeObjectId(EditorObjectType::VERTEX, bestVertexId);
-          updateSelection(objectId, vertex.selected, state);
-        }
+    if (lmbClicked) {
+      if (state.isCreatingLine) {
+        // draw a line between the start vertex and the hovered vertex
+        const EditorLineDef lineDef(state.lineStartVertexId, bestVertexId, LineDefType::REGULAR, -1, -1);
+
+        auto cmd = std::make_unique<AddLineDefCommand>(lineDef);
+        history.execute(std::move(cmd), state);
+        state.isCreatingLine = false;
+        state.lineStartVertexId = 0;
       } else {
-        vertex.hovered = true;
+        vertex.selected = !vertex.selected;
+        const uint32_t objectId = makeObjectId(EditorObjectType::VERTEX, bestVertexId);
+        updateSelection(objectId, vertex.selected, state);
       }
     } else {
-      auto &line = state.findLinedef(bestLineId);
-
-      if (lmbClicked) {
-        line.selected = !line.selected;
-        const uint32_t objectId = makeObjectId(EditorObjectType::LINEDEF, bestLineId);
-        updateSelection(objectId, line.selected, state);
-      } else {
-        line.hovered = true;
-      }
+      vertex.hovered = true;
     }
   } else {
-    // if clicking nothing, reset the selection
-    // if (lmbClicked) { resetSelection(state); }
+    auto &line = state.findLinedef(bestLineId);
+
+    if (lmbClicked) {
+      line.selected = !line.selected;
+      const uint32_t objectId = makeObjectId(EditorObjectType::LINEDEF, bestLineId);
+      updateSelection(objectId, line.selected, state);
+    } else {
+      line.hovered = true;
+    }
   }
 }
 

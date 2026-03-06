@@ -201,8 +201,11 @@ struct EditorState
 
   // dragging state
   bool isDragging = false;
+  bool isShiftDragging = false;
+  ImVec2 shiftDraggingStart = { 0, 0 };
   ImVec2 draggingOffset = { 0, 0 };
   ImVec2 draggingStart = { 0, 0 };
+  int shiftDraggingAxis = 0; // 0 = none, 1 = x, 2 = y
 
   // block selection state
   bool isBlockSelecting = false;

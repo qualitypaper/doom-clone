@@ -1,13 +1,13 @@
 #include "editor_renderer.h"
 
+#include "commands.h"
 #include "editor.h"
-#include "editor_input_handler.h"
+#include "math_utils.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 #include "imgui_internal.h"
-#include "math_utils.h"
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -132,6 +132,12 @@ void EditorRenderer::render() const
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
   m_editor->processInput(vertexRadius);
+
+  // suggest creating a new line/vertex
+  if (m_editor->state->renderOptionsWindow) {
+    showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
+  }
+
   m_editor->TransformVertices();
 
   // render a window showing all the sectors
@@ -139,11 +145,6 @@ void EditorRenderer::render() const
 
   // render a window showing all sidedefs
   drawSidedefsWindow();
-
-  // suggest creating a new line/vertex
-  if (m_editor->state->renderOptionsWindow) {
-    showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
-  }
 
   // draw map outlines
   drawMapOutlines(vertexRadius, thickness);
@@ -424,8 +425,10 @@ void EditorRenderer::drawArrowForLinedef(const float_t thickness,
 
   const float zoom = std::max(0.1f, m_editor->state->canvasZoom);
 
-  const ImVec2 leftArrowEnd { static_cast<float>(endVec.x  + leftArrowDir.x * s_arrowLength * zoom), static_cast<float>(endVec.y + leftArrowDir.y * s_arrowLength * zoom) };
-  const ImVec2 rightArrowEnd { static_cast<float>(endVec.x + rightArrowDir.x * s_arrowLength * zoom),  static_cast<float>(endVec.y + rightArrowDir.y * s_arrowLength * zoom) };
+  const ImVec2 leftArrowEnd{ static_cast<float>(endVec.x + leftArrowDir.x * s_arrowLength * zoom),
+    static_cast<float>(endVec.y + leftArrowDir.y * s_arrowLength * zoom) };
+  const ImVec2 rightArrowEnd{ static_cast<float>(endVec.x + rightArrowDir.x * s_arrowLength * zoom),
+    static_cast<float>(endVec.y + rightArrowDir.y * s_arrowLength * zoom) };
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 

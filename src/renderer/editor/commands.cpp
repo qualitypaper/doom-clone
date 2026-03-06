@@ -69,11 +69,16 @@ void MoveLineDefCommand::undo(EditorState &state)
 
   endVertex.x = oldEnd.x;
   endVertex.y = oldEnd.y;
+
+  std::cout << "Undone linedef move\n";
 }
 
 AddVertexCommand::AddVertexCommand(EditorVertex _vertex) : vertex(std::move(_vertex)) {}
 
-void AddVertexCommand::execute(EditorState &state) { state.level->vertices.emplace_back(vertex); }
+void AddVertexCommand::execute(EditorState &state)
+{
+  state.level->vertices.emplace_back(vertex);
+}
 
 void AddVertexCommand::undo(EditorState &state) { state.level->vertices.pop_back(); }
 
