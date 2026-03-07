@@ -3,8 +3,8 @@
 #include "config.h"
 #include "math_utils.h"
 
-#include <iostream>
 #include <format>
+#include <iostream>
 #include <queue>
 
 void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const
@@ -150,9 +150,7 @@ int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
   }
 
   const int rightId = BuildBSPTree(split.front);
-  if (split.back.size() == 3) {
-    std::printf("");
-  }
+  if (split.back.size() == 3) { std::printf(""); }
   const int leftId = BuildBSPTree(split.back);
 
   nodes[id].leftChild = static_cast<int16_t>(leftId);
@@ -243,14 +241,9 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
     return (dominant <= 0) ? SegmentPosition::FRONT : SegmentPosition::BACK;
   }
 
-  if (startCross <= 0 && endCross <= 0) {
-    return SegmentPosition::FRONT;
-  } else if (startCross >= 0 && endCross >= 0) {
-    return SegmentPosition::BACK;
-  }
+  if (startCross <= 0 && endCross <= 0) { return SegmentPosition::FRONT; }
 
-  // Should not be reached — all cases are handled above
-  return SegmentPosition::SPANNING;
+  return SegmentPosition::BACK;
 }
 
 // returns a score of the segment; the smaller, the better
@@ -287,8 +280,9 @@ bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
   for (auto &seg : segs) {
     for (auto &other : segs) {
       if (seg == other) continue;
+
       const SegmentPosition pos = DetermineSegmentPosition(seg, other);
-      if (pos == SegmentPosition::SPANNING) return false;
+      if (pos != SegmentPosition::FRONT) return false;
     }
   }
 
@@ -334,15 +328,20 @@ void BSPBuilder::BuildRowsRecursive(const int16_t index,
   std::vector<std::vector<std::string>> &rows) const
 {
   if (currentDepth >= rows.size()) return;
+  if (index & 0x8000) {
+
+    rows[currentDepth].push_back(std::to_string(index));
+    return;
+  }
 
   const int16_t left = nodes[index].leftChild;
   const int16_t right = nodes[index].rightChild;
   rows[currentDepth].push_back(std::to_string(left));
   rows[currentDepth].push_back(std::to_string(right));
 
-  if (left != -1) { BuildRowsRecursive(left, currentDepth + 1, rows); }
+  if (!(left & 0x8000)) { BuildRowsRecursive(left, currentDepth + 1, rows); }
 
-  if (right != -1) { BuildRowsRecursive(right, currentDepth + 1, rows); }
+  if (!(right & 0x8000)) { BuildRowsRecursive(right, currentDepth + 1, rows); }
 }
 
 std::vector<std::string> BSPBuilder::FormatRows(const std::vector<std::vector<std::string>> &rows)

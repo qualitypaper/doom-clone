@@ -66,7 +66,9 @@ ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
 
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 {
-  auto &vertex = state.level->vertices[vertexId];
+  auto &vertex = state.findVertex(vertexId);
+  const uint32_t vertexIndex = getObjectIndex(vertexId);
+
   // Remove all linedefs that reference this vertex (iterate backwards to avoid index issues)
   for (int i = static_cast<int>(vertex.connectedLineDefs.size()) - 1; i >= 0; i--) {
     uint32_t ldId = getObjectIndex(vertex.connectedLineDefs[i]);
@@ -88,17 +90,17 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   }
 
   // Remove the vertex using swap-and-pop
-  const auto lastVertexIndex = static_cast<uint32_t>(state.level->vertices.size() - 1);
+  const uint32_t lastVertexIndex = static_cast<uint32_t>(state.level->vertices.size() - 1);
+  const uint32_t lastVertexId = makeObjectId(EditorObjectType::VERTEX, lastVertexIndex);
 
-  if (vertexId != lastVertexIndex) {
+  if (vertexIndex != lastVertexIndex) {
     const auto &lastVertex = state.level->vertices.back();
 
     for (const uint32_t ldObjectId : lastVertex.connectedLineDefs) {
-      const auto ldIndex = getObjectIndex(ldObjectId);
-      auto &ld = state.findLinedef(ldIndex);
+      auto &ld = state.findLinedef(ldObjectId);
 
-      if (ld.start == lastVertexIndex) ld.start = vertexId;
-      if (ld.end == lastVertexIndex) ld.end = vertexId;
+      if (ld.start == lastVertexId) ld.start = vertexId;
+      if (ld.end == lastVertexId) ld.end = vertexId;
     }
 
     vertex = lastVertex;
@@ -190,7 +192,7 @@ void EditorState::reset()
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
 
-  scrollingStart = {0.0f, 0.0f};
+  scrollingStart = { 0.0f, 0.0f };
   scrollingOffset = { 0.0f, 0.0f };
   canvasZoom = 1.0f;
 }
@@ -228,12 +230,35 @@ void Editor::updateAABB(const uint32_t sectorID) const
 }
 
 Editor::Editor(Level &_level, uint16_t _width, uint16_t _height)
-  : m_inputHandler(std::make_unique<EditorInputHandler>()), m_history(std::make_unique<CommandHistory>()),
-    state(std::make_unique<EditorState>(_level, _width, _height))
-{}
+  : m_history(std::make_shared<CommandHistory>()), state(std::make_shared<EditorState>(_level, _width, _height))
+{ this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history); }
 
-void Editor::processInput(const float_t vertexRadius) const
-{ EditorInputHandler::processInput(*this->state, *this->m_history, vertexRadius); }
+/**
+ * function resets the state, the must be set to default on each frame
+ */
+void Editor::resetStateFrame() const
+{
+  if (state->hoveredObjectId == UINT32_MAX) return;
+  switch (getObjectType(state->hoveredObjectId)) {
+  case EditorObjectType::LINEDEF: {
+    auto &ld = state->findLinedef(state->hoveredObjectId);
+    ld.hovered = false;
+    break;
+  }
+  case EditorObjectType::VERTEX: {
+    auto &v = state->findVertex(state->hoveredObjectId);
+    v.hovered = false;
+    break;
+  }
+
+  default: {
+  }
+  }
+
+  state->hoveredObjectId = UINT32_MAX;
+}
+
+void Editor::processInput(const float_t vertexRadius) const { m_inputHandler->processInput(vertexRadius); }
 
 void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 {
@@ -247,8 +272,13 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
   this->updateAABB(sectorId);
 }
 
-void Editor::addVertex(const int16_t x, const int16_t y) const
-{ m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(x, y)), *state); }
+void Editor::addVertex(const int32_t x, const int32_t y) const
+{
+  const EditorVertex temp{ x, y };
+  // const ImVec2 newVertex = transformVertex(temp);
+
+  m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(temp.x, temp.y)), *state);
+}
 
 void Editor::executeCommand(std::unique_ptr<Command> cmd) const { m_history->execute(std::move(cmd), *state); }
 
@@ -259,33 +289,38 @@ void Editor::drawConnectedLine(const uint32_t vertexIndex) const
   state->lineStartVertexId = vertexIndex;
 }
 
-
-template<HasXY T> constexpr T Editor::scale(const T &vec, const float_t scaleFactor) const
+ImVec2 Editor::transformVertex(const EditorVertex &v) const
 {
-  return { decltype(vec.x)(scaleFactor * static_cast<float>(vec.x)),
-    decltype(vec.y)(scaleFactor * static_cast<float>(vec.y)) };
+  ImVec2 transformed = zoomVertex(v);
+
+  // apply dragging
+  if (v.selected || v.isAnyConnectedLineDefSelected(*state)) {
+    transformed.x = transformed.x + state->draggingOffset.x;
+    transformed.y = transformed.y + state->draggingOffset.y;
+  }
+
+  // apply scrolling
+  transformed.x = transformed.x + state->scrollingOffset.x;
+  transformed.y = transformed.y + state->scrollingOffset.y;
+
+  return transformed;
 }
 
-template<HasXY T> ImVec2 Editor::zoomVertex(const T &vertex) const
+ImVec2 Editor::untransformVertex(ImVec2 transformed) const
 {
-  const float zoom = state->canvasZoom;
-  T centered = math_utils::toCenterCoordinates(vertex, state->width, state->height);
+  // apply scrolling
+  transformed.x = transformed.x - state->scrollingOffset.x;
+  transformed.y = transformed.y - state->scrollingOffset.y;
 
-  centered = scale(centered, zoom);
-  T from_center_coordinates = math_utils::fromCenterCoordinates(centered, state->width, state->height);
-
-  return { static_cast<float>(from_center_coordinates.x), static_cast<float>(from_center_coordinates.y) };
+  return zoomVertex(transformed, 1 / state->canvasZoom);
 }
 
 /**
  * applies transformations to all vertices like zoom, drag, scroll
  * only if one of this parameters change the method will recalculate the vector
  */
-void Editor::TransformVertices() const
+void Editor::transformVertices() const
 {
-  if (state->level->vertices.size() == 7) {
-    std::cout << "";
-  }
   static float prevZoom = -1;
   static size_t undoStackSize = 0;
   static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
@@ -305,22 +340,11 @@ void Editor::TransformVertices() const
 
   const std::vector<EditorVertex> &vertices = state->level->vertices;
 
-  if (state->transformedVertices.size() != vertices.size()) { state->transformedVertices.resize(vertices.size()); }
+  if (state->transformedVertices.size() != vertices.size()) {
+    state->transformedVertices.resize(vertices.size());
+    std::printf("");
+  }
 
   // editor vertex contains a vector, so copy is unacceptable
-  for (auto [i, v] : std::ranges::views::enumerate(vertices)) {
-    ImVec2 transformed = zoomVertex(v);
-
-    // apply dragging
-    if (v.selected || v.isAnyConnectedLineDefSelected(*state)) {
-      transformed.x = transformed.x + draggingOffset.x;
-      transformed.y = transformed.y + draggingOffset.y;
-    }
-
-    // apply scrolling
-    transformed.x = transformed.x + scrollingOffset.x;
-    transformed.y = transformed.y + scrollingOffset.y;
-
-    state->transformedVertices[i] = transformed;
-  }
+  for (auto [i, v] : std::ranges::views::enumerate(vertices)) { state->transformedVertices[i] = transformVertex(v); }
 }

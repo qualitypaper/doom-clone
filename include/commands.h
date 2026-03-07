@@ -1,8 +1,9 @@
 #pragma once
+
 #include "editor.h"
+#include "imgui.h"
 
 #include <memory>
-#include <utility>
 #include <vector>
 
 struct Command
@@ -25,9 +26,9 @@ struct AddLineDefCommand : Command
 struct MoveVertexCommand : Command
 {
   uint32_t vertexId;
-  EditorVertex oldVertex, newVertex;
+  ImVec2 offset;
 
-  MoveVertexCommand(uint32_t _vertexId, EditorVertex _oldVertex, EditorVertex _newVertex);
+  MoveVertexCommand(uint32_t _vertexId, ImVec2 offset);
 
   void execute(EditorState &state) override;
 

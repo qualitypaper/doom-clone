@@ -3,6 +3,7 @@
 #include "commands.h"
 #include "editor.h"
 #include "math_utils.h"
+#include "utils.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -19,10 +20,9 @@
 static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
 static ImU32 g_selectedColor = IM_COL32(0, 0, 255, 255);
 static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
+
 static float g_defaultVertexRadius = 4.0f;
 static float g_defaultLinedefThickness = 2.0f;
-
-static std::vector<bool> g_renderedLinedefs;
 
 EditorRenderer::EditorRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
 {
@@ -81,12 +81,13 @@ void EditorRenderer::drawLinePreview(const float_t thickness) const
 {
   if (!m_editor->state->isCreatingLine) return;
 
-  const auto &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
+  const EditorVertex &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
+  const ImVec2 startTransformed = m_editor->transformVertex(startVertex);
 
   const ImVec2 mousePos = ImGui::GetMousePos();
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
-  drawList->AddLine(startVertex.toImVec2(), mousePos, g_hoverColor, thickness);
+  drawList->AddLine(startTransformed, mousePos, g_hoverColor, thickness);
 }
 
 void EditorRenderer::drawPopupsForSelectedObjects() const
@@ -109,8 +110,7 @@ void EditorRenderer::render() const
 
   // Start the Dear ImGui frame
   startFrame();
-  g_renderedLinedefs.clear();
-  g_renderedLinedefs.resize(m_editor->state->level->linedefs.size());
+  m_editor->resetStateFrame();
 
   const ImGuiIO &io = ImGui::GetIO();
   ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -128,7 +128,6 @@ void EditorRenderer::render() const
   // 3. Draw "screen-level" elements
   ImGui::TextColored(ImVec4(1, 1, 0, 1), "FPS: %.1f", io.Framerate);
 
-
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
   m_editor->processInput(vertexRadius);
@@ -138,7 +137,13 @@ void EditorRenderer::render() const
     showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
 
-  m_editor->TransformVertices();
+  m_editor->transformVertices();
+
+  // log the selection size every 100 frames
+  static auto logger = std::make_unique<DelayedLogger<size_t>>("Selection size: {}", static_cast<size_t>(100));
+  logger->log(m_editor->state->selection.size());
+
+  drawCoordinatesCenter(vertexRadius);
 
   // render a window showing all the sectors
   drawSectorsWindow();
@@ -177,7 +182,7 @@ void EditorRenderer::drawBlockSelection() const
   const float minY = std::min(blockSelectionStart.y, blockSelectionEnd.y);
   const float maxY = std::max(blockSelectionStart.y, blockSelectionEnd.y);
 
-  drawList->AddRectFilled({ minX, maxY }, { maxX, minY }, IM_COL32(100, 100, 0, 150));
+  drawList->AddRectFilled({ minX, minY }, { maxX, maxY }, IM_COL32(100, 100, 0, 150));
 }
 
 void EditorRenderer::drawSidedefsWindow() const
@@ -274,35 +279,6 @@ void EditorRenderer::drawSectorsWindow() const
   ImGui::Begin("Sectors");
 
   if (ImGui::Button("Create sector")) { m_editor->state->level->sectors.emplace_back(); }
-  //
-  // for (uint32_t sectorId = 0; sectorId < m_editor->state->level->sectors.size(); sectorId++) {
-  //   auto &sector = m_editor->state->findSector(sectorId);
-  //   ImGui::PushID(sectorId);
-  //
-  //   ImGui::Text("Sector: %d", sectorId);
-  //   ImGui::SetNextItemWidth(100);
-  //   int floorHeight = sector.floorHeight;
-  //   int ceilingHeight = sector.ceilingHeight;
-  //   if (ImGui::InputInt("Sector floor height", &floorHeight)) {
-  //     sector.floorHeight = static_cast<int16_t>(floorHeight);
-  //   }
-  //   ImGui::SetNextItemWidth(100);
-  //   if (ImGui::InputInt("Sector ceiling height", &ceilingHeight)) {
-  //     sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
-  //   }
-  //
-  //   float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
-  //     ImGui::ColorConvertU32ToFloat4(sector.color).y,
-  //     ImGui::ColorConvertU32ToFloat4(sector.color).z };
-  //
-  //   if (ImGui::ColorPicker3("Sector color", color)) {
-  //     // update sidedef color
-  //     sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
-  //   }
-  //
-  //   ImGui::NewLine();
-  //   ImGui::PopID();
-  // }
 
   constexpr ImGuiTableFlags tableFlags =
     ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg
@@ -438,9 +414,6 @@ void EditorRenderer::drawArrowForLinedef(const float_t thickness,
 
 void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thickness) const
 {
-  const EditorVertex startVertex = m_editor->state->findVertex(ld.start);
-  const EditorVertex endVertex = m_editor->state->findVertex(ld.end);
-
   ImU32 color;
   if (ld.selected) {
     color = g_selectedColor;
@@ -466,13 +439,11 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
 void EditorRenderer::drawLinedefs(const float_t thickness) const
 {
   for (size_t i = 0; i < m_editor->state->level->linedefs.size(); i++) {
-    if (i < g_renderedLinedefs.size() && g_renderedLinedefs[i]) continue;
 
     const auto &ld = m_editor->state->level->linedefs[i];
     const auto startVertex = m_editor->state->findVertex(ld.start);
     const auto endVertex = m_editor->state->findVertex(ld.end);
 
-    if (i < g_renderedLinedefs.size()) { g_renderedLinedefs[i] = true; }
     drawLinedef(ld, thickness);
   }
 }
@@ -484,18 +455,30 @@ void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t t
   drawVertices(vertexRadius);
 }
 
+void EditorRenderer::drawCoordinatesCenter(const float vertexRadius) const
+{
+  const EditorVertex center =
+    math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow.width, m_sdlWindow.height);
+  const ImVec2 centerTransformed = m_editor->transformVertex(center);
+
+  ImDrawList *drawList = ImGui::GetWindowDrawList();
+  drawList->AddCircleFilled(centerTransformed, vertexRadius, IM_COL32(50, 0, 255, 255));
+}
+
 void EditorRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const
 {
   ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
   const bool vertexCreation = ImGui::Button("Create Vertex");
-  const bool lineCreation = ImGui::Button("Create Line");
 
   if (vertexCreation) {
-    m_editor->addVertex(static_cast<int16_t>(mousePos.x), static_cast<int16_t>(mousePos.y));
+    const int32_t x = mousePos.x - m_editor->state->scrollingOffset.x;
+    const int32_t y = mousePos.y - m_editor->state->scrollingOffset.y;
+
+    const ImVec2 zoomed = m_editor->zoomVertex(ImVec2(x, y), 1 / m_editor->state->canvasZoom);
+
+    m_editor->addVertex(zoomed.x, zoomed.y);
     isOpen = false;
-  } else if (lineCreation) {
-    // TODO:
   }
 
   ImGui::End();
@@ -570,7 +553,7 @@ void EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
   }
 
   if (ImGui::Button("Create Connected Line")) { m_editor->drawConnectedLine(index); }
-  if (ImGui::Button("Delete")) { EditorVertex::remove(*m_editor->state, index); }
+  if (ImGui::Button("Delete")) { EditorVertex::remove(*m_editor->state, selectedId); }
 
   ImGui::PopID();
   ImGui::End();

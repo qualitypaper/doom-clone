@@ -129,7 +129,7 @@ int main()
 
   BSPBuilder bspBuilder(*level);
   bspBuilder.BuildBSPTree();
-  // bspBuilder.PrintTree();
+  bspBuilder.PrintTree();
 
   level = std::make_shared<Level>(*bspBuilder.GetConstructedLevel());
 

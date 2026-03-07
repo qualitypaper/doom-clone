@@ -30,6 +30,7 @@ private:
   // map drawing methods
   void drawMapOutlines(float_t vertexRadius, float_t thickness) const;
 
+  void drawCoordinatesCenter(float vertexRadius) const;
   void drawLinePreview(float_t thickness) const;
   void drawVertices(float_t vertexRadius) const;
   void drawLinedef(const EditorLineDef &ld, float_t thickness) const;

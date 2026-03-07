@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <serialization.h>
+#include <set>
 #include <vector>
 
 // forward declarations
@@ -106,6 +107,21 @@ struct EditorVertex : EditorObject
   EditorVertex operator*(const double c) const { return { static_cast<int32_t>(x * c), static_cast<int32_t>(y * c) }; }
   EditorVertex operator/(const double c) const { return { static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
 
+  EditorVertex &operator+=(const ImVec2 &offset)
+  {
+    this->x += static_cast<int32_t>(offset.x);
+    this->y += static_cast<int32_t>(offset.y);
+
+    return *this;
+  }
+  EditorVertex &operator-=(const ImVec2 &offset)
+  {
+    this->x -= static_cast<int32_t>(offset.x);
+    this->y -= static_cast<int32_t>(offset.y);
+
+    return *this;
+  }
+
   [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
   [[nodiscard]] constexpr ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
   [[nodiscard]] constexpr double length() const { return std::sqrt(x * x + y * y); }
@@ -118,6 +134,7 @@ struct EditorVertex : EditorObject
     x = static_cast<int32_t>(std::round(static_cast<double>(x) / len));
     y = static_cast<int32_t>(std::round(static_cast<double>(y) / len));
   }
+
 
   static void remove(EditorState &state, uint32_t vertexId);
 
@@ -205,7 +222,7 @@ struct EditorState
   ImVec2 shiftDraggingStart = { 0, 0 };
   ImVec2 draggingOffset = { 0, 0 };
   ImVec2 draggingStart = { 0, 0 };
-  int shiftDraggingAxis = 0; // 0 = none, 1 = x, 2 = y
+  int shiftDraggingAxis = 0;// 0 = none, 1 = x, 2 = y
 
   // block selection state
   bool isBlockSelecting = false;
@@ -220,7 +237,9 @@ struct EditorState
   bool renderOptionsWindow = false;
   ImVec2 optionsWindowPos = { 0, 0 };
 
-  std::vector<uint32_t> selection;
+  std::set<uint32_t> selection;
+  uint32_t hoveredObjectId = UINT32_MAX;
+
   std::vector<ImVec2> transformedVertices;
 
   bool isScrolling = false;
@@ -290,26 +309,46 @@ struct EditorState
 class Editor
 {
 private:
+  std::shared_ptr<CommandHistory> m_history;
   std::unique_ptr<EditorInputHandler> m_inputHandler;
-  std::unique_ptr<CommandHistory> m_history;
 
 private:
   void updateAABB(uint32_t sectorID) const;
 
 public:
-  std::unique_ptr<EditorState> state;
+  std::shared_ptr<EditorState> state;
 
 public:
   Editor(Level &_level, uint16_t _width, uint16_t _height);
 
+  void resetStateFrame() const;
+
   void processInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<Command> cmd) const;
   void addLineDef(int32_t sectorId, LineDef &linedef) const;
-  void addVertex(int16_t x, int16_t y) const;
+  void addVertex(int32_t x, int32_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
 
-  void TransformVertices() const;
+  void transformVertices() const;
+  [[nodiscard]] ImVec2 transformVertex(const EditorVertex &v) const;
+  [[nodiscard]] ImVec2 untransformVertex(ImVec2 transformed) const;
 
-  template<HasXY T> constexpr T scale(const T &vec, float_t scaleFactor) const;
-  template<HasXY T> ImVec2 zoomVertex(const T &vertex) const;
+  template<HasXY T> constexpr T scale(const T &vec, const float scaleFactor) const
+  {
+    return { decltype(vec.x)(scaleFactor * static_cast<float>(vec.x)),
+      decltype(vec.y)(scaleFactor * static_cast<float>(vec.y)) };
+  }
+
+  // zooms the vertex
+  // if no zoom parameter is specified will default to state->canvasZoom
+  template<HasXY T> ImVec2 zoomVertex(const T &vertex, float zoom = -1) const
+  {
+    if (zoom == -1) { zoom = state->canvasZoom; }
+    T centered = math_utils::toCenterCoordinates(vertex, state->width, state->height);
+
+    centered = scale(centered, zoom);
+    T from_center_coordinates = math_utils::fromCenterCoordinates(centered, state->width, state->height);
+
+    return { static_cast<float>(from_center_coordinates.x), static_cast<float>(from_center_coordinates.y) };
+  }
 };

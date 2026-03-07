@@ -1,4 +1,5 @@
 #include "commands.h"
+#include "editor.h"
 
 AddLineDefCommand::AddLineDefCommand(EditorLineDef _lineDef) : lineDef(std::move(_lineDef)) {}
 
@@ -17,22 +18,19 @@ void AddLineDefCommand::undo(EditorState &state)
   state.findVertex(lineDef.end).connectedLineDefs.pop_back();
 }
 
-MoveVertexCommand::MoveVertexCommand(const uint32_t _vertexId, EditorVertex _oldVertex, EditorVertex _newVertex)
-  : vertexId(_vertexId), oldVertex(std::move(_oldVertex)), newVertex(std::move(_newVertex))
-{}
+
+MoveVertexCommand::MoveVertexCommand(const uint32_t _vertexId, const ImVec2 _offset) :vertexId(_vertexId), offset(_offset){}
 
 void MoveVertexCommand::execute(EditorState &state)
 {
   auto &vertex = state.findVertex(vertexId);
-  vertex.x = newVertex.x;
-  vertex.y = newVertex.y;
+  vertex += offset;
 }
 
 void MoveVertexCommand::undo(EditorState &state)
 {
   auto &vertex = state.findVertex(vertexId);
-  vertex.x = oldVertex.x;
-  vertex.y = oldVertex.y;
+  vertex -= offset;
 }
 
 MoveLineDefCommand::MoveLineDefCommand(uint32_t _lineDefId,

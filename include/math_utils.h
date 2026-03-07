@@ -1,9 +1,9 @@
 #pragma once
 
-#include <glm/glm.hpp>
-#include <concepts>
 #include <cmath>
+#include <concepts>
 #include <cstdint>
+#include <glm/glm.hpp>
 
 template<typename T>
 concept HasXY = requires(T t) {
@@ -26,11 +26,9 @@ template<HasXY T> constexpr T fromCenterCoordinates(const T &vec, const uint16_t
 }
 
 // takes two vectors and returns the cross product (z component is always 0, since we are in 2D)
-template<HasXY T>
-constexpr int32_t crossProductLengthNDir(const T v1, const T v2) { return v1.x * v2.y - v1.y * v2.x; }
+template<HasXY T> constexpr int32_t crossProductLengthNDir(const T v1, const T v2) { return v1.x * v2.y - v1.y * v2.x; }
 
-template<typename T>
-constexpr float getDistanceSq(T v1, T v2)
+template<typename T> constexpr float getDistanceSq(T v1, T v2)
 {
   const float x = v2.x - v1.x;
   const float y = v1.y - v2.y;
@@ -38,8 +36,7 @@ constexpr float getDistanceSq(T v1, T v2)
   return x * x + y * y;
 }
 
-template<HasXY T>
-constexpr float dotProduct(T a, T b) { return a.x * b.x + a.y * b.y; }
+template<HasXY T> constexpr float dotProduct(T a, T b) { return a.x * b.x + a.y * b.y; }
 /**
  *
  * @param p1 starting point of the first line
@@ -49,9 +46,7 @@ constexpr float dotProduct(T a, T b) { return a.x * b.x + a.y * b.y; }
  * @return null vector when d1 and d2 are collinear, otherwise a solution to LSE
  */
 
-template<HasXY T>
-inline std::pair<double, double>
-  findLinesIntersection(const T p1, const T d1, const T p2, const T d2)
+template<HasXY T> inline std::pair<double, double> findLinesIntersection(const T p1, const T d1, const T p2, const T d2)
 {
   const glm::mat2x2 A{ d1.x, d1.y, -d2.x, -d2.y };
 
