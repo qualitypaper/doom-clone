@@ -205,8 +205,7 @@ void EditorInputHandler::flushDragging() const
         verticesMovedByLinedefs.at(line.start) = true;
         verticesMovedByLinedefs.at(line.end) = true;
 
-        cmd = std::make_unique<MoveLineDefCommand>(
-          id, start, end, start + unzoomedOffset, end + unzoomedOffset);
+        cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start + unzoomedOffset, end + unzoomedOffset);
       } else if (verticesMovedByLinedefs.at(line.start) && !verticesMovedByLinedefs.at(line.end)) {
         verticesMovedByLinedefs.at(line.end) = true;
 
@@ -241,7 +240,9 @@ void EditorInputHandler::processKeyboardInputs() const
   // reset the state when pressing escape
   if (ImGui::IsKeyPressed(ImGuiKey_Escape)) { state->reset(); }
 
-  if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z)) {
+  const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
+
+  if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_Z)) {
     if (const auto history = m_commandHistory.lock()) {
       if (io.KeyShift) {
         history->redo(*state);
@@ -251,47 +252,56 @@ void EditorInputHandler::processKeyboardInputs() const
     }
   }
 
-  if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S)) {
+  if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_S)) {
     // save the current level into a .bin file
     // vertices, linedefs, sidedefs, sectors
     state->level->serialize("saved_level.bin");
   }
 
-  if (io.KeyCtrl && !io.WantCaptureMouse && io.MouseWheel != 0) {
+  if (ctrlDown && !io.WantCaptureMouse && io.MouseWheel != 0) {
     state->canvasZoom = std::clamp(state->canvasZoom * (io.MouseWheel > 0 ? 1.1f : 0.9f), 0.5f, 3.0f);
+  }
+
+  if (ImGui::IsKeyDown(ImGuiKey_C)) {
+    const auto firstSelectedVertex = std::ranges::find_if(
+      state->selection, [](const uint32_t id) { return getObjectType(id) == EditorObjectType::VERTEX; });
+
+    if (firstSelectedVertex != state->selection.end()) {
+      state->isCreatingLine = true;
+      state->lineStartVertexId = *firstSelectedVertex;
+    }
   }
 }
 
-/**
- *
- * @param vertexRadius
- * @param hoveringThresholdSq
- * @return the nearest vertex/linedef to the cursor, if it passes a threshold
- * returns UINT32_MAX when none are in the range
- */
-uint32_t EditorInputHandler::findNearestPastThreshold(const float vertexRadius,
-  const float hoveringThresholdSq = 25.0f * 25.0f) const
+std::pair<uint32_t, float> EditorInputHandler::findNearestVertices(const float vertexRadius) const
 {
   const auto state = m_state.lock();
-  if (!state) return UINT32_MAX;
+  if (!state) return { UINT32_MAX, FLT_MAX };
 
-  const ImVec2 mousePos = ImGui::GetMousePos();
-
-  uint32_t bestVertexIndex = 0;
-  uint32_t bestLineIndex = 0;
-  float_t bestVertexDist = FLT_MAX;
-  float_t bestLineDist = FLT_MAX;
+  uint32_t bestVertexIndex = UINT32_MAX;
+  float bestVertexDist = FLT_MAX;
 
   for (size_t i = 0; i < state->level->vertices.size(); i++) {
     const ImVec2 vec = state->transformedVertices[i];
 
-    const float_t nodeDis = math_utils::getDistanceSq(vec, mousePos) - vertexRadius * vertexRadius;
+    const float_t nodeDis = math_utils::getDistanceSq(vec, ImGui::GetMousePos()) - vertexRadius * vertexRadius;
 
     if (nodeDis < bestVertexDist) {
       bestVertexDist = nodeDis;
       bestVertexIndex = static_cast<uint32_t>(i);
     }
   }
+
+  return { bestVertexIndex, bestVertexDist };
+}
+
+std::pair<uint32_t, float> EditorInputHandler::findNearestLinedefs() const
+{
+  const auto state = m_state.lock();
+  if (!state) return { UINT32_MAX, FLT_MAX };
+
+  uint32_t bestLineIndex = UINT32_MAX;
+  float_t bestLineDist = FLT_MAX;
 
   // finding the nearest lines which can be hovered/selected
   for (size_t i = 0; i < state->level->linedefs.size(); i++) {
@@ -300,13 +310,31 @@ uint32_t EditorInputHandler::findNearestPastThreshold(const float vertexRadius,
     const ImVec2 start = state->findTransformedVertex(ld.start);
     const ImVec2 end = state->findTransformedVertex(ld.end);
 
-    const float_t distance = getDistanceToSegmentSq(start, end, mousePos);
+    const float_t distance = getDistanceToSegmentSq(start, end, ImGui::GetMousePos());
 
     if (distance < bestLineDist) {
       bestLineDist = distance;
       bestLineIndex = static_cast<uint32_t>(i);
     }
   }
+
+  return { bestLineIndex, bestLineDist };
+}
+/**
+ *
+ * @param vertexRadius
+ * @param shouldProcessLinedefs
+ * @param hoveringThresholdSq
+ * @return the nearest vertex/linedef to the cursor, if it passes a threshold
+ * returns UINT32_MAX when none are in the range
+ */
+uint32_t EditorInputHandler::findNearestPastThreshold(const float vertexRadius,
+  const bool shouldProcessLinedefs = true,
+  const float hoveringThresholdSq = 25.0f * 25.0f) const
+{
+
+  auto [bestVertexIndex, bestVertexDist] = findNearestVertices(vertexRadius);
+  auto [bestLineIndex, bestLineDist] = shouldProcessLinedefs ? findNearestLinedefs() : std::pair(UINT32_MAX, FLT_MAX);
 
   if (bestLineDist < bestVertexDist && bestLineDist < hoveringThresholdSq) {
     return makeObjectId(EditorObjectType::LINEDEF, bestLineIndex);
@@ -326,59 +354,52 @@ void EditorInputHandler::processNearestObject(const uint32_t bestObjectId) const
 
   const bool lmbClicked = !ImGui::GetIO().WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
-  const uint32_t bestObjectIndex = getObjectIndex(bestObjectId);
+  EditorObject *object = state->findObject(bestObjectId);
 
-  switch (getObjectType(bestObjectId)) {
-  case EditorObjectType::VERTEX: {
-    // select vertex
-    auto &vertex = state->level->vertices[bestObjectIndex];
+  if (!object) return;
 
-    if (lmbClicked) {
-      if (state->isCreatingLine) {
-        // draw a line between the start vertex and the hovered vertex
-        const EditorLineDef lineDef(state->lineStartVertexId, bestObjectId, LineDefType::REGULAR, -1, -1);
-
-        auto cmd = std::make_unique<AddLineDefCommand>(lineDef);
-        if (const auto history = m_commandHistory.lock()) { history->execute(std::move(cmd), *state); }
-
-        state->isCreatingLine = false;
-        state->lineStartVertexId = 0;
-      } else {
-        vertex.selected = !vertex.selected;
-
-        updateSelection(bestObjectId, vertex.selected);
-      }
-    } else {
-      vertex.hovered = true;
-      state->hoveredObjectId = bestObjectId;
+  if (lmbClicked) {
+    if (object->type == EditorObjectType::VERTEX && state->isCreatingLine) {
+      createLine(bestObjectId);
+      return;
     }
 
-    break;
+    object->select();
+    updateSelection(bestObjectId, object->selected);
+  } else {
+    object->hover();
+    state->hoveredObjectId = bestObjectId;
   }
-  case EditorObjectType::LINEDEF: {
-    auto &line = state->level->linedefs[bestObjectIndex];
+}
 
-    if (lmbClicked) {
-      line.selected = !line.selected;
-      updateSelection(bestObjectId, line.selected);
-    } else {
-      line.hovered = true;
-      state->hoveredObjectId = bestObjectId;
-    }
+void EditorInputHandler::createLine(const uint32_t toObjectId) const
+{
+  if (getObjectType(toObjectId) != EditorObjectType::VERTEX) return;
 
-    break;
-  }
-  default: {
-  }
-  }
+  const auto state = m_state.lock();
+  if (!state) return;
+
+  // draw a line between the start vertex and the hovered vertex
+  const EditorLineDef lineDef(state->lineStartVertexId, toObjectId, LineDefType::REGULAR, -1, -1);
+
+  auto cmd = std::make_unique<AddLineDefCommand>(lineDef);
+  if (const auto history = m_commandHistory.lock()) { history->execute(std::move(cmd), *state); }
+
+  state->isCreatingLine = false;
+  state->lineStartVertexId = 0;
 }
 
 void EditorInputHandler::processMouseInteractions(const float_t vertexRadius) const
 {
-
   static float_t s_hoveringThresholdSq = 25.0f * 25.0f;
 
-  const uint32_t bestObjectId = findNearestPastThreshold(vertexRadius, s_hoveringThresholdSq);
+  const auto state = m_state.lock();
+  if (!state) return;
+
+  // no linedefs shall be selectable when user is drawing a line
+  const bool shouldProcessLinedefs = !state->isCreatingLine;
+
+  const uint32_t bestObjectId = findNearestPastThreshold(vertexRadius, shouldProcessLinedefs, s_hoveringThresholdSq);
 
   processNearestObject(bestObjectId);
 }

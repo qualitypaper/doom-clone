@@ -4,6 +4,16 @@
 
 struct CommandHistory;
 
+class Interaction
+{
+public:
+  Interaction() = default;
+  virtual ~Interaction() = default;
+
+  virtual void hover() {}
+  virtual void select() {}
+};
+
 class EditorInputHandler
 {
 private:
@@ -15,8 +25,11 @@ private:
   void processMouseDragging() const;
   void processMouseRelatedInput() const;
   void processKeyboardInputs() const;
-  uint32_t findNearestPastThreshold(float vertexRadius, float hoveringThresholdSq) const;
+  [[nodiscard]] std::pair<uint32_t, float> findNearestVertices(float vertexRadius) const;
+  [[nodiscard]] std::pair<uint32_t, float> findNearestLinedefs() const;
+  [[nodiscard]] uint32_t findNearestPastThreshold(float vertexRadius, bool shouldProcessLinedefs, float hoveringThresholdSq) const;
   void processNearestObject(uint32_t bestObjectId) const;
+  void createLine(uint32_t toObjectId) const;
   void processMouseInteractions(float_t vertexRadius) const;
   void updateSelection(uint32_t id, bool selected) const;
   void resetSelection() const;

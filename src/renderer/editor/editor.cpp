@@ -192,9 +192,9 @@ void EditorState::reset()
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
 
-  scrollingStart = { 0.0f, 0.0f };
-  scrollingOffset = { 0.0f, 0.0f };
-  canvasZoom = 1.0f;
+  // scrollingStart = { 0.0f, 0.0f };
+  // scrollingOffset = { 0.0f, 0.0f };
+  // canvasZoom = 1.0f;
 }
 
 void Editor::updateAABB(const uint32_t sectorID) const
@@ -326,12 +326,12 @@ void Editor::transformVertices() const
   static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
 
   // check for state updates
-  if (prevZoom == state->canvasZoom && draggingOffset.x == state->draggingOffset.x
-      && draggingOffset.y == state->draggingOffset.y && scrollingOffset.x == state->scrollingOffset.x
-      && scrollingOffset.y == state->scrollingOffset.y && undoStackSize == m_history->undoStack.size()
-      && state->transformedVertices.size() == state->level->vertices.size()) {
-    return;
-  }
+  // if (prevZoom == state->canvasZoom && draggingOffset.x == state->draggingOffset.x
+  //     && draggingOffset.y == state->draggingOffset.y && scrollingOffset.x == state->scrollingOffset.x
+  //     && scrollingOffset.y == state->scrollingOffset.y && undoStackSize == m_history->undoStack.size()
+  //     && state->transformedVertices.size() == state->level->vertices.size()) {
+  //   return;
+  // }
 
   prevZoom = state->canvasZoom;
   draggingOffset = state->draggingOffset;

@@ -150,7 +150,6 @@ int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
   }
 
   const int rightId = BuildBSPTree(split.front);
-  if (split.back.size() == 3) { std::printf(""); }
   const int leftId = BuildBSPTree(split.back);
 
   nodes[id].leftChild = static_cast<int16_t>(leftId);

@@ -52,6 +52,16 @@ struct EditorObject : Serializable
   EditorObjectType type;
   bool selected = false;
   bool hovered = false;
+
+  virtual void select()
+  {
+    this->selected = !this->selected;
+  }
+
+  virtual void hover()
+  {
+    this->hovered = !this->hovered;
+  }
 };
 
 struct EditorLineDef : EditorObject
