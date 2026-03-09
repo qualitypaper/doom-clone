@@ -44,7 +44,18 @@ constexpr EditorObjectType getObjectType(const uint32_t objectId)
 
 constexpr uint32_t getObjectIndex(const uint32_t objectId) { return objectId & kObjectIndexMask; }
 
-struct EditorObject : Serializable
+struct DraggableObject
+{
+  DraggableObject() = default;
+  virtual ~DraggableObject() = default;
+
+  bool dragged = false;
+
+  virtual void drag(uint32_t objectId, EditorState *state, CommandHistory *history);
+  static void resetDraggableState(EditorState *state);
+};
+
+struct EditorObject : public Serializable, public DraggableObject
 {
   explicit EditorObject(const EditorObjectType _type) : type(_type) {}
   ~EditorObject() override = default;
@@ -53,18 +64,12 @@ struct EditorObject : Serializable
   bool selected = false;
   bool hovered = false;
 
-  virtual void select()
-  {
-    this->selected = !this->selected;
-  }
+  virtual void select() { this->selected = !this->selected; }
 
-  virtual void hover()
-  {
-    this->hovered = !this->hovered;
-  }
+  virtual void hover() { this->hovered = !this->hovered; }
 };
 
-struct EditorLineDef : EditorObject
+struct EditorLineDef : public EditorObject
 {
   EditorLineDef() : EditorObject(EditorObjectType::LINEDEF) {}
   explicit EditorLineDef(const LineDef &_linedef)
@@ -74,8 +79,8 @@ struct EditorLineDef : EditorObject
   EditorLineDef(const uint32_t _start,
     const uint32_t _end,
     const LineDefType _type,
-    const uint32_t _frontSideDef,
-    const uint32_t _backSideDef)
+    const int32_t _frontSideDef,
+    const int32_t _backSideDef)
     : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSideDef(_frontSideDef),
       backSideDef(_backSideDef)
   {}
@@ -90,9 +95,11 @@ struct EditorLineDef : EditorObject
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
+
+  void drag(uint32_t objectId, EditorState *state, CommandHistory *history) override;
 };
 
-struct EditorVertex : EditorObject
+struct EditorVertex : public EditorObject
 {
   EditorVertex() : EditorObject(EditorObjectType::VERTEX) {}
   EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
@@ -145,11 +152,12 @@ struct EditorVertex : EditorObject
     y = static_cast<int32_t>(std::round(static_cast<double>(y) / len));
   }
 
-
   static void remove(EditorState &state, uint32_t vertexId);
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
+
+  void drag(uint32_t objectId, EditorState *state, CommandHistory *history) override;
 };
 
 struct EditorSidedef : EditorObject
@@ -248,6 +256,7 @@ struct EditorState
   ImVec2 optionsWindowPos = { 0, 0 };
 
   std::set<uint32_t> selection;
+  std::set<uint32_t> dragged;
   uint32_t hoveredObjectId = UINT32_MAX;
 
   std::vector<ImVec2> transformedVertices;
@@ -343,10 +352,18 @@ public:
   [[nodiscard]] ImVec2 transformVertex(const EditorVertex &v) const;
   [[nodiscard]] ImVec2 untransformVertex(ImVec2 transformed) const;
 
-  template<HasXY T> constexpr T scale(const T &vec, const float scaleFactor) const
+  template<HasXY T> static constexpr T scale(const T &vec, const float scaleFactor)
   {
     return { decltype(vec.x)(scaleFactor * static_cast<float>(vec.x)),
       decltype(vec.y)(scaleFactor * static_cast<float>(vec.y)) };
+  }
+
+  template<HasXY T> static constexpr T unscale(const T &vec, const float scaleFactor)
+  {
+    assert(scaleFactor != 0);
+
+    return { decltype(vec.x)( static_cast<float>(vec.x) / scaleFactor),
+      decltype(vec.y)( static_cast<float>(vec.y) / scaleFactor) };
   }
 
   // zooms the vertex
@@ -356,7 +373,7 @@ public:
     if (zoom == -1) { zoom = state->canvasZoom; }
     T centered = math_utils::toCenterCoordinates(vertex, state->width, state->height);
 
-    centered = scale(centered, zoom);
+    centered = Editor::scale(centered, zoom);
     T from_center_coordinates = math_utils::fromCenterCoordinates(centered, state->width, state->height);
 
     return { static_cast<float>(from_center_coordinates.x), static_cast<float>(from_center_coordinates.y) };

@@ -33,44 +33,6 @@ void MoveVertexCommand::undo(EditorState &state)
   vertex -= offset;
 }
 
-MoveLineDefCommand::MoveLineDefCommand(uint32_t _lineDefId,
-  EditorVertex _oldStart,
-  EditorVertex _oldEnd,
-  EditorVertex _newStart,
-  EditorVertex _newEnd)
-  : lineDefId(_lineDefId), oldStart(std::move(_oldStart)), oldEnd(std::move(_oldEnd)), newStart(std::move(_newStart)),
-    newEnd(std::move(_newEnd))
-{}
-
-void MoveLineDefCommand::execute(EditorState &state)
-{
-  const auto &lineDef = state.findLinedef(lineDefId);
-
-  auto &startVertex = state.findVertex(lineDef.start);
-  auto &endVertex = state.findVertex(lineDef.end);
-
-  startVertex.x = newStart.x;
-  startVertex.y = newStart.y;
-
-  endVertex.x = newEnd.x;
-  endVertex.y = newEnd.y;
-}
-
-void MoveLineDefCommand::undo(EditorState &state)
-{
-  const auto &lineDef = state.findLinedef(lineDefId);
-  auto &startVertex = state.findVertex(lineDef.start);
-  auto &endVertex = state.findVertex(lineDef.end);
-
-  startVertex.x = oldStart.x;
-  startVertex.y = oldStart.y;
-
-  endVertex.x = oldEnd.x;
-  endVertex.y = oldEnd.y;
-
-  std::cout << "Undone linedef move\n";
-}
-
 AddVertexCommand::AddVertexCommand(EditorVertex _vertex) : vertex(std::move(_vertex)) {}
 
 void AddVertexCommand::execute(EditorState &state)

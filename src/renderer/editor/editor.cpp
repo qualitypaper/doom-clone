@@ -20,6 +20,20 @@ AABB::AABB(const Vertex start, const Vertex end)
   this->maxY = std::max(start.y, end.y);
   this->minY = std::min(start.y, end.y);
 }
+void DraggableObject::drag(uint32_t objectId, EditorState *state, CommandHistory *history)
+{
+  this->dragged = true;
+  state->dragged.emplace(objectId);
+}
+void DraggableObject::resetDraggableState(EditorState *state)
+{
+  for (const uint32_t id : state->dragged) {
+    EditorObject *object = state->findObject(id);
+    object->dragged = false;
+  }
+
+  state->dragged.clear();
+}
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
 {
@@ -238,24 +252,14 @@ Editor::Editor(Level &_level, uint16_t _width, uint16_t _height)
  */
 void Editor::resetStateFrame() const
 {
-  if (state->hoveredObjectId == UINT32_MAX) return;
-  switch (getObjectType(state->hoveredObjectId)) {
-  case EditorObjectType::LINEDEF: {
-    auto &ld = state->findLinedef(state->hoveredObjectId);
-    ld.hovered = false;
-    break;
-  }
-  case EditorObjectType::VERTEX: {
-    auto &v = state->findVertex(state->hoveredObjectId);
-    v.hovered = false;
-    break;
-  }
+  DraggableObject::resetDraggableState(state.get());
 
-  default: {
-  }
-  }
+  if (state->hoveredObjectId != UINT32_MAX) {
+    auto object = state->findObject(state->hoveredObjectId);
+    object->hovered = false;
 
-  state->hoveredObjectId = UINT32_MAX;
+    state->hoveredObjectId = UINT32_MAX;
+  }
 }
 
 void Editor::processInput(const float_t vertexRadius) const { m_inputHandler->processInput(vertexRadius); }
@@ -287,6 +291,33 @@ void Editor::drawConnectedLine(const uint32_t vertexIndex) const
 {
   state->isCreatingLine = true;
   state->lineStartVertexId = vertexIndex;
+}
+
+void EditorVertex::drag(const uint32_t objectId, EditorState *state, CommandHistory *history)
+{
+  assert(getObjectType(objectId) == EditorObjectType::VERTEX);
+
+  if (dragged) return;
+  DraggableObject::drag(objectId, state, history);
+
+  ImVec2 unzoomedOffset = Editor::unscale(state->draggingOffset, state->canvasZoom);
+
+  auto cmd = std::make_unique<MoveVertexCommand>(objectId, unzoomedOffset);
+
+  history->execute(std::move(cmd), *state);
+}
+
+void EditorLineDef::drag(const uint32_t objectId, EditorState *state, CommandHistory *history)
+{
+  assert(getObjectType(objectId) == EditorObjectType::LINEDEF);
+
+  if (dragged) return;
+  DraggableObject::drag(objectId, state, history);
+
+  auto &startVertex = state->findVertex(start), &endVertex = state->findVertex(end);
+
+  startVertex.drag(start, state, history);
+  endVertex.drag(end, state, history);
 }
 
 ImVec2 Editor::transformVertex(const EditorVertex &v) const

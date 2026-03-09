@@ -161,70 +161,17 @@ void EditorInputHandler::flushDragging() const
 {
   const auto state = m_state.lock();
   if (!state) return;
-
   // early return if there is no dragging offset
   if (state->draggingOffset.x == 0 && state->draggingOffset.y == 0) return;
 
-  // Collect encoded vertex object IDs that will be moved by selected linedefs
-  std::unordered_map<uint32_t, bool> verticesMovedByLinedefs;
-  verticesMovedByLinedefs.reserve(state->level->vertices.size());
-
-  for (const uint32_t id : state->selection) {
-    if (getObjectType(id) == EditorObjectType::LINEDEF) {
-      const auto &ld = state->findLinedef(id);
-      verticesMovedByLinedefs.emplace(ld.start, false);
-      verticesMovedByLinedefs.emplace(ld.end, false);
-    }
-  }
+  const auto history = m_commandHistory.lock();
+  if (!history) return;
 
   for (const uint32_t id : state->selection) {
     const auto object = state->findObject(id);
     if (!object) continue;
 
-    const EditorObjectType type = getObjectType(id);
-
-    switch (type) {
-    case EditorObjectType::VERTEX: {
-      if (verticesMovedByLinedefs.contains(id)) continue;
-
-      ImVec2 unzoomedOffset{ state->draggingOffset.x / state->canvasZoom, state->draggingOffset.y / state->canvasZoom };
-
-      auto cmd = std::make_unique<MoveVertexCommand>(id, unzoomedOffset);
-
-      if (const auto history = m_commandHistory.lock()) { history->execute(std::move(cmd), *state); }
-      break;
-    }
-    case EditorObjectType::LINEDEF: {
-      const auto &line = state->findLinedef(id);
-      auto &start = state->findVertex(line.start), &end = state->findVertex(line.end);
-
-      std::unique_ptr<MoveLineDefCommand> cmd;
-      ImVec2 unzoomedOffset{ state->draggingOffset.x / state->canvasZoom, state->draggingOffset.y / state->canvasZoom };
-
-      if (!verticesMovedByLinedefs.at(line.start) && !verticesMovedByLinedefs.at(line.end)) {
-        verticesMovedByLinedefs.at(line.start) = true;
-        verticesMovedByLinedefs.at(line.end) = true;
-
-        cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start + unzoomedOffset, end + unzoomedOffset);
-      } else if (verticesMovedByLinedefs.at(line.start) && !verticesMovedByLinedefs.at(line.end)) {
-        verticesMovedByLinedefs.at(line.end) = true;
-
-        cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start, end + unzoomedOffset);
-      } else if (!verticesMovedByLinedefs.at(line.start) && verticesMovedByLinedefs.at(line.end)) {
-        verticesMovedByLinedefs.at(line.start) = true;
-
-        cmd = std::make_unique<MoveLineDefCommand>(id, start, end, start + unzoomedOffset, end);
-      } else {
-        // skip if those vertices were already moved by other linedefs
-        continue;
-      }
-
-      if (const auto history = m_commandHistory.lock()) { history->execute(std::move(cmd), *state); }
-      break;
-    }
-    default:
-      break;
-    }
+    object->drag(id, state.get(), history.get());
   }
 }
 

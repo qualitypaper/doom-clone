@@ -35,23 +35,6 @@ struct MoveVertexCommand : Command
   void undo(EditorState &state) override;
 };
 
-struct MoveLineDefCommand : Command
-{
-  uint32_t lineDefId;
-  EditorVertex oldStart, oldEnd;
-  EditorVertex newStart, newEnd;
-
-  MoveLineDefCommand(uint32_t _lineDefId,
-    EditorVertex _oldStart,
-    EditorVertex _oldEnd,
-    EditorVertex _newStart,
-    EditorVertex _newEnd);
-
-  void execute(EditorState &state) override;
-
-  void undo(EditorState &state) override;
-};
-
 struct AddVertexCommand : Command
 {
   EditorVertex vertex;

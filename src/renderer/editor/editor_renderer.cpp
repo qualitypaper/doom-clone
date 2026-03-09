@@ -139,10 +139,6 @@ void EditorRenderer::render() const
 
   m_editor->transformVertices();
 
-  // log the selection size every 100 frames
-  static auto logger = std::make_unique<DelayedLogger<size_t>>("Selection size: {}", static_cast<size_t>(100));
-  logger->log(m_editor->state->selection.size());
-
   drawCoordinatesCenter(vertexRadius);
 
   // render a window showing all the sectors
@@ -414,6 +410,7 @@ void EditorRenderer::drawArrowForLinedef(const float_t thickness,
 
 void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thickness) const
 {
+
   ImU32 color;
   if (ld.selected) {
     color = g_selectedColor;
@@ -427,10 +424,14 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
   if (ld.backSideDef != -1) { color -= 0x32323200; }
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
-  drawList->AddLine(m_editor->state->transformedVertices[getObjectIndex(ld.start)],
-    m_editor->state->transformedVertices[getObjectIndex(ld.end)],
-    color,
-    thickness);
+
+  const ImVec2 &startVec = m_editor->state->transformedVertices[getObjectIndex(ld.start)];
+  const ImVec2 &endVec = m_editor->state->transformedVertices[getObjectIndex(ld.end)];
+
+  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow.width <= startVec.x || m_sdlWindow.height <= startVec.y) return;
+  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow.width <= endVec.x || m_sdlWindow.height <= endVec.y) return;
+
+  drawList->AddLine(startVec, endVec, color, thickness);
 
   // draw a small arrow showing the direction of the linedef
   drawArrowForLinedef(thickness, ld.start, ld.end, color);
@@ -438,14 +439,7 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
 
 void EditorRenderer::drawLinedefs(const float_t thickness) const
 {
-  for (size_t i = 0; i < m_editor->state->level->linedefs.size(); i++) {
-
-    const auto &ld = m_editor->state->level->linedefs[i];
-    const auto startVertex = m_editor->state->findVertex(ld.start);
-    const auto endVertex = m_editor->state->findVertex(ld.end);
-
-    drawLinedef(ld, thickness);
-  }
+  for (const auto &ld : m_editor->state->level->linedefs) { drawLinedef(ld, thickness); }
 }
 void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
 {
@@ -589,11 +583,12 @@ void EditorRenderer::createSelect(const char *label,
 
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
 {
+  const auto &v = m_editor->state->findVertex(vertexId);
+  if (v.x < 0 || v.y < 0 || m_sdlWindow.width <= v.x || m_sdlWindow.height <= v.y) return;
+
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
   ImU32 color;
-
-  const auto &v = m_editor->state->findVertex(vertexId);
 
   if (v.selected) {
     color = g_selectedColor;

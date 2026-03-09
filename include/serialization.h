@@ -75,8 +75,14 @@ struct Serializable
   Serializable() = default;
   virtual ~Serializable() = default;
 
-  virtual void serialize(FileWriter &fw) const {}
-  virtual void deserialize(FileReader &fr) {}
+  virtual void serialize(FileWriter &fw) const
+  {
+    throw std::runtime_error("serialize method is unimplemented for the custom type.");
+  }
+  virtual void deserialize(FileReader &fr)
+  {
+    throw std::runtime_error("deserialize method is unimplemented for the custom type.");
+  }
 };
 
 #endif// DOOMCLONE_SERIALIZATION_H
