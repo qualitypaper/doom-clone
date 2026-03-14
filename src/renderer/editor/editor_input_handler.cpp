@@ -202,7 +202,7 @@ void EditorInputHandler::processKeyboardInputs() const
   if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_S)) {
     // save the current level into a .bin file
     // vertices, linedefs, sidedefs, sectors
-    state->level->serialize("saved_level.bin");
+    state->level->save(state->width, state->height);
   }
 
   if (ctrlDown && !io.WantCaptureMouse && io.MouseWheel != 0) {

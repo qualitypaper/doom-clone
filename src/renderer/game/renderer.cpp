@@ -1,20 +1,61 @@
 #include "renderer.h"
 
-#include <utility>
-
 #include "bsp.h"
 #include "config.h"
 #include "framebuffer.h"
 #include "gameloop.h"
+#include "math_utils.h"
 
 #include <algorithm>
 #include <fmt/core.h>
+#include <utility>
 
 static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (M_PI / 180.0));
 static double_t FOCAL_LENGTH;
 
 static constexpr uint32_t mapColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t alpha)
-{ return (r << 24) | (g << 16) | (b << 8) | alpha; }
+{
+  return (r << 24) | (g << 16) | (b << 8) | alpha;
+}
+
+namespace {
+template<HasXY T> void clipNearPlane(T &vecToClip, const T &endVec)
+{
+  const double_t t = (config::NEAR_CLIPPING - vecToClip.y) / (endVec.y - vecToClip.y);
+
+  vecToClip.x += t * (endVec.x - vecToClip.x);
+  vecToClip.y = config::NEAR_CLIPPING;
+}
+
+template<HasXY T> static void rotate(const T &vec, const double_t angle, T &res)
+{
+  res.x = vec.x * std::cos(angle) - vec.y * std::sin(angle);
+  res.y = vec.x * std::sin(angle) + vec.y * std::cos(angle);
+}
+
+template<HasXY T, HasXY V>
+void applyTransformations(const entity::Player &playerState,
+  const V &start,
+  const V &end,
+  const Sector &floorCeilingSector,
+  T &view1,
+  T &view2,
+  int16_t &floorZ,
+  int16_t &ceilingZ)
+{
+  const double_t startX = start.x - playerState.x;
+  const double_t startY = start.y - playerState.y;
+
+  const double_t endX = end.x - playerState.x;
+  const double_t endY = end.y - playerState.y;
+
+  floorZ = floorCeilingSector.floorHeight - playerState.z;
+  ceilingZ = floorCeilingSector.ceilingHeight - playerState.z;
+
+  rotate(T(startX, startY), playerState.angle, view1);
+  rotate(T(endX, endY), playerState.angle, view2);
+}
+}// namespace
 
 Renderer::Renderer(FrameBuffer &_fb,
   std::shared_ptr<Level> _level,
@@ -81,45 +122,6 @@ void Renderer::DrawSolidWall(const int32_t x, const int32_t projectedCeilingZ, c
   }
 }
 
-void clipNearPlane(double_t &x1, double_t &y1, const double_t x2, const double_t y2)
-{
-  const double_t t = (config::NEAR_CLIPPING - y1) / (y2 - y1);
-
-  x1 += t * (x2 - x1);
-  y1 = config::NEAR_CLIPPING;
-}
-
-void rotate(const float_t x, const float_t y, const double_t angle, double_t &xRes, double_t &yRes)
-{
-  xRes = x * std::cos(angle) - y * std::sin(angle);
-  yRes = x * std::sin(angle) + y * std::cos(angle);
-}
-
-void applyTransformations(const entity::Player &playerState,
-  const Vertex start,
-  const Vertex end,
-  const Sector &floorCeilingSector,
-  double_t &viewX1,
-  double_t &viewY1,
-  double_t &viewX2,
-  double_t &viewY2,
-  int16_t &floorZ,
-  int16_t &ceilingZ)
-{
-  const float_t startX = start.x - playerState.x;
-  const float_t startY = start.y - playerState.y;
-
-  const float_t endX = end.x - playerState.x;
-  const float_t endY = end.y - playerState.y;
-
-  floorZ = floorCeilingSector.floorHeight - playerState.z;
-  ceilingZ = floorCeilingSector.ceilingHeight - playerState.z;
-
-  rotate(startX, startY, playerState.angle, viewX1, viewY1);
-  rotate(endX, endY, playerState.angle, viewX2, viewY2);
-}
-
-
 void Renderer::Render(const GameState &gameState)
 {
   if (m_level->nodes.empty()) {
@@ -144,8 +146,7 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
   const bool isBackSide = seg.side;
 
   if (isBackSide && ld.backSidedef == -1) {
-    std::printf(
-      "backSidedefIndex == -1 -> When the segment is on the back side, the backSidedef mustn't be empty.");
+    std::printf("backSidedefIndex == -1 -> When the segment is on the back side, the backSidedef mustn't be empty.");
 
     fmt::println("Some number");
     return;
@@ -157,31 +158,29 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
   const SideDef &sidedef = m_level->sidedefs[frontSidedefId];
   const Sector &sector = m_level->sectors[sidedef.sectorId];
 
-  double_t viewX1 = 0, viewY1 = 0, viewX2 = 0, viewY2 = 0;
+  glm::dvec2 view1 = { 0, 0 }, view2 = { 0, 0 };
   int16_t floorZ = 0, ceilingZ = 0;
 
   applyTransformations(gameState.playerState,
     m_level->vertices[seg.startVertex],
     m_level->vertices[seg.endVertex],
     sector,
-    viewX1,
-    viewY1,
-    viewX2,
-    viewY2,
+    view1,
+    view2,
     floorZ,
     ceilingZ);
 
   // near plane clipping
-  if (viewY1 < config::NEAR_CLIPPING && viewY2 < config::NEAR_CLIPPING) return;
+  if (view1.y < config::NEAR_CLIPPING && view2.y < config::NEAR_CLIPPING) return;
 
-  if (viewY1 < config::NEAR_CLIPPING) {
-    clipNearPlane(viewX1, viewY1, viewX2, viewY2);
-  } else if (viewY2 < config::NEAR_CLIPPING) {
-    clipNearPlane(viewX2, viewY2, viewX1, viewY1);
+  if (view1.y < config::NEAR_CLIPPING) {
+    clipNearPlane(view1, view2);
+  } else if (view2.y < config::NEAR_CLIPPING) {
+    clipNearPlane(view2, view1);
   }
 
-  const int32_t projectedStartX = ProjectX(viewX1, 1 / viewY1);
-  const int32_t projectedEndX = ProjectX(viewX2, 1 / viewY2);
+  const int32_t projectedStartX = ProjectX(view1.x, 1 / view1.y);
+  const int32_t projectedEndX = ProjectX(view2.x, 1 / view2.y);
 
   int32_t start, end;
   double_t inv_y1, inv_y2;
@@ -189,13 +188,13 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
   if (projectedStartX > projectedEndX) {
     start = projectedEndX;
     end = projectedStartX;
-    inv_y1 = 1 / viewY2;
-    inv_y2 = 1 / viewY1;
+    inv_y1 = 1 / view2.y;
+    inv_y2 = 1 / view1.y;
   } else {
     start = projectedStartX;
     end = projectedEndX;
-    inv_y1 = 1 / viewY1;
-    inv_y2 = 1 / viewY2;
+    inv_y1 = 1 / view1.y;
+    inv_y2 = 1 / view2.y;
   }
 
   if (start < 0 && end < 0) return;
@@ -204,7 +203,7 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     if (m_solidSegs[i]) continue;
 
     const double_t t = static_cast<double>(i - start) / (end - start);
-    const double_t inv_y = lerp(inv_y1, inv_y2, t);
+    const double_t inv_y = std::lerp(inv_y1, inv_y2, t);
 
     // represent ceiling and floor in screen coordinates
     const int32_t projectedFloorY = std::min(m_canvasHeight - 1, ProjectZ(floorZ, inv_y));
@@ -292,10 +291,14 @@ bool Renderer::PointOnSide(const Vertex v, const BspNode &node)
 
 
 int32_t Renderer::ProjectZ(const double_t z, const double_t inv_y) const
-{ return static_cast<int32_t>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y); }
+{
+  return static_cast<int32_t>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y);
+}
 
 int32_t Renderer::ProjectX(const double_t x, const double_t inv_y) const
-{ return static_cast<int32_t>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y); }
+{
+  return static_cast<int32_t>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y);
+}
 
 void Renderer::DrawDefaultPortal(const int32_t x,
   const int32_t projectedFloorY,

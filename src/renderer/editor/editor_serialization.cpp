@@ -1,9 +1,8 @@
 #include "math_utils.h"
 
-
-#include <editor.h>
-#include <serialization.h>
-
+#include "bsp.h"
+#include "editor.h"
+#include "serialization.h"
 
 void EditorLineDef::serialize(FileWriter &fw) const
 {
@@ -33,8 +32,10 @@ void EditorSector::serialize(FileWriter &fw) const
 {
   fw.WriteRaw(floorHeight);
   fw.WriteRaw(ceilingHeight);
-  fw.WriteRaw(specialType);
+  fw.WriteRaw(floorTextureIndex);
+  fw.WriteRaw(ceilingTextureIndex);
   fw.WriteRaw(lightLevel);
+  fw.WriteRaw(specialType);
   fw.WriteRaw(tag);
   fw.WriteRaw(color);
 }
@@ -43,8 +44,10 @@ void EditorSector::deserialize(FileReader &fr)
 {
   fr.ReadRaw(floorHeight);
   fr.ReadRaw(ceilingHeight);
-  fr.ReadRaw(specialType);
+  fr.ReadRaw(floorTextureIndex);
+  fr.ReadRaw(ceilingTextureIndex);
   fr.ReadRaw(lightLevel);
+  fr.ReadRaw(specialType);
   fr.ReadRaw(tag);
   fr.ReadRaw(color);
 }
@@ -64,6 +67,9 @@ void EditorVertex::deserialize(FileReader &fr)
 void EditorSidedef::serialize(FileWriter &fw) const
 {
   fw.WriteRaw(sectorId);
+  fw.WriteRaw(upperWallTexture);
+  fw.WriteRaw(middleWallTexture);
+  fw.WriteRaw(bottomWallTexture);
   fw.WriteRaw(xOffset);
   fw.WriteRaw(yOffset);
 }
@@ -71,13 +77,22 @@ void EditorSidedef::serialize(FileWriter &fw) const
 void EditorSidedef::deserialize(FileReader &fr)
 {
   fr.ReadRaw(sectorId);
+  fr.ReadRaw(upperWallTexture);
+  fr.ReadRaw(middleWallTexture);
+  fr.ReadRaw(bottomWallTexture);
   fr.ReadRaw(xOffset);
   fr.ReadRaw(yOffset);
 }
 
-void EditorLevel::serialize(const std::filesystem::path &path) const
+void EditorLevel::save(const uint16_t width, const uint16_t height) const
 {
-  FileWriter fw(path);
+  // run bsp algorithm before saving
+  //Level level;
+  //toGameLevel(level, width, height);
+
+  //BSPBuilder bspBuilder();
+
+  FileWriter fw("saved_level.bin");
 
   std::cout << "Saving level to saved_level.bin...\n";
   std::cout << std::filesystem::current_path() << '\n';
@@ -100,9 +115,9 @@ void EditorLevel::serialize(const std::filesystem::path &path) const
   fw.WriteVector(sectors);
 }
 
-void EditorLevel::deserialize(const std::filesystem::path &path)
+void EditorLevel::load()
 {
-  FileReader fr(path);
+  FileReader fr("saved_level.bin");
   if (!fr.IsStreamGood()) {
     std::cerr << "Failed to open saved_level.bin for loading. Using hardcoded level data." << std::endl;
     return;
@@ -148,7 +163,13 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
   for (auto &sd : sidedefs) { level.sidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset); }
 
   for (auto &sector : sectors) {
-    level.sectors.emplace_back(
-      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag, sector.color);
+    level.sectors.emplace_back(sector.floorHeight,
+      sector.ceilingHeight,
+      sector.floorTextureIndex,
+      sector.ceilingTextureIndex,
+      sector.specialType,
+      sector.lightLevel,
+      sector.tag,
+      sector.color);
   }
 }

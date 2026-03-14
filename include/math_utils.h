@@ -1,9 +1,13 @@
-#pragma once
+#ifndef MATH_UTILS_H
+#define MATH_UTILS_H
+
+#define _USE_MATH_DEFINES
 
 #include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <cmath>
 
 template<typename T>
 concept HasXY = requires(T t) {
@@ -13,7 +17,7 @@ concept HasXY = requires(T t) {
 
 namespace math_utils {
 
-constexpr double toRadians(const double angle) { return M_PI * angle / 180; }
+inline double toRadians(const double angle) { return M_PI * angle / 180; }
 
 template<HasXY T> constexpr T toCenterCoordinates(const T &vec, const uint16_t width, const uint16_t height)
 { return { vec.x - width / 2, height / 2 - vec.y }; }
@@ -69,3 +73,4 @@ template<HasXY T> T rotateAroundX(const T v, const double angleDegrees)
 }
 
 }// namespace math_utils
+#endif

@@ -1,9 +1,12 @@
 .vscode
 .idea
 .cursor
+.vs/
+
 *.log
 *.tmp
 
+out/
 build/
 .imgui/
 .cache/

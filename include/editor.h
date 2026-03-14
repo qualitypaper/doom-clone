@@ -140,8 +140,8 @@ struct EditorVertex : public EditorObject
   }
 
   [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
-  [[nodiscard]] constexpr ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
-  [[nodiscard]] constexpr double length() const { return std::sqrt(x * x + y * y); }
+  [[nodiscard]] ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
+  [[nodiscard]] double length() const { return std::sqrt(x * x + y * y); }
   [[nodiscard]] ImVec2 fromCenterCoords(const SdlWindow &sdlWindow) const;
 
   void normalize()
@@ -170,6 +170,10 @@ struct EditorSidedef : EditorObject
   int16_t sectorId = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
+  int16_t upperWallTexture = -1;
+  int16_t middleWallTexture = -1;
+  int16_t bottomWallTexture = -1;
+  
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
@@ -190,8 +194,10 @@ struct EditorSector : EditorObject
 
   int16_t floorHeight = 0;
   int16_t ceilingHeight = 0;
-  int16_t specialType = 0;
+  int16_t floorTextureIndex = -1;
+  int16_t ceilingTextureIndex = -1;
   int16_t lightLevel = 0;
+  int16_t specialType = 0;
   int16_t tag = 0;
   uint32_t color = 0;
   AABB bounding_box{};
@@ -213,8 +219,8 @@ struct EditorLevel
   {}
 
 
-  void serialize(const std::filesystem::path &path) const;
-  void deserialize(const std::filesystem::path &path);
+  void save(const uint16_t width, const uint16_t height) const;
+  void load();
 
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
 
@@ -231,6 +237,8 @@ struct EditorState
 
   uint16_t width, height;
 
+  // offset to the start of the level
+  uint32_t offset;
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
 

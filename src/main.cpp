@@ -41,16 +41,8 @@ static std::vector<Vertex> vertices = {
 // ==========================================
 static std::vector<Sector> sectors = {
 
-  {
-    // Sector 0
-    .floorHeight = 0,
-    .ceilingHeight = 36,
-  },
-  {
-    // Sector 1 (Taller and deeper)
-    .floorHeight = 0,
-    .ceilingHeight = 20,
-  }
+  { 0, 36, -1, -1, 0, 0, 0 },
+  { 0, 20, -1, -1, 0, 0, 0 }
 };
 
 // ==========================================
@@ -59,16 +51,16 @@ static std::vector<Sector> sectors = {
 // Note: You usually add textures here. For now, we just link to sectors.
 static std::vector<SideDef> sidedefs = {
   // -- Sector 0 Sides --
-  { .sectorId = 0 },// 0: South wall
-  { .sectorId = 0 },// 1: Portal line (facing Sector 1)
-  { .sectorId = 0 },// 2: North wall
-  { .sectorId = 0 },// 3: West wall
+  { 0, 0, 0, 0, 0, 0 },// 0: South wall
+  { 0, 0, 0, 0, 0, 0 },// 1: Portal line (facing Sector 1)
+  { 0, 0, 0, 0, 0, 0 },// 2: North wall
+  { 0, 0, 0, 0, 0, 0 },// 3: West wall
 
   // -- Sector 1 Sides --
-  { .sectorId = 1 },// 4: Portal line (facing Sector 0)
-  { .sectorId = 1 },// 5: North wall
-  { .sectorId = 1 },// 6: East wall
-  { .sectorId = 1 },// 7: South wall
+  { 1, 0, 0, 0, 0, 0 },// 4: Portal line (facing Sector 0)
+  { 1, 0, 0, 0, 0, 0 },// 5: North wall
+  { 1, 0, 0, 0, 0, 0 },// 6: East wall
+  { 1, 0, 0, 0, 0, 0 },// 7: South wall
 };
 
 // ==========================================
@@ -104,7 +96,7 @@ static std::vector<LineDef> linedefs = {
   { 4, 1, LineDefType::REGULAR, 7, -1 },
 };
 
-int main()
+int main(int argc, char *argv[])
 {
   // setup inputs and states
   InputState input{};
@@ -117,7 +109,7 @@ int main()
   std::shared_ptr<Level> level;
   if (true) {
     EditorLevel edLevel{};
-    edLevel.deserialize("saved_level.bin");
+    edLevel.load();
     Level tempLevel;
     edLevel.toGameLevel(tempLevel, config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
     level = std::make_shared<Level>(tempLevel);

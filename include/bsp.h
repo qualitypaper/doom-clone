@@ -1,5 +1,6 @@
 #pragma once
 #include "gameloop.h"
+#include "serialization.h"
 
 #include <array>
 #include <fstream>
@@ -7,7 +8,7 @@
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 
-struct Seg
+struct Seg : public Serializable
 {
   int16_t startVertex;
   int16_t endVertex;
@@ -16,25 +17,33 @@ struct Seg
   int8_t side;// 0 for front, 1 for back
   int16_t offset;
 
+  Seg(int16_t _startVertex, int16_t _endVertex, int16_t _angle, int16_t _linedefIndex, int8_t _side, int16_t _offset)
+    : startVertex(_startVertex), endVertex(_endVertex), angle(_angle), linedefIndex(_linedefIndex), side(_side),
+      offset(_offset)
+
+  {}
+
   bool operator==(const Seg &other) const
-  { return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex; }
+  {
+    return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex;
+  }
+
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
 };
 
-struct BspNode
+struct BspNode : public Serializable
 {
   BspNode() = default;
   BspNode(int16_t _x, int16_t _y, int16_t _dx, int16_t _dy);
 
   int16_t x = 0, y = 0, dx = 0, dy = 0;
-  std::array<int16_t, 4> leftBoundingBox{ std::numeric_limits<int16_t>::max(),
-    std::numeric_limits<int16_t>::min(),
-    std::numeric_limits<int16_t>::min(),
-    std::numeric_limits<int16_t>::max() },
-    rightBoundingBox{ std::numeric_limits<int16_t>::max(),
-      std::numeric_limits<int16_t>::min(),
-      std::numeric_limits<int16_t>::min(),
-      std::numeric_limits<int16_t>::max() };
+  std::array<int16_t, 4> leftBoundingBox{ INT16_MAX, INT16_MIN, INT16_MIN, INT16_MAX };
+  std::array<int16_t, 4> rightBoundingBox{ INT16_MAX, INT16_MIN, INT16_MIN, INT16_MAX };
   int16_t leftChild = -1, rightChild = -1;
+
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
 };
 
 inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
@@ -43,10 +52,13 @@ inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
               << "), Children: (" << node.leftChild << "," << node.rightChild << ")";
 }
 
-struct SubSector
+struct SubSector : public Serializable
 {
   int16_t segCount;
   int16_t firstSegIndex;
+
+  void serialize(FileWriter &fw) const override;
+  void deserialize(FileReader &fr) override;
 };
 
 struct SplitResult

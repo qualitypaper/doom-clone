@@ -78,6 +78,7 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
       const int16_t newVertexId = static_cast<int16_t>(level->vertices.size() - 1);
 
       const LineDef segLd = level->linedefs[seg.linedefIndex];
+
       LineDef startLd{ seg.startVertex, newVertexId, segLd.type, segLd.frontSidedef, segLd.backSidedef };
       LineDef endLd{ newVertexId, seg.endVertex, segLd.type, segLd.frontSidedef, segLd.backSidedef };
 
