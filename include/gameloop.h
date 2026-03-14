@@ -2,6 +2,8 @@
 
 #include "entity.h"
 #include "sdl_window.h"
+
+#include <array>
 #include <vector>
 
 /*
@@ -49,6 +51,9 @@ struct Vertex
 struct SideDef
 {
   int16_t sectorId = -1;
+  int16_t upperWallTexture = -1;
+  int16_t middleWallTexture = -1;
+  int16_t bottomWallTexture = -1;
   int16_t xOffset = 0;
   int16_t yOffset = 0;
 };
@@ -68,11 +73,14 @@ struct Sector
 {
   int16_t floorHeight;
   int16_t ceilingHeight;
-  int16_t specialType;
+  int16_t floorTextureIndex;
+  int16_t ceilingTextureIndex;
   int16_t lightLevel;
+  int16_t specialType;
   int16_t tag;
 
-  // temporary, till textures will be added, RGBA format
+
+  // temporary, till textures will not be added, RGBA format
   // default - BLACK
   uint32_t color;
 };

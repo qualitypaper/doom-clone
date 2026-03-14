@@ -41,18 +41,16 @@ static std::vector<Vertex> vertices = {
 // ==========================================
 static std::vector<Sector> sectors = {
 
-  { // Sector 0
+  {
+    // Sector 0
     .floorHeight = 0,
     .ceilingHeight = 36,
-    .specialType = 0,
-    .lightLevel = 192,
-    .tag = 0 },
-  { // Sector 1 (Taller and deeper)
+  },
+  {
+    // Sector 1 (Taller and deeper)
     .floorHeight = 0,
     .ceilingHeight = 20,
-    .specialType = 0,
-    .lightLevel = 128,
-    .tag = 0 }
+  }
 };
 
 // ==========================================

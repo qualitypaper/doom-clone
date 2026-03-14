@@ -162,8 +162,9 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   }
 
   // process sectors
-  for (const auto &[floorHeight, ceilingHeight, specialType, lightLevel, tag, color] : _level.sectors) {
-    editorSectors.emplace_back(floorHeight, ceilingHeight, specialType, lightLevel, tag, color);
+  for (const auto &sector : _level.sectors) {
+    editorSectors.emplace_back(
+      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag, sector.color);
   }
 
   // process sidedefs
