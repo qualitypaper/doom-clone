@@ -40,8 +40,8 @@ BSPBuilder::BSPBuilder(const Level &_level) : level(std::make_unique<Level>(_lev
 
   for (size_t i = 0; i < level->linedefs.size(); i++) {
     auto &ld = level->linedefs[i];
-    segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0);
-    if (ld.backSidedef != -1) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1); }
+    segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0, 0);
+    if (ld.backSidedef != -1) { segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1, 0); }
   }
 }
 
@@ -116,7 +116,9 @@ void BSPBuilder::CreateSubsector(std::vector<Seg> &segs)
 }
 
 int16_t BSPBuilder::CreateLeafIndex() const
-{ return (1 << 15) | (static_cast<int16_t>(subsectors.size() - 1) & 0x7FFF); }
+{
+  return (1 << 15) | (static_cast<int16_t>(subsectors.size() - 1) & 0x7FFF);
+}
 
 int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 {
@@ -177,7 +179,7 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
     minY = std::min(minY, y1);
   }
 
-  size_t bestSplitterIndex = 0;
+  uint32_t bestSplitterIndex = 0;
   uint32_t bestScore = std::numeric_limits<uint32_t>::max();
 
   for (size_t i = 0; i < segs.size(); i++) {
@@ -185,7 +187,7 @@ uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 
     if (score < bestScore) {
       bestScore = score;
-      bestSplitterIndex = i;
+      bestSplitterIndex = static_cast<uint32_t>(i);
     }
   }
 
@@ -295,4 +297,3 @@ std::unique_ptr<Level> BSPBuilder::GetConstructedLevel()
   return std::make_unique<Level>(
     level->vertices, level->linedefs, level->sidedefs, level->sectors, nodes, subsectors, newSegments);
 }
-

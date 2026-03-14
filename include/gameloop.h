@@ -76,12 +76,13 @@ enum class LineDefType { REGULAR, DOOR };
 
 struct LineDef : public Serializable
 {
-  int16_t start;
-  int16_t end;
-  LineDefType type;
-  int16_t frontSidedef;
-  int16_t backSidedef;
+  int16_t start = -1;
+  int16_t end = -1;
+  LineDefType type = LineDefType::REGULAR;
+  int16_t frontSidedef = -1;
+  int16_t backSidedef = -1;
 
+  LineDef() = default;
   LineDef(int16_t _start, int16_t _end, LineDefType _type, int16_t _frontSidedef, int16_t _backSidedef)
     : start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
   {}

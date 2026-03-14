@@ -171,6 +171,7 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   for (const auto &sd : _level.sidedefs) { editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset); }
 
 
+  this->offset = 0;
   this->level = std::make_unique<EditorLevel>(
     std::move(editorVertices), std::move(editorLinedefs), std::move(editorSectors), std::move(editorSidedefs));
 }
@@ -271,7 +272,7 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 
   if (sectorId == -1) return;
 
-  auto sector = state->findSector(sectorId);
+  EditorSector& sector = state->findSector(sectorId);
 
   sector.linedefIds.emplace_back();
   this->updateAABB(sectorId);

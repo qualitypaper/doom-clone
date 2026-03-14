@@ -160,7 +160,10 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
       getObjectIndex(ld.start), getObjectIndex(ld.end), ld.type, ld.frontSideDef, ld.backSideDef);
   }
 
-  for (auto &sd : sidedefs) { level.sidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset); }
+  for (auto &sd : sidedefs) {
+    level.sidedefs.emplace_back(
+      sd.sectorId, sd.xOffset, sd.yOffset, sd.upperWallTexture, sd.middleWallTexture, sd.bottomWallTexture);
+  }
 
   for (auto &sector : sectors) {
     level.sectors.emplace_back(sector.floorHeight,

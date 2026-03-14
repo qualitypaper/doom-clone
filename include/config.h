@@ -26,7 +26,7 @@ constexpr uint8_t DESIRED_FRAMERATE = 144;
 // made for fov of 90 degress, where tan(FOV/2) equals 1, if desired to change add (...)/tan(FOV/2)
 constexpr const uint32_t PROJECTION_PLANE_DISTANCE = 1;
 
-constexpr const float MOUSE_SENSITIVITY = 0.01;
+constexpr const float MOUSE_SENSITIVITY = 0.01f;
 
 constexpr uint8_t FOV = 90;
 }// namespace config

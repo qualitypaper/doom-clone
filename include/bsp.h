@@ -10,13 +10,14 @@ enum class SegmentPosition { FRONT, BACK, SPANNING };
 
 struct Seg : public Serializable
 {
-  int16_t startVertex;
-  int16_t endVertex;
-  int16_t angle;
-  int16_t linedefIndex;
-  int8_t side;// 0 for front, 1 for back
-  int16_t offset;
+  int16_t startVertex = -1;
+  int16_t endVertex = -1;
+  int16_t angle = 0;
+  int16_t linedefIndex = -1;
+  int8_t side = -1;// 0 for front, 1 for back
+  int16_t offset = 0;
 
+  Seg() = default;
   Seg(int16_t _startVertex, int16_t _endVertex, int16_t _angle, int16_t _linedefIndex, int8_t _side, int16_t _offset)
     : startVertex(_startVertex), endVertex(_endVertex), angle(_angle), linedefIndex(_linedefIndex), side(_side),
       offset(_offset)
@@ -56,6 +57,10 @@ struct SubSector : public Serializable
 {
   int16_t segCount;
   int16_t firstSegIndex;
+
+  SubSector() = default;
+  SubSector(const int16_t _segCount, const int16_t _firstSegIndex) : segCount(_segCount), firstSegIndex(_firstSegIndex)
+  {}
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;

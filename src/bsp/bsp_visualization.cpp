@@ -120,7 +120,7 @@ std::vector<std::vector<std::string>> BSPBuilder::BuildRows() const
 {
   const size_t maxDepth = MaxDepth();
   std::vector<std::vector<std::string>> rows;
-
+  if (maxDepth == 0) { return std::move(rows); }
   rows.resize(maxDepth);
 
   rows[0].emplace_back("0");

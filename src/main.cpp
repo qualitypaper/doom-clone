@@ -26,24 +26,20 @@ bool running;
 // ==========================================
 static std::vector<Vertex> vertices = {
   // Sector 0 (The Starting Room)
-  { 0, 0 },// 0
-  { 50, 0 },// 1
-  { 50, 50 },// 2
-  { 0, 50 },// 3
+  Vertex(0, 0),// 0
+  Vertex(50, 0),// 1
+  Vertex(50, 50),// 2
+  Vertex(0, 50),// 3
 
   // Sector 1 (The Connected Hallway - shares 1 and 2 with Sector 0)
-  { 100, 0 },// 4
-  { 100, 50 }// 5
+  Vertex(100, 0),// 4
+  Vertex(100, 50)// 5
 };
 
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static std::vector<Sector> sectors = {
-
-  { 0, 36, -1, -1, 0, 0, 0 },
-  { 0, 20, -1, -1, 0, 0, 0 }
-};
+static std::vector<Sector> sectors = { Sector(0, 36, -1, -1, 0, 0, 0), Sector(0, 20, -1, -1, 0, 0, 0) };
 
 // ==========================================
 // 3. SIDEDEFS (Visual sides of lines)
@@ -51,16 +47,16 @@ static std::vector<Sector> sectors = {
 // Note: You usually add textures here. For now, we just link to sectors.
 static std::vector<SideDef> sidedefs = {
   // -- Sector 0 Sides --
-  { 0, 0, 0, 0, 0, 0 },// 0: South wall
-  { 0, 0, 0, 0, 0, 0 },// 1: Portal line (facing Sector 1)
-  { 0, 0, 0, 0, 0, 0 },// 2: North wall
-  { 0, 0, 0, 0, 0, 0 },// 3: West wall
+  SideDef(0, 0, 0, 0, 0, 0),// 0: South wall
+  SideDef(0, 0, 0, 0, 0, 0),// 1: Portal line (facing Sector 1)
+  SideDef(0, 0, 0, 0, 0, 0),// 2: North wall
+  SideDef(0, 0, 0, 0, 0, 0),// 3: West wall
 
   // -- Sector 1 Sides --
-  { 1, 0, 0, 0, 0, 0 },// 4: Portal line (facing Sector 0)
-  { 1, 0, 0, 0, 0, 0 },// 5: North wall
-  { 1, 0, 0, 0, 0, 0 },// 6: East wall
-  { 1, 0, 0, 0, 0, 0 },// 7: South wall
+  SideDef(1, 0, 0, 0, 0, 0),// 4: Portal line (facing Sector 0)
+  SideDef(1, 0, 0, 0, 0, 0),// 5: North wall
+  SideDef(1, 0, 0, 0, 0, 0),// 6: East wall
+  SideDef(1, 0, 0, 0, 0, 0),// 7: South wall
 };
 
 // ==========================================
@@ -72,28 +68,28 @@ static std::vector<LineDef> linedefs = {
   // Start, End, Type, FrontSide, BackSide
 
   // Wall: (0,0) to (50,0)
-  { 0, 1, LineDefType::REGULAR, 0, -1 },
+  LineDef(0, 1, LineDefType::REGULAR, 0, -1),
 
   // PORTAL: (50,0) to (50,50) -> Connects Sector 0 and 1
   // Notice it has a Back SideDef (index 4)
-  { 1, 2, LineDefType::REGULAR, 1, 4 },
+  LineDef(1, 2, LineDefType::REGULAR, 1, 4),
 
   // Wall: (50,50) to (0,50)
-  { 2, 3, LineDefType::REGULAR, 2, -1 },
+  LineDef(2, 3, LineDefType::REGULAR, 2, -1),
 
   // Wall: (0,50) to (0,0)
-  { 3, 0, LineDefType::REGULAR, 3, -1 },
+  LineDef(3, 0, LineDefType::REGULAR, 3, -1),
 
   // --- SECTOR 1 (Rectangular extension) ---
 
   // Wall: (50,50) to (100,50)
-  { 2, 5, LineDefType::REGULAR, 5, -1 },
+  LineDef(2, 5, LineDefType::REGULAR, 5, -1),
 
   // Wall: (100,50) to (100,0)
-  { 5, 4, LineDefType::REGULAR, 6, -1 },
+  LineDef(5, 4, LineDefType::REGULAR, 6, -1),
 
   // Wall: (100,0) to (50,0)
-  { 4, 1, LineDefType::REGULAR, 7, -1 },
+  LineDef(4, 1, LineDefType::REGULAR, 7, -1),
 };
 
 int main(int argc, char *argv[])

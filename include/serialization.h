@@ -2,6 +2,8 @@
 #define DOOMCLONE_SERIALIZATION_H
 #include <filesystem>
 #include <fstream>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 class FileWriter
@@ -20,7 +22,11 @@ public:
     for (auto &elem : vec) { elem.serialize(*this); }
   }
 
-  template<typename T> void WriteObject(T &obj) { obj.serialize(*this); }
+  template<typename T> void WriteObject(T &obj) 
+  { 
+    FileWriter& fw = *this;
+    obj.serialize(fw); 
+  }
 
   void WriteData(const char *data, const size_t size)
   {
@@ -40,7 +46,7 @@ public:
   bool IsStreamGood() const { return !m_fis.fail(); }
   template<typename T> void ReadRaw(T &type) { ReadData((char *)&type, sizeof(T)); }
 
-  template<typename T> void ReadObject(T &obj) { obj.deserialize(this); }
+  template<typename T> void ReadObject(T &obj) { obj.deserialize(*this); }
 
   template<typename T> void ReadVector(std::vector<T> &vec, const bool readSize = true)
   {
@@ -52,12 +58,12 @@ public:
 
     for (size_t i = 0; IsStreamGood() && (!readSize || (readSize && i < n)); i++) {
       T val{};
-      if (std::is_trivial<T>()) {
+      if constexpr (std::is_trivial_v<T>) {
         ReadRaw(val);
       } else {
         val.deserialize(*this);
       }
-      vec.emplace_back(val);
+      vec.emplace_back(std::move(val));
     }
   }
 
