@@ -35,9 +35,9 @@ void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow) const
 
   for (const auto &subsector : subsectors) {
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
-      const auto &seg = newSegments[i];
-      const auto &startVertex = level->vertices[seg.startVertex];
-      const auto &endVertex = level->vertices[seg.endVertex];
+      const auto &seg = segments[i];
+      const auto &startVertex = vertices[seg.startVertex];
+      const auto &endVertex = vertices[seg.endVertex];
 
       const ImVec2 mappedStart = math_utils::fromCenterCoordinates(
         ImVec2{ static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) },
@@ -120,7 +120,8 @@ std::vector<std::vector<std::string>> BSPBuilder::BuildRows() const
 {
   const size_t maxDepth = MaxDepth();
   std::vector<std::vector<std::string>> rows;
-  if (maxDepth == 0) { return std::move(rows); }
+  if (maxDepth == 0) { return std::vector<std::vector<std::string>>(); }
+
   rows.resize(maxDepth);
 
   rows[0].emplace_back("0");

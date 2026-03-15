@@ -24,7 +24,11 @@ static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 static float g_defaultVertexRadius = 4.0f;
 static float g_defaultLinedefThickness = 2.0f;
 
-EditorRenderer::EditorRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow(sdlWindow)
+EditorRenderer::EditorRenderer(SdlWindow &sdlWindow,
+  Level &level,
+  const uint16_t _levelNum,
+  const uint16_t _numOfLevels)
+  : m_sdlWindow(sdlWindow)
 {
   const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
@@ -48,7 +52,7 @@ EditorRenderer::EditorRenderer(SdlWindow &sdlWindow, Level &level) : m_sdlWindow
   ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
 
-  this->m_editor = std::make_unique<Editor>(level, sdlWindow.width, sdlWindow.height);
+  this->m_editor = std::make_unique<Editor>(level, _levelNum, _numOfLevels, sdlWindow.width, sdlWindow.height);
 }
 
 EditorRenderer::~EditorRenderer()
@@ -307,7 +311,6 @@ void EditorRenderer::drawSectorsWindow() const
         ImGui::TableNextRow();
         ImGui::TableSetColumnIndex(0);
 
-
         int floorHeight = sector.floorHeight;
         int ceilingHeight = sector.ceilingHeight;
         int lightLevel = sector.lightLevel;
@@ -546,7 +549,7 @@ void EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
     ImGui::Text("Connected LineDef ID: %u", ldIndex);
   }
 
-  if (ImGui::Button("Create Connected Line")) { m_editor->drawConnectedLine(index); }
+  if (ImGui::Button("Create Connected Line")) { m_editor->drawConnectedLine(selectedId); }
   if (ImGui::Button("Delete")) { EditorVertex::remove(*m_editor->state, selectedId); }
 
   ImGui::PopID();

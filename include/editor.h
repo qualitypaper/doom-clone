@@ -27,7 +27,9 @@ struct AABB
   int16_t minX, minY;
 
   [[nodiscard]] bool contains(const int16_t x, const int16_t y) const
-  { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
+  {
+    return x >= minX && x <= maxX && y >= minY && y <= maxY;
+  }
 };
 
 enum class EditorObjectType { LINEDEF, VERTEX, SECTOR, SIDEDEF };
@@ -37,10 +39,14 @@ constexpr uint32_t kObjectTypeShift = 30;
 constexpr uint32_t kObjectIndexMask = (1u << kObjectTypeShift) - 1u;
 
 constexpr uint32_t makeObjectId(EditorObjectType type, const uint32_t index)
-{ return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask); }
+{
+  return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask);
+}
 
 constexpr EditorObjectType getObjectType(const uint32_t objectId)
-{ return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u); }
+{
+  return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u);
+}
 
 constexpr uint32_t getObjectIndex(const uint32_t objectId) { return objectId & kObjectIndexMask; }
 
@@ -55,7 +61,9 @@ struct DraggableObject
   static void resetDraggableState(EditorState *state);
 };
 
-struct EditorObject : public Serializable, public DraggableObject
+struct EditorObject
+  : public Serializable
+  , public DraggableObject
 {
   explicit EditorObject(const EditorObjectType _type) : type(_type) {}
   ~EditorObject() override = default;
@@ -73,7 +81,8 @@ struct EditorLineDef : public EditorObject
 {
   EditorLineDef() : EditorObject(EditorObjectType::LINEDEF) {}
   explicit EditorLineDef(const LineDef &_linedef)
-    : EditorObject(EditorObjectType::LINEDEF), start(_linedef.start), end(_linedef.end), type(_linedef.type),
+    : EditorObject(EditorObjectType::LINEDEF), start(makeObjectId(EditorObjectType::VERTEX, _linedef.start)),
+      end(makeObjectId(EditorObjectType::VERTEX, _linedef.end)), type(_linedef.type),
       frontSideDef(_linedef.frontSidedef), backSideDef(_linedef.backSidedef)
   {}
   EditorLineDef(const uint32_t _start,
@@ -117,9 +126,13 @@ struct EditorVertex : public EditorObject
   EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
 
   EditorVertex operator+(const ImVec2 &other) const
-  { return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) }; }
+  {
+    return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) };
+  }
   EditorVertex operator-(const ImVec2 &other) const
-  { return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) }; }
+  {
+    return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) };
+  }
 
   EditorVertex operator*(const double c) const { return { static_cast<int32_t>(x * c), static_cast<int32_t>(y * c) }; }
   EditorVertex operator/(const double c) const { return { static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
@@ -173,7 +186,7 @@ struct EditorSidedef : EditorObject
   int16_t upperWallTexture = -1;
   int16_t middleWallTexture = -1;
   int16_t bottomWallTexture = -1;
-  
+
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
@@ -213,32 +226,37 @@ struct EditorLevel
   EditorLevel(std::vector<EditorVertex> _vertices,
     std::vector<EditorLineDef> _lines,
     std::vector<EditorSector> _sectors,
-    std::vector<EditorSidedef> _sidedefs)
+    std::vector<EditorSidedef> _sidedefs,
+    size_t _levelNum)
     : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)),
-      sidedefs(std::move(_sidedefs))
+      sidedefs(std::move(_sidedefs)), levelNum(_levelNum)
   {}
 
 
-  void save(const uint16_t width, const uint16_t height) const;
-  void load();
-
+  void save(uint16_t &levelsNum, const uint16_t width, const uint16_t height);
+  void Load(const uint16_t width, const uint16_t height);
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
+  static void Load(Level &level, const uint16_t levelNum);
+  static void SkipHeaderAndLevels(FileReader &fr, const uint16_t levelNum);
+  static void SkipLevels(FileReader &fr, uint16_t levelNum);
+
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;
   std::vector<EditorSector> sectors;
   std::vector<EditorSidedef> sidedefs;
+  // equals to zero when level is the first lump
+  uint16_t levelNum;
 };
 
 struct EditorState
 {
-  EditorState(Level &_level, uint16_t _width, uint16_t _height);
+  EditorState(Level &_level, const uint16_t _levelNum, const uint16_t _numOfLevels, uint16_t _width, uint16_t _height);
   void reset();
 
   uint16_t width, height;
 
-  // offset to the start of the level
-  uint32_t offset;
+  uint16_t numOfLevels = 0;
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
 
@@ -279,7 +297,9 @@ struct EditorState
   {
     const uint32_t index = getObjectIndex(id);
 
-    if (index >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the sectors array"); }
+    if (index >= level->vertices.size()) {
+      throw std::runtime_error("Index is bigger than the sectors array");
+    }
 
     return level->vertices[index];
   }
@@ -288,7 +308,9 @@ struct EditorState
   {
     const uint32_t index = getObjectIndex(id);
 
-    if (index >= level->vertices.size()) { throw std::runtime_error("Index is bigger than the sectors array"); }
+    if (index >= level->vertices.size()) {
+      throw std::runtime_error("Index is bigger than the sectors array");
+    }
 
     return transformedVertices[index];
   }
@@ -296,7 +318,9 @@ struct EditorState
   [[nodiscard]] EditorSector &findSector(const uint32_t id) const
   {
     const uint32_t index = getObjectIndex(id);
-    if (index >= level->sectors.size()) { throw std::runtime_error("Index is bigger than the sectors array."); }
+    if (index >= level->sectors.size()) {
+      throw std::runtime_error("Index is bigger than the sectors array.");
+    }
 
     return level->sectors[index];
   }
@@ -305,7 +329,9 @@ struct EditorState
   {
     uint32_t index = getObjectIndex(id);
 
-    if (index >= level->linedefs.size()) { throw std::runtime_error("Index is bigger than the linedefs array."); }
+    if (index >= level->linedefs.size()) {
+      throw std::runtime_error("Index is bigger than the linedefs array.");
+    }
 
     return level->linedefs[index];
   }
@@ -317,13 +343,16 @@ struct EditorState
 
     switch (type) {
     case EditorObjectType::VERTEX:
-      if (index < level->vertices.size()) return &level->vertices[index];
+      if (index < level->vertices.size())
+        return &level->vertices[index];
       break;
     case EditorObjectType::LINEDEF:
-      if (index < level->linedefs.size()) return &level->linedefs[index];
+      if (index < level->linedefs.size())
+        return &level->linedefs[index];
       break;
     case EditorObjectType::SECTOR:
-      if (index < level->sectors.size()) return &level->sectors[index];
+      if (index < level->sectors.size())
+        return &level->sectors[index];
       break;
     default:
       break;
@@ -346,7 +375,11 @@ public:
   std::shared_ptr<EditorState> state;
 
 public:
-  Editor(Level &_level, uint16_t _width, uint16_t _height);
+  Editor(Level &_level,
+    const uint16_t _levelNum,
+    const uint16_t _numOfLevels,
+    const uint16_t _width,
+    const uint16_t _height);
 
   void resetStateFrame() const;
 
@@ -370,15 +403,17 @@ public:
   {
     assert(scaleFactor != 0);
 
-    return { decltype(vec.x)( static_cast<float>(vec.x) / scaleFactor),
-      decltype(vec.y)( static_cast<float>(vec.y) / scaleFactor) };
+    return { decltype(vec.x)(static_cast<float>(vec.x) / scaleFactor),
+      decltype(vec.y)(static_cast<float>(vec.y) / scaleFactor) };
   }
 
   // zooms the vertex
   // if no zoom parameter is specified will default to state->canvasZoom
   template<HasXY T> ImVec2 zoomVertex(const T &vertex, float zoom = -1) const
   {
-    if (zoom == -1) { zoom = state->canvasZoom; }
+    if (zoom == -1) {
+      zoom = state->canvasZoom;
+    }
     T centered = math_utils::toCenterCoordinates(vertex, state->width, state->height);
 
     centered = Editor::scale(centered, zoom);

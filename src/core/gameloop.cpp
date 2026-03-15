@@ -1,4 +1,5 @@
 #include "gameloop.h"
+#include "bsp.h"
 #include "config.h"
 #include "sdl_window.h"
 
@@ -24,7 +25,8 @@ void HandleKeyInput(const SDL_Event &event, InputState &input)
 void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode, const SdlWindow &sdlWindow)
 {
   // nothing to change
-  if (state.currentMode == newMode) return;
+  if (state.currentMode == newMode)
+    return;
 
   state.currentMode = newMode;
 
@@ -46,4 +48,34 @@ void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode
     input.mouse_dx = 0;
     input.mouse_dy = 0;
   }
+}
+
+void Level::InitializeBspParams(std::unique_ptr<BspLevel> bspLevel)
+{
+  this->nodes = std::move(bspLevel->nodes);
+  this->segments = std::move(bspLevel->segments);
+  this->subsectors = std::move(bspLevel->subsectors);
+
+  if (this->vertices.size() != bspLevel->vertices.size()) {
+    this->vertices = std::move(bspLevel->vertices);
+  }
+
+  if (this->linedefs.size() != bspLevel->linedefs.size()) {
+    this->linedefs = std::move(bspLevel->linedefs);
+  }
+}
+
+void Level::Load(FileReader &fr)
+{
+  if (!fr.IsStreamGood()) {
+    throw std::runtime_error("Failed to open file for loading.");
+  }
+
+  fr.ReadVector(this->linedefs);
+  fr.ReadVector(this->sidedefs);
+  fr.ReadVector(this->vertices);
+  fr.ReadVector(this->segments);
+  fr.ReadVector(this->subsectors);
+  fr.ReadVector(this->nodes);
+  fr.ReadVector(this->sectors);
 }

@@ -17,6 +17,8 @@
 #include <fstream>
 #include <iostream>
 
+int main(int argc, char *argv[]);
+
 void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window);
 
 bool running;
@@ -105,19 +107,12 @@ int main(int argc, char *argv[])
   std::shared_ptr<Level> level;
   if (true) {
     EditorLevel edLevel{};
-    edLevel.load();
     Level tempLevel;
-    edLevel.toGameLevel(tempLevel, config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    edLevel.Load(tempLevel, 1);
     level = std::make_shared<Level>(tempLevel);
   } else {
     level = std::make_shared<Level>(vertices, linedefs, sidedefs, sectors);
   }
-
-  BSPBuilder bspBuilder(*level);
-  bspBuilder.BuildBSPTree();
-  bspBuilder.PrintTree();
-
-  level = std::make_shared<Level>(*bspBuilder.GetConstructedLevel());
 
   // setup sdl window
   SdlWindow sdlWindow("Doom Clone",
@@ -126,7 +121,7 @@ int main(int argc, char *argv[])
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
-  EditorRenderer imguiRenderer(sdlWindow, *level);
+  EditorRenderer editorRenderer(sdlWindow, *level, 1, 1);
 
   // setup the game renderer
   FrameBuffer fb(sdlWindow);
@@ -153,14 +148,14 @@ int main(int argc, char *argv[])
     poll_sdl_events(gameState, input, sdlWindow);
 
     if (gameState.currentMode == EngineMode::EDITOR_2D) {
-      imguiRenderer.render();
+      editorRenderer.render();
 
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
       if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
       continue;
     } else if (gameState.currentMode == EngineMode::BSP_VIEWER) {
-      bspBuilder.Visualize(sdlWindow, input);
+      //bspBuilder.Visualize(sdlWindow, input);
 
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;

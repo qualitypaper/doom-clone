@@ -4,6 +4,8 @@
 #include "editor.h"
 #include "serialization.h"
 
+#include "ranges"
+
 void EditorLineDef::serialize(FileWriter &fw) const
 {
   fw.WriteRaw(getObjectIndex(start));
@@ -84,47 +86,145 @@ void EditorSidedef::deserialize(FileReader &fr)
   fr.ReadRaw(yOffset);
 }
 
-void EditorLevel::save(const uint16_t width, const uint16_t height) const
+void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t height)
 {
+  if (levelNum == 0) {
+    throw std::runtime_error("Level number must be greater than zero.");
+  }
+
+  if (levelsNum < levelNum) {
+    levelNum = ++levelsNum;
+  }
+
   // run bsp algorithm before saving
-  //Level level;
-  //toGameLevel(level, width, height);
+  auto nativeVertices = vertices | std::views::transform([width, height](const auto &v) {
+    const auto vec = math_utils::toCenterCoordinates(v, width, height);
+    return Vertex(vec.x, vec.y);
+  }) | std::ranges::to<std::vector<Vertex>>();
 
-  //BSPBuilder bspBuilder();
+  auto nativeLinedefs = linedefs | std::views::transform([](const auto &ld) {
+    return LineDef(ld.start, ld.end, ld.type, ld.frontSideDef, ld.backSideDef);
+  }) | std::ranges::to<std::vector<LineDef>>();
 
-  FileWriter fw("saved_level.bin");
+  BSPBuilder bspBuilder(std::move(nativeVertices), std::move(nativeLinedefs));
+  bspBuilder.BuildBSPTree();
+  bspBuilder.PrintTree();
 
-  std::cout << "Saving level to saved_level.bin...\n";
+  FileWriter fw("saved_level.wad");
+
+  std::cout << "Saving level to saved_level.wad \n";
   std::cout << std::filesystem::current_path() << '\n';
 
   if (!fw.IsStreamGood()) {
-    std::cerr << "Failed to open file for saving." << std::endl;
+    std::cerr << "Failed to open file for saving." << '\n';
     return;
   }
 
-  // write vertices
-  fw.WriteVector(vertices);
+  // write identification
+  fw.WriteRaw((char8_t)'W');
+  fw.WriteRaw((char8_t)'A');
+  fw.WriteRaw((char8_t)'D');
+
+  // write number of lumps in the file
+  // currently it supports only one level per file
+  fw.WriteRaw((size_t)levelsNum);
+
+  if (levelNum > 1) {
+    std::cout << "Skipping " << levelNum - 1 << " levels in the file.\n";
+    FileReader fr("saved_level.wad");
+    SkipLevels(fr, levelNum);
+  }
+
+  std::unique_ptr<BspLevel> bspLevel = bspBuilder.TakeConstructedLevel();
+
+  size_t lumpSize = 0;
+
+  lumpSize += bspLevel->linedefs.size() * sizeof(LineDef);
+  lumpSize += sidedefs.size() * sizeof(SideDef);
+  lumpSize += bspLevel->vertices.size() * sizeof(Vertex);
+  lumpSize += bspLevel->segments.size() * sizeof(Seg);
+  lumpSize += bspLevel->subsectors.size() * sizeof(SubSector);
+  lumpSize += bspLevel->nodes.size() * sizeof(BspNode);
+  lumpSize += sectors.size() * sizeof(Sector);
+
+  fw.WriteRaw(lumpSize);
 
   // write linedefs
-  fw.WriteVector(linedefs);
+  fw.WriteVector(std::move(bspLevel->linedefs));
 
   // write sidedefs
   fw.WriteVector(sidedefs);
+
+  // write vertices
+  fw.WriteVector(std::move(bspLevel->vertices));
+
+  // write segs
+  fw.WriteVector(std::move(bspLevel->segments));
+
+  // write subsectors
+  fw.WriteVector(std::move(bspLevel->subsectors));
+
+  // write nodes
+  fw.WriteVector(std::move(bspLevel->nodes));
 
   // write sectors
   fw.WriteVector(sectors);
 }
 
-void EditorLevel::load()
+void EditorLevel::SkipLevels(FileReader &fr, uint16_t levelNum)
 {
-  FileReader fr("saved_level.bin");
+  size_t lumpSize = 0;
+  fr.ReadRaw(lumpSize);
+
+  while (fr.IsStreamGood() && levelNum > 1) {
+    // read the size of the following lump
+    fr.Skip(lumpSize);
+    levelNum--;
+  }
+}
+
+void EditorLevel::Load(Level &level, const uint16_t levelNum)
+{
+  FileReader fr("saved_level.wad");
+
+  SkipHeaderAndLevels(fr, levelNum);
+
+  level.Load(fr);
+}
+
+void EditorLevel::SkipHeaderAndLevels(FileReader &fr, const uint16_t levelNum)
+{
+  // skip the file identification
+  fr.Skip(3 * sizeof(char8_t));
+
+  // read number of levels
+  size_t numLevels;
+  fr.ReadRaw(numLevels);
+
+  if (levelNum > numLevels) {
+    throw std::runtime_error("Level number exceeds the current number of levels.");
+  }
+
   if (!fr.IsStreamGood()) {
-    std::cerr << "Failed to open saved_level.bin for loading. Using hardcoded level data." << std::endl;
+    throw std::runtime_error("Stream failed while reading the header.");
+  }
+
+  SkipLevels(fr, levelNum);
+
+  if (!fr.IsStreamGood()) {
+    throw std::runtime_error("Stream failed while skipping lumps");
+  }
+}
+
+void EditorLevel::Load(const uint16_t width, const uint16_t height)
+{
+  FileReader fr("saved_level.wad");
+  if (!fr.IsStreamGood()) {
+    std::cerr << "Failed to open saved_level.wad for loading. Using hardcoded level data." << std::endl;
     return;
   }
 
-  fr.ReadVector(vertices);
-  std::cout << "Read vertices\n";
+  SkipHeaderAndLevels(fr, this->levelNum);
 
   fr.ReadVector(linedefs);
   std::cout << "Read linedefs\n";
@@ -132,6 +232,25 @@ void EditorLevel::load()
   fr.ReadVector(sidedefs);
   std::cout << "Read sidedefs\n";
 
+  fr.ReadVector(vertices);
+  std::cout << "Read vertices\n";
+
+  // skip segments
+  size_t segSize = 0;
+  fr.ReadRaw(segSize);
+  fr.Skip(segSize * sizeof(Seg));
+
+  // skip subsectors
+  size_t subsectorSize = 0;
+  fr.ReadRaw(subsectorSize);
+  fr.Skip(subsectorSize * sizeof(SubSector));
+
+  // skip nodes
+  size_t nodesSize = 0;
+  fr.ReadRaw(nodesSize);
+  fr.Skip(nodesSize * sizeof(BspNode));
+
+  // read sectors
   fr.ReadVector(sectors);
   std::cout << "Read sectors\n";
 

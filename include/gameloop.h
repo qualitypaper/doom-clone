@@ -12,9 +12,13 @@
  Z - vertical plane,
 */
 
+// forward declarations
 struct Seg;
 struct SubSector;
+struct BspLevel;
 struct BspNode;
+
+
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
 
 struct GameState
@@ -138,6 +142,9 @@ struct Level
   std::vector<BspNode> nodes;
   std::vector<SubSector> subsectors;
   std::vector<Seg> segments;
+
+  void InitializeBspParams(std::unique_ptr<BspLevel> bspLevel);
+  void Load(FileReader &fr);
 };
 void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);

@@ -5,6 +5,10 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <concepts>
+
+template<typename T>
+concept HasSkip = requires(T t, size_t bytesToSkip) { t.Skip(bytesToSkip); };
 
 class FileWriter
 {
@@ -15,22 +19,30 @@ public:
   bool IsStreamGood() const { return !m_fos.fail(); }
   template<typename T> void WriteRaw(const T &data) { WriteData(reinterpret_cast<const char *>(&data), sizeof(T)); }
 
+  void Skip(size_t bytesToSkip) { m_fos.seekp(bytesToSkip, std::ios::cur); }
+
   template<typename T> void WriteVector(const std::vector<T> &vec, const bool writeSize = true)
   {
-    if (writeSize) { WriteRaw((uint64_t)vec.size()); }
+    if (writeSize) {
+      WriteRaw((uint64_t)vec.size());
+    }
 
-    for (auto &elem : vec) { elem.serialize(*this); }
+    for (auto &elem : vec) {
+      elem.serialize(*this);
+    }
   }
 
-  template<typename T> void WriteObject(T &obj) 
-  { 
-    FileWriter& fw = *this;
-    obj.serialize(fw); 
+  template<typename T> void WriteObject(T &obj)
+  {
+    FileWriter &fw = *this;
+    obj.serialize(fw);
   }
 
   void WriteData(const char *data, const size_t size)
   {
-    if (IsStreamGood()) { m_fos.write(data, size); }
+    if (IsStreamGood()) {
+      m_fos.write(data, size);
+    }
   }
 
 private:
@@ -45,6 +57,8 @@ public:
 
   bool IsStreamGood() const { return !m_fis.fail(); }
   template<typename T> void ReadRaw(T &type) { ReadData((char *)&type, sizeof(T)); }
+
+  void Skip(size_t bytesToSkip) { m_fis.seekg(bytesToSkip, std::ios::cur); }
 
   template<typename T> void ReadObject(T &obj) { obj.deserialize(*this); }
 
@@ -69,7 +83,9 @@ public:
 
   void ReadData(char *data, const size_t size)
   {
-    if (IsStreamGood()) { m_fis.read(data, size); }
+    if (IsStreamGood()) {
+      m_fis.read(data, size);
+    }
   }
 
 private:

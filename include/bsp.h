@@ -5,6 +5,7 @@
 #include <array>
 #include <fstream>
 #include <memory>
+#include <span>
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 
@@ -73,16 +74,28 @@ struct SplitResult
   std::vector<Seg> back;
 };
 
+struct BspLevel
+{
+  std::vector<Vertex> vertices;
+  std::vector<LineDef> linedefs;
+
+  std::vector<BspNode> nodes;
+  std::vector<SubSector> subsectors;
+  std::vector<Seg> segments;
+};
+
 class BSPBuilder
 {
 private:
+  std::vector<Vertex> vertices;
+  std::vector<LineDef> linedefs;
+
   std::vector<BspNode> nodes;
-  std::vector<Seg> segments;
   std::vector<SubSector> subsectors;
-  std::vector<Seg> newSegments;
+  std::vector<Seg> segments;
 
 private:
-  SplitResult SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter) const;
+  SplitResult SplitBySplitter(std::vector<Seg> &segs, const Seg &splitter);
   void CreateSubsector(std::vector<Seg> &segs);
   [[nodiscard]] int16_t CreateLeafIndex() const;
   [[nodiscard]] uint32_t SelectSplittingLine(const std::vector<Seg> &segs) const;
@@ -104,14 +117,11 @@ private:
   static void DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &root);
 
 public:
-  std::unique_ptr<Level> level;
-
-public:
-  explicit BSPBuilder(const Level &_level);
+  explicit BSPBuilder(std::vector<Vertex> _vertices, std::vector<LineDef> _linedefs);
 
   void BuildBSPTree();
   int BuildBSPTree(std::vector<Seg> &segs);
   void PrintTree() const;
   void Visualize(const SdlWindow &sdlWindow, InputState &input) const;
-  std::unique_ptr<Level> GetConstructedLevel();
+  [[nodiscard]] std::unique_ptr<BspLevel> TakeConstructedLevel();
 };

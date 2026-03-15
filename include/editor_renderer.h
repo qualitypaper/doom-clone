@@ -15,7 +15,7 @@ struct ImVec2;
 class EditorRenderer
 {
 public:
-  EditorRenderer(SdlWindow &sdlWindow, Level &level);
+  EditorRenderer(SdlWindow &sdlWindow, Level &level, const uint16_t _levelNum, const uint16_t _numOfLevels);
   ~EditorRenderer();
 
   void render() const;

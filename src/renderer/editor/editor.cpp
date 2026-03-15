@@ -76,7 +76,9 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
 }
 
 ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
-{ return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height); }
+{
+  return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height);
+}
 
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 {
@@ -113,8 +115,10 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
     for (const uint32_t ldObjectId : lastVertex.connectedLineDefs) {
       auto &ld = state.findLinedef(ldObjectId);
 
-      if (ld.start == lastVertexId) ld.start = vertexId;
-      if (ld.end == lastVertexId) ld.end = vertexId;
+      if (ld.start == lastVertexId)
+        ld.start = vertexId;
+      if (ld.end == lastVertexId)
+        ld.end = vertexId;
     }
 
     vertex = lastVertex;
@@ -124,7 +128,12 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.level->vertices.pop_back();
 }
 
-EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _height) : width(_width), height(_height)
+EditorState::EditorState(Level &_level,
+  const uint16_t _levelNum,
+  const uint16_t _numOfLevels,
+  const uint16_t _width,
+  const uint16_t _height)
+  : width(_width), height(_height), numOfLevels(_numOfLevels)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -168,12 +177,15 @@ EditorState::EditorState(Level &_level, const uint16_t _width, const uint16_t _h
   }
 
   // process sidedefs
-  for (const auto &sd : _level.sidedefs) { editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset); }
+  for (const auto &sd : _level.sidedefs) {
+    editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset);
+  }
 
-
-  this->offset = 0;
-  this->level = std::make_unique<EditorLevel>(
-    std::move(editorVertices), std::move(editorLinedefs), std::move(editorSectors), std::move(editorSidedefs));
+  this->level = std::make_unique<EditorLevel>(std::move(editorVertices),
+    std::move(editorLinedefs),
+    std::move(editorSectors),
+    std::move(editorSidedefs),
+    _levelNum);
 }
 
 void EditorState::reset()
@@ -207,10 +219,6 @@ void EditorState::reset()
 
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
-
-  // scrollingStart = { 0.0f, 0.0f };
-  // scrollingOffset = { 0.0f, 0.0f };
-  // canvasZoom = 1.0f;
 }
 
 void Editor::updateAABB(const uint32_t sectorID) const
@@ -230,24 +238,34 @@ void Editor::updateAABB(const uint32_t sectorID) const
     const auto &end = state->findVertex(ld.end);
 
     // check start
-    if (start.x < sec.bounding_box.minX) sec.bounding_box.minX = start.x;
-    if (start.x > sec.bounding_box.maxX) sec.bounding_box.maxX = start.x;
+    if (start.x < sec.bounding_box.minX)
+      sec.bounding_box.minX = start.x;
+    if (start.x > sec.bounding_box.maxX)
+      sec.bounding_box.maxX = start.x;
 
-    if (start.y < sec.bounding_box.minY) sec.bounding_box.minY = start.y;
-    if (start.y > sec.bounding_box.maxY) sec.bounding_box.maxY = start.y;
+    if (start.y < sec.bounding_box.minY)
+      sec.bounding_box.minY = start.y;
+    if (start.y > sec.bounding_box.maxY)
+      sec.bounding_box.maxY = start.y;
 
     // check end
-    if (end.x < sec.bounding_box.minX) sec.bounding_box.minX = end.x;
-    if (end.x > sec.bounding_box.maxX) sec.bounding_box.maxX = end.x;
+    if (end.x < sec.bounding_box.minX)
+      sec.bounding_box.minX = end.x;
+    if (end.x > sec.bounding_box.maxX)
+      sec.bounding_box.maxX = end.x;
 
-    if (end.y < sec.bounding_box.minY) sec.bounding_box.minY = end.y;
-    if (end.y > sec.bounding_box.maxY) sec.bounding_box.maxY = end.y;
+    if (end.y < sec.bounding_box.minY)
+      sec.bounding_box.minY = end.y;
+    if (end.y > sec.bounding_box.maxY)
+      sec.bounding_box.maxY = end.y;
   }
 }
 
-Editor::Editor(Level &_level, uint16_t _width, uint16_t _height)
-  : m_history(std::make_shared<CommandHistory>()), state(std::make_shared<EditorState>(_level, _width, _height))
-{ this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history); }
+Editor::Editor(Level &_level, const uint16_t _levelNum, const uint16_t _numOfLevels, const uint16_t _width, const uint16_t _height)
+  : m_history(std::make_shared<CommandHistory>()), state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, _width, _height))
+{
+  this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
+}
 
 /**
  * function resets the state, the must be set to default on each frame
@@ -270,9 +288,10 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 {
   state->level->linedefs.emplace_back(linedef);
 
-  if (sectorId == -1) return;
+  if (sectorId == -1)
+    return;
 
-  EditorSector& sector = state->findSector(sectorId);
+  EditorSector &sector = state->findSector(sectorId);
 
   sector.linedefIds.emplace_back();
   this->updateAABB(sectorId);
@@ -289,17 +308,19 @@ void Editor::addVertex(const int32_t x, const int32_t y) const
 void Editor::executeCommand(std::unique_ptr<Command> cmd) const { m_history->execute(std::move(cmd), *state); }
 
 
-void Editor::drawConnectedLine(const uint32_t vertexIndex) const
+void Editor::drawConnectedLine(const uint32_t vertexId) const
 {
   state->isCreatingLine = true;
-  state->lineStartVertexId = vertexIndex;
+  state->lineStartVertexId = vertexId;
 }
 
 void EditorVertex::drag(const uint32_t objectId, EditorState *state, CommandHistory *history)
 {
   assert(getObjectType(objectId) == EditorObjectType::VERTEX);
 
-  if (dragged) return;
+  if (dragged)
+    return;
+
   DraggableObject::drag(objectId, state, history);
 
   ImVec2 unzoomedOffset = Editor::unscale(state->draggingOffset, state->canvasZoom);
@@ -313,7 +334,9 @@ void EditorLineDef::drag(const uint32_t objectId, EditorState *state, CommandHis
 {
   assert(getObjectType(objectId) == EditorObjectType::LINEDEF);
 
-  if (dragged) return;
+  if (dragged)
+    return;
+
   DraggableObject::drag(objectId, state, history);
 
   auto &startVertex = state->findVertex(start), &endVertex = state->findVertex(end);
@@ -379,5 +402,7 @@ void Editor::transformVertices() const
   }
 
   // editor vertex contains a vector, so copy is unacceptable
-  for (auto [i, v] : std::ranges::views::enumerate(vertices)) { state->transformedVertices[i] = transformVertex(v); }
+  for (auto [i, v] : std::ranges::views::enumerate(vertices)) {
+    state->transformedVertices[i] = transformVertex(v);
+  }
 }
