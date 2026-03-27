@@ -83,10 +83,11 @@ void EditorRenderer::endFrame() const
 
 void EditorRenderer::drawLinePreview(const float_t thickness) const
 {
-  if (!m_editor->state->isCreatingLine) return;
+  if (!m_editor->state->isCreatingLine)
+    return;
 
   const EditorVertex &startVertex = m_editor->state->findVertex(m_editor->state->lineStartVertexId);
-  const ImVec2 startTransformed = m_editor->transformVertex(startVertex);
+  const ImVec2 startTransformed = m_editor->TransformVertex(startVertex);
 
   const ImVec2 mousePos = ImGui::GetMousePos();
 
@@ -96,14 +97,39 @@ void EditorRenderer::drawLinePreview(const float_t thickness) const
 
 void EditorRenderer::drawPopupsForSelectedObjects() const
 {
-  for (const auto &objectId : m_editor->state->selection) {
+  if (m_editor->state->selection.empty())
+    return;
+
+  // used deffered deletion logic in order not to break selection iteration
+  std::vector<uint32_t> idsToRemove;
+
+  for (const uint32_t objectId : m_editor->state->selection) {
     const auto object = m_editor->state->findObject(objectId);
-    if (!object) continue;
+    if (!object)
+      continue;
+
+    bool toRemove = false;
 
     if (object->type == EditorObjectType::VERTEX) {
-      drawSelectedVertexPopup(objectId);
+      toRemove = drawSelectedVertexPopup(objectId);
     } else if (object->type == EditorObjectType::LINEDEF) {
-      drawSelectedLinePopup(objectId);
+      toRemove = drawSelectedLinePopup(objectId);
+    }
+
+    if (toRemove) {
+      idsToRemove.push_back(objectId);
+    }
+  }
+
+  // remove requested ids
+  for (const uint32_t id : idsToRemove) {
+    auto type = getObjectType(id);
+
+    // TODO: make delete commands in order to split objects deletion correctly
+    if (type == EditorObjectType::VERTEX) {
+      EditorVertex::remove(*m_editor->state, id);
+    } else if (type == EditorObjectType::LINEDEF) {
+      EditorLineDef::remove(*m_editor->state, id);
     }
   }
 }
@@ -125,7 +151,7 @@ void EditorRenderer::render() const
 
   // 2. Set flags
   constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs
-                                     | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoBringToFrontOnFocus;
 
   ImGui::Begin("HUDOverlay", nullptr, flags);
 
@@ -134,14 +160,14 @@ void EditorRenderer::render() const
 
   // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
   // so (x, y) will be now (y, x)
-  m_editor->processInput(vertexRadius);
+  m_editor->ProcessInput(vertexRadius);
 
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
     showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
 
-  m_editor->transformVertices();
+  m_editor->TransformVertices();
 
   drawCoordinatesCenter(vertexRadius);
 
@@ -163,14 +189,49 @@ void EditorRenderer::render() const
   // draw block selection indication
   drawBlockSelection();
 
+  // draw level selection select
+  drawLevelSelection();
+
   ImGui::End();
 
   endFrame();
 }
 
+void EditorRenderer::drawLevelSelection() const
+{
+  ImGui::SetNextWindowPos(ImVec2(10, 10));
+  ImGui::SetNextWindowSize(ImVec2(150, 0));
+
+  ImGui::Begin("LevelSelection",
+    nullptr,
+    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+  // TODO: rewrite createSelect to use a index based for loop instead of storing indices in a seperate array
+  std::vector<std::uint16_t> levelOptions;
+  levelOptions.reserve(m_editor->state->numOfLevels);
+
+  for (uint16_t i = 0; i < m_editor->state->numOfLevels; i++) {
+    levelOptions.emplace_back(i + 1);
+  }
+
+  static uint16_t currentLevelOption = m_editor->state->level->levelNum;
+  createSelect(
+    "Select level",
+    levelOptions,
+    currentLevelOption,
+    [this](const uint16_t selectedOption) {
+      currentLevelOption = selectedOption;
+
+      m_editor->changeLevel(selectedOption);
+    },
+    [this]() { m_editor->addEmptyLevel(); });
+
+  ImGui::End();
+}
+
 void EditorRenderer::drawBlockSelection() const
 {
-  if (!m_editor->state->isBlockSelecting) return;
+  if (!m_editor->state->isBlockSelecting)
+    return;
 
   const auto drawList = ImGui::GetWindowDrawList();
   const ImVec2 blockSelectionStart = m_editor->state->blockSelectionStart;
@@ -194,9 +255,9 @@ void EditorRenderer::drawSidedefsWindow() const
     m_editor->state->level->sidedefs.emplace_back(-1, 0, 0);
   }
 
-  constexpr ImGuiTableFlags tableFlags =
-    ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg
-    | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
+  constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH
+    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody
+    | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
 
   if (ImGui::BeginTable("PropertyTable", 1, tableFlags)) {
     ImGui::TableSetupColumn("Sidedefs table", ImGuiTableColumnFlags_WidthStretch);
@@ -278,11 +339,13 @@ void EditorRenderer::drawSectorsWindow() const
 
   ImGui::Begin("Sectors");
 
-  if (ImGui::Button("Create sector")) { m_editor->state->level->sectors.emplace_back(); }
+  if (ImGui::Button("Create sector")) {
+    m_editor->state->level->sectors.emplace_back();
+  }
 
-  constexpr ImGuiTableFlags tableFlags =
-    ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg
-    | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
+  constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH
+    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody
+    | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
 
   if (ImGui::BeginTable("PropertyTable", 1, tableFlags)) {
     ImGui::TableSetupColumn("Sectors table", ImGuiTableColumnFlags_WidthStretch);
@@ -424,15 +487,19 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
   }
 
   // tint a bit the color of the portal linedef
-  if (ld.backSideDef != -1) { color -= 0x32323200; }
+  if (ld.backSideDef != -1) {
+    color -= 0x32323200;
+  }
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
   const ImVec2 &startVec = m_editor->state->transformedVertices[getObjectIndex(ld.start)];
   const ImVec2 &endVec = m_editor->state->transformedVertices[getObjectIndex(ld.end)];
 
-  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow.width <= startVec.x || m_sdlWindow.height <= startVec.y) return;
-  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow.width <= endVec.x || m_sdlWindow.height <= endVec.y) return;
+  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow.width <= startVec.x || m_sdlWindow.height <= startVec.y)
+    return;
+  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow.width <= endVec.x || m_sdlWindow.height <= endVec.y)
+    return;
 
   drawList->AddLine(startVec, endVec, color, thickness);
 
@@ -442,7 +509,9 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
 
 void EditorRenderer::drawLinedefs(const float_t thickness) const
 {
-  for (const auto &ld : m_editor->state->level->linedefs) { drawLinedef(ld, thickness); }
+  for (const auto &ld : m_editor->state->level->linedefs) {
+    drawLinedef(ld, thickness);
+  }
 }
 void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
 {
@@ -456,7 +525,7 @@ void EditorRenderer::drawCoordinatesCenter(const float vertexRadius) const
 {
   const EditorVertex center =
     math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow.width, m_sdlWindow.height);
-  const ImVec2 centerTransformed = m_editor->transformVertex(center);
+  const ImVec2 centerTransformed = m_editor->TransformVertex(center);
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
   drawList->AddCircleFilled(centerTransformed, vertexRadius, IM_COL32(50, 0, 255, 255));
@@ -481,7 +550,7 @@ void EditorRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpe
   ImGui::End();
 }
 
-void EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
+bool EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
 {
   const auto index = getObjectIndex(lineId);
   auto &ld = m_editor->state->findLinedef(index);
@@ -521,19 +590,26 @@ void EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
   const std::string frontSideDefLabel = fmt::format(":Front SideDef ##LDSidedef{0}", ld.start);
   const std::string backSideDefLabel = fmt::format(":Back SideDef ##LDSidedef{0}", ld.end);
 
-  createSelect(frontSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.frontSideDef);
-  createSelect(backSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.backSideDef, true);
+  createSidedefSelect(frontSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.frontSideDef);
+  createSidedefSelect(backSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.backSideDef, true);
 
-  if (ImGui::Button("Delete")) { EditorLineDef::remove(*m_editor->state, index); }
+  bool deleteRequested = false;
+
+  if (ImGui::Button("Delete")) {
+    deleteRequested = true;
+    // EditorLineDef::remove(*m_editor->state, index);
+  }
 
   ImGui::NewLine();
   ImGui::NewLine();
 
   ImGui::PopID();
   ImGui::End();
+
+  return deleteRequested;
 }
 
-void EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
+bool EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 {
   const uint32_t index = getObjectIndex(selectedId);
 
@@ -549,14 +625,23 @@ void EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
     ImGui::Text("Connected LineDef ID: %u", ldIndex);
   }
 
-  if (ImGui::Button("Create Connected Line")) { m_editor->drawConnectedLine(selectedId); }
-  if (ImGui::Button("Delete")) { EditorVertex::remove(*m_editor->state, selectedId); }
+  if (ImGui::Button("Create Connected Line")) {
+    m_editor->drawConnectedLine(selectedId);
+  }
+
+  bool deleteRequested = false;
+  if (ImGui::Button("Delete")) {
+    deleteRequested = true;
+    // EditorVertex::remove(*m_editor->state, selectedId);
+  }
 
   ImGui::PopID();
   ImGui::End();
+
+  return deleteRequested;
 }
 
-void EditorRenderer::createSelect(const char *label,
+void EditorRenderer::createSidedefSelect(const char *label,
   const std::vector<EditorSidedef> &sidedefs,
   int32_t &currentItem,
   const bool hasReset)
@@ -567,17 +652,48 @@ void EditorRenderer::createSelect(const char *label,
       const bool isReset = currentItem == -1;
 
       const auto resetLabel = "-1";
-      if (ImGui::Selectable(resetLabel, isReset)) { currentItem = -1; }
+      if (ImGui::Selectable(resetLabel, isReset)) {
+        currentItem = -1;
+      }
     }
 
     for (size_t i = 0; i < sidedefs.size(); i++) {
       const bool is_selected = static_cast<size_t>(currentItem) == i;
       std::string optionLabel = std::to_string(i);
 
-      if (ImGui::Selectable(optionLabel.c_str(), is_selected)) { currentItem = static_cast<int32_t>(i); }
+      if (ImGui::Selectable(optionLabel.c_str(), is_selected)) {
+        currentItem = static_cast<int32_t>(i);
+      }
 
       // Set the initial focus when opening the combo (scrolling to selection)
-      if (is_selected) { ImGui::SetItemDefaultFocus(); }
+      if (is_selected) {
+        ImGui::SetItemDefaultFocus();
+      }
+    }
+    ImGui::EndCombo();
+  }
+}
+
+void EditorRenderer::createSelect(const char *label,
+  const std::vector<std::uint16_t> &options,
+  std::uint16_t currentItem,
+  const std::function<void(uint16_t)> &setCurrElem,
+  const std::function<void()> &addNewElem)
+{
+  if (ImGui::BeginCombo(label, fmt::format("Level: {}", currentItem).c_str())) {
+    for (const std::uint16_t &option : options) {
+      const bool is_selected = currentItem == option;
+      if (ImGui::Selectable(fmt::format("Level {}", option).c_str(), is_selected)) {
+        setCurrElem(option);
+      }
+      // Set the initial focus when opening the combo (scrolling to selection)
+      if (is_selected) {
+        ImGui::SetItemDefaultFocus();
+      }
+    }
+
+    if (ImGui::Button("Add New")) {
+      addNewElem();
     }
     ImGui::EndCombo();
   }
@@ -587,7 +703,8 @@ void EditorRenderer::createSelect(const char *label,
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
 {
   const auto &v = m_editor->state->findVertex(vertexId);
-  if (v.x < 0 || v.y < 0 || m_sdlWindow.width <= v.x || m_sdlWindow.height <= v.y) return;
+  if (v.x < 0 || v.y < 0 || m_sdlWindow.width <= v.x || m_sdlWindow.height <= v.y)
+    return;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 

@@ -351,7 +351,7 @@ void EditorInputHandler::processMouseInteractions(const float_t vertexRadius) co
   processNearestObject(bestObjectId);
 }
 
-void EditorInputHandler::processInput(const float_t vertexRadius) const
+void EditorInputHandler::ProcessInput(const float_t vertexRadius) const
 {
 
   processKeyboardInputs();

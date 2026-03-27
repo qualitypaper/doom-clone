@@ -88,7 +88,7 @@ void EditorSidedef::deserialize(FileReader &fr)
 
 void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t height)
 {
-  if (levelNum == 0) {
+  if (levelNum <= 0) {
     throw std::runtime_error("Level number must be greater than zero.");
   }
 

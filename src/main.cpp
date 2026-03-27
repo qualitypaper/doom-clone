@@ -106,9 +106,8 @@ int main(int argc, char *argv[])
 
   std::shared_ptr<Level> level;
   if (true) {
-    EditorLevel edLevel{};
     Level tempLevel;
-    edLevel.Load(tempLevel, 1);
+    EditorLevel::Load(tempLevel, 1);
     level = std::make_shared<Level>(tempLevel);
   } else {
     level = std::make_shared<Level>(vertices, linedefs, sidedefs, sectors);

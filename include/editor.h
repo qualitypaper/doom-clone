@@ -383,15 +383,19 @@ public:
 
   void resetStateFrame() const;
 
-  void processInput(float_t vertexRadius) const;
+  void ProcessInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<Command> cmd) const;
   void addLineDef(int32_t sectorId, LineDef &linedef) const;
   void addVertex(int32_t x, int32_t y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
 
-  void transformVertices() const;
-  [[nodiscard]] ImVec2 transformVertex(const EditorVertex &v) const;
-  [[nodiscard]] ImVec2 untransformVertex(ImVec2 transformed) const;
+  void TransformVertices() const;
+  [[nodiscard]] ImVec2 TransformVertex(const EditorVertex &v) const;
+  [[nodiscard]] ImVec2 UntransformVertex(ImVec2 transformed) const;
+
+  void addEmptyLevel();
+  void changeLevel(const uint16_t newLevelNum);
+
 
   template<HasXY T> static constexpr T scale(const T &vec, const float scaleFactor)
   {

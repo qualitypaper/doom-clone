@@ -145,17 +145,15 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
 
   const bool isBackSide = seg.side;
 
-  if (isBackSide && ld.backSidedef == -1) {
-    std::printf("backSidedefIndex == -1 -> When the segment is on the back side, the backSidedef mustn't be empty.");
+  const int16_t frontSidedefIndex = isBackSide ? ld.backSidedef : ld.frontSidedef;
+  const int16_t backSidedefIndex = isBackSide ? ld.frontSidedef : ld.backSidedef;
 
-    fmt::println("Some number");
+  if (frontSidedefIndex == -1) {
+    throw std::runtime_error("frontSidedefIndex == -1 -> The frontSidedef mustn't be empty.");
     return;
   }
 
-  const int16_t frontSidedefId = isBackSide ? ld.backSidedef : ld.frontSidedef;
-  const int16_t backSidedefId = isBackSide ? ld.frontSidedef : ld.backSidedef;
-
-  const SideDef &sidedef = m_level->sidedefs[frontSidedefId];
+  const SideDef &sidedef = m_level->sidedefs[frontSidedefIndex];
   const Sector &sector = m_level->sectors[sidedef.sectorId];
 
   glm::dvec2 view1 = { 0, 0 }, view2 = { 0, 0 };
@@ -212,14 +210,14 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     DrawFloor(i, projectedFloorY, sector.color);
     DrawCeiling(i, projectedCeilingY, sector.color);
 
-    if (backSidedefId == -1) {
+    if (backSidedefIndex == -1) {
       // solid wall
       DrawSolidWall(i, projectedCeilingY, projectedFloorY);
 
       m_solidSegs[i] = true;
     } else {
       // portal
-      const SideDef backSidedef = m_level->sidedefs[backSidedefId];
+      const SideDef backSidedef = m_level->sidedefs[backSidedefIndex];
       const Sector nextSector = m_level->sectors[backSidedef.sectorId];
 
       const int16_t nextCeilZ =

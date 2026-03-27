@@ -282,7 +282,7 @@ void Editor::resetStateFrame() const
   }
 }
 
-void Editor::processInput(const float_t vertexRadius) const { m_inputHandler->processInput(vertexRadius); }
+void Editor::ProcessInput(const float_t vertexRadius) const { m_inputHandler->ProcessInput(vertexRadius); }
 
 void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 {
@@ -345,7 +345,7 @@ void EditorLineDef::drag(const uint32_t objectId, EditorState *state, CommandHis
   endVertex.drag(end, state, history);
 }
 
-ImVec2 Editor::transformVertex(const EditorVertex &v) const
+ImVec2 Editor::TransformVertex(const EditorVertex &v) const
 {
   ImVec2 transformed = zoomVertex(v);
 
@@ -362,7 +362,7 @@ ImVec2 Editor::transformVertex(const EditorVertex &v) const
   return transformed;
 }
 
-ImVec2 Editor::untransformVertex(ImVec2 transformed) const
+ImVec2 Editor::UntransformVertex(ImVec2 transformed) const
 {
   // apply scrolling
   transformed.x = transformed.x - state->scrollingOffset.x;
@@ -375,20 +375,15 @@ ImVec2 Editor::untransformVertex(ImVec2 transformed) const
  * applies transformations to all vertices like zoom, drag, scroll
  * only if one of this parameters change the method will recalculate the vector
  */
-void Editor::transformVertices() const
+void Editor::TransformVertices() const
 {
   static float prevZoom = -1;
   static size_t undoStackSize = 0;
   static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
 
-  // check for state updates
-  // if (prevZoom == state->canvasZoom && draggingOffset.x == state->draggingOffset.x
-  //     && draggingOffset.y == state->draggingOffset.y && scrollingOffset.x == state->scrollingOffset.x
-  //     && scrollingOffset.y == state->scrollingOffset.y && undoStackSize == m_history->undoStack.size()
-  //     && state->transformedVertices.size() == state->level->vertices.size()) {
-  //   return;
-  // }
-
+  // TODO: trigger transformVertices only when one of these parameters change, currently it is called on each frame, but
+  // it should be optimized
+  
   prevZoom = state->canvasZoom;
   draggingOffset = state->draggingOffset;
   scrollingOffset = state->scrollingOffset;
@@ -403,6 +398,21 @@ void Editor::transformVertices() const
 
   // editor vertex contains a vector, so copy is unacceptable
   for (auto [i, v] : std::ranges::views::enumerate(vertices)) {
-    state->transformedVertices[i] = transformVertex(v);
+    state->transformedVertices[i] = TransformVertex(v);
   }
+}
+
+void Editor::addEmptyLevel() { 
+  state->numOfLevels++;
+  state->level->save(state->level->levelNum, this->state->width, this->state->height);
+
+  state->level = std::make_unique<EditorLevel>();
+  state->level->levelNum = state->numOfLevels;
+}
+
+void Editor::changeLevel(const uint16_t newLevelNum) {
+  state->level->save(state->level->levelNum, this->state->width, this->state->height);
+
+  state->level = std::make_unique<EditorLevel>();
+  state->level->Load(state->width, state->height);
 }

@@ -3,11 +3,12 @@
 #include "editor.h"
 #include "editor_input_handler.h"
 #include "gameloop.h"
-#include "sdl_window.h"
 #include "math_utils.h"
+#include "sdl_window.h"
 
 #include <memory>
 #include <vector>
+#include <functional>
 
 struct ImVec2;
 
@@ -19,6 +20,7 @@ public:
   ~EditorRenderer();
 
   void render() const;
+
 
 private:
   SdlWindow &m_sdlWindow;
@@ -37,20 +39,25 @@ private:
   void drawLinedefs(float_t thickness) const;
   void drawBlockSelection() const;
   void drawVertex(uint32_t vertexId, float vertexRadius) const;
-  void
-    drawArrowForLinedef(float_t thickness, uint32_t startVertexId, uint32_t endVertexId, ImU32 color) const;
+  void drawArrowForLinedef(float_t thickness, uint32_t startVertexId, uint32_t endVertexId, ImU32 color) const;
 
   // popups
   void drawSidedefsWindow() const;
   void drawSectorsWindow() const;
-  void drawSelectedLinePopup(uint32_t lineId) const;
-  void drawSelectedVertexPopup(uint32_t selectedId) const;
+  bool drawSelectedLinePopup(uint32_t lineId) const;
+  bool drawSelectedVertexPopup(uint32_t selectedId) const;
   void drawPopupsForSelectedObjects() const;
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const;
+  void drawLevelSelection() const;
 
   // static methods
-  static void createSelect(const char *label,
+  static void createSidedefSelect(const char *label,
     const std::vector<EditorSidedef> &sidedefs,
     int32_t &currentItem,
     bool hasReset = false);
+  static void createSelect(const char *label,
+    const std::vector<std::uint16_t> &options,
+    std::uint16_t currentItem,
+    const std::function<void(uint16_t)> &setCurrElem,
+    const std::function<void()> &addNewElem);
 };

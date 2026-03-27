@@ -46,5 +46,5 @@ public:
   {}
 
 public:
-  void processInput(float_t vertexRadius) const;
+  void ProcessInput(float_t vertexRadius) const;
 };

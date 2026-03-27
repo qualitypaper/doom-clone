@@ -28,6 +28,7 @@ struct GameState
   uint32_t rng_seed;
   time_t gameTime;
   EngineMode currentMode;
+  uint16_t levelNum;
 };
 
 struct Vertex : public Serializable
