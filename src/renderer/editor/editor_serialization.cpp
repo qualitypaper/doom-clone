@@ -162,40 +162,30 @@ void EditorLevel::Save(uint16_t &numberOfLevels, const uint16_t width, const uin
 
   std::unique_ptr<BspLevel> bspLevel = bspBuilder.TakeConstructedLevel();
 
+  const size_t lumpSizePos = fw.Cursor();
   size_t lumpSize = 0;
-
-  lumpSize += bspLevel->linedefs.size() * sizeof(LineDef);
-  lumpSize += sidedefs.size() * sizeof(SideDef);
-  lumpSize += bspLevel->vertices.size() * sizeof(Vertex);
-  lumpSize += bspLevel->segments.size() * sizeof(Seg);
-  lumpSize += bspLevel->subsectors.size() * sizeof(SubSector);
-  lumpSize += bspLevel->nodes.size() * sizeof(BspNode);
-  lumpSize += sectors.size() * sizeof(Sector);
-
   fw.WriteRaw(lumpSize);
 
-  // write linedefs
   fw.WriteVector(bspLevel->linedefs);
-
-  // write sidedefs
   fw.WriteVector(sidedefs);
-
-  // write vertices
   fw.WriteVector(bspLevel->vertices);
-
-  // write segs
   fw.WriteVector(bspLevel->segments);
-
-  // write subsectors
   fw.WriteVector(bspLevel->subsectors);
-
-  // write nodes
   fw.WriteVector(bspLevel->nodes);
-
-  // write sectors
   fw.WriteVector(sectors);
+
+  lumpSize = fw.Cursor() - lumpSizePos;
+  fw.SetPos(lumpSizePos);
+  fw.WriteRaw(lumpSize);
+  fw.SetPos(fw.Cursor() + lumpSize);
 }
 
+
+/**
+ * after calling the method the cursor of the reader is right at the beginning of the data of @param levelNum
+ * @param fr initialized FileReader
+ * @param levelNum number of the level to skip to
+ */
 void EditorLevel::SkipLevels(FileReader &fr, uint16_t levelNum)
 {
   // if levelNum is already at start, there is no need to skip levels
@@ -205,13 +195,16 @@ void EditorLevel::SkipLevels(FileReader &fr, uint16_t levelNum)
     return;
   }
 
+  size_t lumpSize = 0;
   while (fr.IsStreamGood() && levelNum > 1) {
-    size_t lumpSize = 0;
     fr.ReadRaw(lumpSize);
     // read the size of the following lump
     fr.Skip(lumpSize);
     levelNum--;
   }
+
+  // skipping lump size bytes after reaching the needed level
+  fr.Skip(sizeof(size_t));
 }
 
 size_t EditorLevel::Load(Level &level, const uint16_t levelNum)

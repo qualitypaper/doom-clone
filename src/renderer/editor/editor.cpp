@@ -217,6 +217,12 @@ void EditorState::reset()
 
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
+
+  level.reset();
+  transformedVertices = std::vector<ImVec2>();
+
+  // reset all the editor state  scrolling
+
 }
 
 void Editor::updateAABB(const uint32_t sectorID) const
@@ -413,9 +419,12 @@ void Editor::addEmptyLevel() const
 
 void Editor::changeLevel(const uint16_t newLevelNum) const
 {
-  if (state->level->levelNum == newLevelNum) return;
+  if (state->level->levelNum == newLevelNum)
+    return;
 
   state->level->Save(state->numOfLevels, this->state->width, this->state->height);
+
+  state->reset();
 
   state->level = std::make_unique<EditorLevel>(newLevelNum);
   state->level->Load(state->width, state->height);
