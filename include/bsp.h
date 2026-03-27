@@ -26,12 +26,11 @@ struct Seg : public Serializable
   {}
 
   bool operator==(const Seg &other) const
-  {
-    return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex;
-  }
+  { return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex; }
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
+  static size_t SerializationSize();
 };
 
 struct BspNode : public Serializable
@@ -46,6 +45,7 @@ struct BspNode : public Serializable
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
+  static size_t SerializationSize();
 };
 
 inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
@@ -65,6 +65,7 @@ struct SubSector : public Serializable
 
   void serialize(FileWriter &fw) const override;
   void deserialize(FileReader &fr) override;
+  static size_t SerializationSize();
 };
 
 struct SplitResult

@@ -76,9 +76,7 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
 }
 
 ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
-{
-  return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height);
-}
+{ return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height); }
 
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 {
@@ -261,11 +259,14 @@ void Editor::updateAABB(const uint32_t sectorID) const
   }
 }
 
-Editor::Editor(Level &_level, const uint16_t _levelNum, const uint16_t _numOfLevels, const uint16_t _width, const uint16_t _height)
-  : m_history(std::make_shared<CommandHistory>()), state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, _width, _height))
-{
-  this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
-}
+Editor::Editor(Level &_level,
+  const uint16_t _levelNum,
+  const uint16_t _numOfLevels,
+  const uint16_t _width,
+  const uint16_t _height)
+  : m_history(std::make_shared<CommandHistory>()),
+    state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, _width, _height))
+{ this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history); }
 
 /**
  * function resets the state, the must be set to default on each frame
@@ -383,7 +384,7 @@ void Editor::TransformVertices() const
 
   // TODO: trigger transformVertices only when one of these parameters change, currently it is called on each frame, but
   // it should be optimized
-  
+
   prevZoom = state->canvasZoom;
   draggingOffset = state->draggingOffset;
   scrollingOffset = state->scrollingOffset;
@@ -402,17 +403,20 @@ void Editor::TransformVertices() const
   }
 }
 
-void Editor::addEmptyLevel() { 
+void Editor::addEmptyLevel() const
+{
+  state->level->Save(state->numOfLevels, this->state->width, this->state->height);
   state->numOfLevels++;
-  state->level->save(state->level->levelNum, this->state->width, this->state->height);
 
-  state->level = std::make_unique<EditorLevel>();
-  state->level->levelNum = state->numOfLevels;
+  state->level = std::make_unique<EditorLevel>(state->numOfLevels);
 }
 
-void Editor::changeLevel(const uint16_t newLevelNum) {
-  state->level->save(state->level->levelNum, this->state->width, this->state->height);
+void Editor::changeLevel(const uint16_t newLevelNum) const
+{
+  if (state->level->levelNum == newLevelNum) return;
 
-  state->level = std::make_unique<EditorLevel>();
+  state->level->Save(state->numOfLevels, this->state->width, this->state->height);
+
+  state->level = std::make_unique<EditorLevel>(newLevelNum);
   state->level->Load(state->width, state->height);
 }

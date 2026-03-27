@@ -1,6 +1,7 @@
 #include "math_utils.h"
 
 #include "bsp.h"
+#include "config.h"
 #include "editor.h"
 #include "serialization.h"
 
@@ -8,24 +9,27 @@
 
 void EditorLineDef::serialize(FileWriter &fw) const
 {
-  fw.WriteRaw(getObjectIndex(start));
-  fw.WriteRaw(getObjectIndex(end));
-  const int32_t intType = static_cast<int32_t>(type);
+  fw.WriteRaw(static_cast<int16_t>(getObjectIndex(start)));
+  fw.WriteRaw(static_cast<int16_t>(getObjectIndex(end)));
+  const int8_t intType = static_cast<int8_t>(type);
   fw.WriteRaw(intType);
-  fw.WriteRaw(frontSideDef);
-  fw.WriteRaw(backSideDef);
+
+  fw.WriteRaw(static_cast<int16_t>(frontSideDef));
+  fw.WriteRaw(static_cast<int16_t>(backSideDef));
 }
 
 void EditorLineDef::deserialize(FileReader &fr)
 {
-  fr.ReadRaw(start);
-  start = makeObjectId(EditorObjectType::VERTEX, start);
-  fr.ReadRaw(end);
-  end = makeObjectId(EditorObjectType::VERTEX, end);
+  int16_t _start, _end;
+  fr.ReadRaw(_start);
+  start = makeObjectId(EditorObjectType::VERTEX, _start);
+  fr.ReadRaw(_end);
+  end = makeObjectId(EditorObjectType::VERTEX, _end);
 
-  int32_t intType;
+  int8_t intType;
   fr.ReadRaw(intType);
   type = static_cast<LineDefType>(intType);
+
   fr.ReadRaw(frontSideDef);
   fr.ReadRaw(backSideDef);
 }
@@ -86,14 +90,14 @@ void EditorSidedef::deserialize(FileReader &fr)
   fr.ReadRaw(yOffset);
 }
 
-void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t height)
+void EditorLevel::Save(uint16_t &numberOfLevels, const uint16_t width, const uint16_t height)
 {
   if (levelNum <= 0) {
     throw std::runtime_error("Level number must be greater than zero.");
   }
 
-  if (levelsNum < levelNum) {
-    levelNum = ++levelsNum;
+  if (numberOfLevels < levelNum) {
+    levelNum = ++numberOfLevels;
   }
 
   // run bsp algorithm before saving
@@ -110,9 +114,22 @@ void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t
   bspBuilder.BuildBSPTree();
   bspBuilder.PrintTree();
 
-  FileWriter fw("saved_level.wad");
 
-  std::cout << "Saving level to saved_level.wad \n";
+  // create file if doesn't exist
+  std::ios::openmode openmode;
+  const bool fileExists = std::filesystem::exists(config::SAVED_LEVEL_PATH);
+
+  if (!fileExists) {
+    openmode = std::ios::binary | std::ios::out;
+  } else {
+    // open in "in" mode in order to avoid truncating the file
+    openmode = std::ios::binary | std::ios::out | std::ios::in;
+  }
+
+  FileWriter fw(config::SAVED_LEVEL_PATH, openmode);
+  fw.SetPos(0);
+
+  std::cout << "Saving level\n";
   std::cout << std::filesystem::current_path() << '\n';
 
   if (!fw.IsStreamGood()) {
@@ -120,19 +137,27 @@ void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t
     return;
   }
 
-  // write identification
-  fw.WriteRaw((char8_t)'W');
-  fw.WriteRaw((char8_t)'A');
-  fw.WriteRaw((char8_t)'D');
+  // if file is new write file identification
+  if (!fileExists) {
+    fw.WriteRaw(static_cast<char8_t>('W'));
+    fw.WriteRaw(static_cast<char8_t>('A'));
+    fw.WriteRaw(static_cast<char8_t>('D'));
+  } else {
+    fw.Skip(3 * sizeof(char8_t));
+  }
 
   // write number of lumps in the file
   // currently it supports only one level per file
-  fw.WriteRaw((size_t)levelsNum);
+  fw.WriteRaw(static_cast<size_t>(numberOfLevels));
 
   if (levelNum > 1) {
     std::cout << "Skipping " << levelNum - 1 << " levels in the file.\n";
-    FileReader fr("saved_level.wad");
+    FileReader fr(config::SAVED_LEVEL_PATH);
+    fr.SetPos(fw.Cursor());
+
     SkipLevels(fr, levelNum);
+
+    fw.SetPos(fr.Cursor());
   }
 
   std::unique_ptr<BspLevel> bspLevel = bspBuilder.TakeConstructedLevel();
@@ -150,22 +175,22 @@ void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t
   fw.WriteRaw(lumpSize);
 
   // write linedefs
-  fw.WriteVector(std::move(bspLevel->linedefs));
+  fw.WriteVector(bspLevel->linedefs);
 
   // write sidedefs
   fw.WriteVector(sidedefs);
 
   // write vertices
-  fw.WriteVector(std::move(bspLevel->vertices));
+  fw.WriteVector(bspLevel->vertices);
 
   // write segs
-  fw.WriteVector(std::move(bspLevel->segments));
+  fw.WriteVector(bspLevel->segments);
 
   // write subsectors
-  fw.WriteVector(std::move(bspLevel->subsectors));
+  fw.WriteVector(bspLevel->subsectors);
 
   // write nodes
-  fw.WriteVector(std::move(bspLevel->nodes));
+  fw.WriteVector(bspLevel->nodes);
 
   // write sectors
   fw.WriteVector(sectors);
@@ -173,26 +198,34 @@ void EditorLevel::save(uint16_t &levelsNum, const uint16_t width, const uint16_t
 
 void EditorLevel::SkipLevels(FileReader &fr, uint16_t levelNum)
 {
-  size_t lumpSize = 0;
-  fr.ReadRaw(lumpSize);
+  // if levelNum is already at start, there is no need to skip levels
+  if (levelNum <= 1) {
+    // skipping the lump size, because the cursor is expected right at the start of the serialized data
+    fr.Skip(sizeof(size_t));
+    return;
+  }
 
   while (fr.IsStreamGood() && levelNum > 1) {
+    size_t lumpSize = 0;
+    fr.ReadRaw(lumpSize);
     // read the size of the following lump
     fr.Skip(lumpSize);
     levelNum--;
   }
 }
 
-void EditorLevel::Load(Level &level, const uint16_t levelNum)
+size_t EditorLevel::Load(Level &level, const uint16_t levelNum)
 {
-  FileReader fr("saved_level.wad");
+  FileReader fr(config::SAVED_LEVEL_PATH);
 
-  SkipHeaderAndLevels(fr, levelNum);
+  const size_t numOfLevels = ReadHeaderAndSkipLevels(fr, levelNum);
 
   level.Load(fr);
+
+  return numOfLevels;
 }
 
-void EditorLevel::SkipHeaderAndLevels(FileReader &fr, const uint16_t levelNum)
+size_t EditorLevel::ReadHeaderAndSkipLevels(FileReader &fr, const uint16_t levelNum)
 {
   // skip the file identification
   fr.Skip(3 * sizeof(char8_t));
@@ -214,17 +247,19 @@ void EditorLevel::SkipHeaderAndLevels(FileReader &fr, const uint16_t levelNum)
   if (!fr.IsStreamGood()) {
     throw std::runtime_error("Stream failed while skipping lumps");
   }
+
+  return numLevels;
 }
 
 void EditorLevel::Load(const uint16_t width, const uint16_t height)
 {
-  FileReader fr("saved_level.wad");
+  FileReader fr(config::SAVED_LEVEL_PATH);
   if (!fr.IsStreamGood()) {
-    std::cerr << "Failed to open saved_level.wad for loading. Using hardcoded level data." << std::endl;
+    std::cerr << "Failed to open " << config::SAVED_LEVEL_PATH << " for loading. Using hardcoded level data." << '\n';
     return;
   }
 
-  SkipHeaderAndLevels(fr, this->levelNum);
+  ReadHeaderAndSkipLevels(fr, this->levelNum);
 
   fr.ReadVector(linedefs);
   std::cout << "Read linedefs\n";
@@ -232,23 +267,31 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
   fr.ReadVector(sidedefs);
   std::cout << "Read sidedefs\n";
 
-  fr.ReadVector(vertices);
+  std::vector<Vertex> _vertices;
+  fr.ReadVector(_vertices);
+
+  vertices.resize(_vertices.size());
+  for (size_t i = 0; i < _vertices.size(); ++i) {
+    const Vertex temp = math_utils::fromCenterCoordinates(_vertices[i], width, height);
+    vertices[i] = EditorVertex(temp.x, temp.y);
+  }
+
   std::cout << "Read vertices\n";
 
   // skip segments
   size_t segSize = 0;
   fr.ReadRaw(segSize);
-  fr.Skip(segSize * sizeof(Seg));
+  fr.Skip(segSize * Seg::SerializationSize());
 
   // skip subsectors
   size_t subsectorSize = 0;
   fr.ReadRaw(subsectorSize);
-  fr.Skip(subsectorSize * sizeof(SubSector));
+  fr.Skip(subsectorSize * SubSector::SerializationSize());
 
   // skip nodes
   size_t nodesSize = 0;
   fr.ReadRaw(nodesSize);
-  fr.Skip(nodesSize * sizeof(BspNode));
+  fr.Skip(nodesSize * BspNode::SerializationSize());
 
   // read sectors
   fr.ReadVector(sectors);

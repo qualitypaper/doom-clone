@@ -105,11 +105,14 @@ int main(int argc, char *argv[])
   };
 
   std::shared_ptr<Level> level;
+  size_t numOfLevels;
+
   if (true) {
     Level tempLevel;
-    EditorLevel::Load(tempLevel, 1);
+    numOfLevels = EditorLevel::Load(tempLevel, 1);
     level = std::make_shared<Level>(tempLevel);
   } else {
+    numOfLevels = 1;
     level = std::make_shared<Level>(vertices, linedefs, sidedefs, sectors);
   }
 
@@ -120,7 +123,7 @@ int main(int argc, char *argv[])
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
-  EditorRenderer editorRenderer(sdlWindow, *level, 1, 1);
+  EditorRenderer editorRenderer(sdlWindow, *level, 1, numOfLevels);
 
   // setup the game renderer
   FrameBuffer fb(sdlWindow);

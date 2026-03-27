@@ -18,7 +18,8 @@ void LineDef::serialize(FileWriter &fw) const
 {
   fw.WriteRaw(start);
   fw.WriteRaw(end);
-  const int32_t intType = static_cast<int32_t>(type);
+  const int8_t intType = static_cast<int8_t>(type);
+
   fw.WriteRaw(intType);
   fw.WriteRaw(frontSidedef);
   fw.WriteRaw(backSidedef);
@@ -28,9 +29,10 @@ void LineDef::deserialize(FileReader &fr)
 {
   fr.ReadRaw(start);
   fr.ReadRaw(end);
-  int32_t intType;
+  int8_t intType;
   fr.ReadRaw(intType);
   type = static_cast<LineDefType>(intType);
+
   fr.ReadRaw(frontSidedef);
   fr.ReadRaw(backSidedef);
 }
@@ -93,13 +95,19 @@ void BspNode::serialize(FileWriter &fw) const
   fw.WriteRaw(rightChild);
 }
 
+size_t BspNode::SerializationSize()
+{
+  return sizeof(x) + sizeof(y) + sizeof(dx) + sizeof(dy) + sizeof(leftBoundingBox) + sizeof(rightBoundingBox)
+    + sizeof(leftChild) + sizeof(rightChild);
+}
+
 void BspNode::deserialize(FileReader &fr)
 {
   fr.ReadRaw(x);
   fr.ReadRaw(y);
   fr.ReadRaw(dx);
   fr.ReadRaw(dy);
-   
+
   fr.ReadRaw(leftBoundingBox);
   fr.ReadRaw(rightBoundingBox);
 
@@ -126,12 +134,18 @@ void Seg::deserialize(FileReader &fr)
   fr.ReadRaw(side);
   fr.ReadRaw(offset);
 }
+size_t Seg::SerializationSize()
+{
+  return sizeof(startVertex) + sizeof(endVertex) + sizeof(angle) + sizeof(linedefIndex) + sizeof(side) + sizeof(offset);
+}
 
 void SubSector::serialize(FileWriter &fw) const
 {
   fw.WriteRaw(segCount);
   fw.WriteRaw(firstSegIndex);
 }
+
+size_t SubSector::SerializationSize() { return sizeof(segCount) + sizeof(firstSegIndex); }
 
 void SubSector::deserialize(FileReader &fr)
 {

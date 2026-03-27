@@ -27,9 +27,7 @@ struct AABB
   int16_t minX, minY;
 
   [[nodiscard]] bool contains(const int16_t x, const int16_t y) const
-  {
-    return x >= minX && x <= maxX && y >= minY && y <= maxY;
-  }
+  { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
 };
 
 enum class EditorObjectType { LINEDEF, VERTEX, SECTOR, SIDEDEF };
@@ -39,14 +37,10 @@ constexpr uint32_t kObjectTypeShift = 30;
 constexpr uint32_t kObjectIndexMask = (1u << kObjectTypeShift) - 1u;
 
 constexpr uint32_t makeObjectId(EditorObjectType type, const uint32_t index)
-{
-  return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask);
-}
+{ return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask); }
 
 constexpr EditorObjectType getObjectType(const uint32_t objectId)
-{
-  return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u);
-}
+{ return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u); }
 
 constexpr uint32_t getObjectIndex(const uint32_t objectId) { return objectId & kObjectIndexMask; }
 
@@ -88,8 +82,8 @@ struct EditorLineDef : public EditorObject
   EditorLineDef(const uint32_t _start,
     const uint32_t _end,
     const LineDefType _type,
-    const int32_t _frontSideDef,
-    const int32_t _backSideDef)
+    const int16_t _frontSideDef,
+    const int16_t _backSideDef)
     : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSideDef(_frontSideDef),
       backSideDef(_backSideDef)
   {}
@@ -97,8 +91,8 @@ struct EditorLineDef : public EditorObject
   uint32_t start = 0;
   uint32_t end = 0;
   LineDefType type = LineDefType::REGULAR;
-  int32_t frontSideDef = -1;
-  int32_t backSideDef = -1;
+  int16_t frontSideDef = -1;
+  int16_t backSideDef = -1;
 
   static void remove(const EditorState &state, uint32_t ldId);
 
@@ -126,13 +120,9 @@ struct EditorVertex : public EditorObject
   EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
 
   EditorVertex operator+(const ImVec2 &other) const
-  {
-    return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) };
-  }
+  { return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) }; }
   EditorVertex operator-(const ImVec2 &other) const
-  {
-    return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) };
-  }
+  { return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) }; }
 
   EditorVertex operator*(const double c) const { return { static_cast<int32_t>(x * c), static_cast<int32_t>(y * c) }; }
   EditorVertex operator/(const double c) const { return { static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
@@ -194,14 +184,14 @@ struct EditorSidedef : EditorObject
 
 struct EditorSector : EditorObject
 {
-  EditorSector(int16_t _floorHeight,
-    int16_t _ceilingHeight,
-    int16_t _specialType,
-    int16_t _lightLevel,
-    int16_t _tag,
-    uint32_t _color = 0)
+  EditorSector(const int16_t _floorHeight,
+    const int16_t _ceilingHeight,
+    const int16_t _specialType,
+    const int16_t _lightLevel,
+    const int16_t _tag,
+    const uint32_t _color = 0)
     : EditorObject(EditorObjectType::SECTOR), floorHeight(_floorHeight), ceilingHeight(_ceilingHeight),
-      specialType(_specialType), lightLevel(_lightLevel), tag(_tag), color(_color)
+      lightLevel(_lightLevel), specialType(_specialType), tag(_tag), color(_color)
   {}
   EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
 
@@ -227,17 +217,18 @@ struct EditorLevel
     std::vector<EditorLineDef> _lines,
     std::vector<EditorSector> _sectors,
     std::vector<EditorSidedef> _sidedefs,
-    size_t _levelNum)
+    const size_t _levelNum)
     : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)),
       sidedefs(std::move(_sidedefs)), levelNum(_levelNum)
   {}
+  explicit EditorLevel(const size_t _levelNum) : levelNum(_levelNum) {}
 
 
-  void save(uint16_t &levelsNum, const uint16_t width, const uint16_t height);
-  void Load(const uint16_t width, const uint16_t height);
+  void Save(uint16_t &numberOfLevels, uint16_t width, uint16_t height);
+  void Load(uint16_t width, uint16_t height);
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
-  static void Load(Level &level, const uint16_t levelNum);
-  static void SkipHeaderAndLevels(FileReader &fr, const uint16_t levelNum);
+  static size_t Load(Level &level, uint16_t levelNum);
+  static size_t ReadHeaderAndSkipLevels(FileReader &fr, uint16_t levelNum);
   static void SkipLevels(FileReader &fr, uint16_t levelNum);
 
 
@@ -246,7 +237,7 @@ struct EditorLevel
   std::vector<EditorSector> sectors;
   std::vector<EditorSidedef> sidedefs;
   // equals to zero when level is the first lump
-  uint16_t levelNum;
+  uint16_t levelNum = 0;
 };
 
 struct EditorState
@@ -308,8 +299,8 @@ struct EditorState
   {
     const uint32_t index = getObjectIndex(id);
 
-    if (index >= level->vertices.size()) {
-      throw std::runtime_error("Index is bigger than the sectors array");
+    if (index >= transformedVertices.size()) {
+      return { 0, 0 };
     }
 
     return transformedVertices[index];
@@ -375,11 +366,7 @@ public:
   std::shared_ptr<EditorState> state;
 
 public:
-  Editor(Level &_level,
-    const uint16_t _levelNum,
-    const uint16_t _numOfLevels,
-    const uint16_t _width,
-    const uint16_t _height);
+  Editor(Level &_level, uint16_t _levelNum, uint16_t _numOfLevels, uint16_t _width, uint16_t _height);
 
   void resetStateFrame() const;
 
@@ -393,8 +380,8 @@ public:
   [[nodiscard]] ImVec2 TransformVertex(const EditorVertex &v) const;
   [[nodiscard]] ImVec2 UntransformVertex(ImVec2 transformed) const;
 
-  void addEmptyLevel();
-  void changeLevel(const uint16_t newLevelNum);
+  void addEmptyLevel() const;
+  void changeLevel(uint16_t newLevelNum) const;
 
 
   template<HasXY T> static constexpr T scale(const T &vec, const float scaleFactor)

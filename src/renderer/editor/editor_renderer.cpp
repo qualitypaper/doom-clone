@@ -205,6 +205,7 @@ void EditorRenderer::drawLevelSelection() const
   ImGui::Begin("LevelSelection",
     nullptr,
     ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+
   // TODO: rewrite createSelect to use a index based for loop instead of storing indices in a seperate array
   std::vector<std::uint16_t> levelOptions;
   levelOptions.reserve(m_editor->state->numOfLevels);
@@ -213,12 +214,13 @@ void EditorRenderer::drawLevelSelection() const
     levelOptions.emplace_back(i + 1);
   }
 
-  static uint16_t currentLevelOption = m_editor->state->level->levelNum;
+  uint16_t currentLevelOption = m_editor->state->level->levelNum;
+
   createSelect(
     "Select level",
     levelOptions,
     currentLevelOption,
-    [this](const uint16_t selectedOption) {
+    [this, &currentLevelOption](const uint16_t selectedOption) {
       currentLevelOption = selectedOption;
 
       m_editor->changeLevel(selectedOption);
@@ -643,7 +645,7 @@ bool EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 
 void EditorRenderer::createSidedefSelect(const char *label,
   const std::vector<EditorSidedef> &sidedefs,
-  int32_t &currentItem,
+  int16_t &currentItem,
   const bool hasReset)
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {

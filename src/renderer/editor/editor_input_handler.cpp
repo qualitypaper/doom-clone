@@ -202,7 +202,7 @@ void EditorInputHandler::processKeyboardInputs() const
   if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_S)) {
     // save the current level into a .bin file
     // vertices, linedefs, sidedefs, sectors
-    state->level->save(state->numOfLevels, state->width, state->height);
+    state->level->Save(state->numOfLevels, state->width, state->height);
   }
 
   if (ctrlDown && !io.WantCaptureMouse && io.MouseWheel != 0) {
@@ -228,7 +228,7 @@ std::pair<uint32_t, float> EditorInputHandler::findNearestVertices(const float v
   uint32_t bestVertexIndex = UINT32_MAX;
   float bestVertexDist = FLT_MAX;
 
-  for (size_t i = 0; i < state->level->vertices.size(); i++) {
+  for (size_t i = 0; i < state->transformedVertices.size(); i++) {
     const ImVec2 vec = state->transformedVertices[i];
 
     const float_t nodeDis = math_utils::getDistanceSq(vec, ImGui::GetMousePos()) - vertexRadius * vertexRadius;

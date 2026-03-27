@@ -16,7 +16,7 @@ struct ImVec2;
 class EditorRenderer
 {
 public:
-  EditorRenderer(SdlWindow &sdlWindow, Level &level, const uint16_t _levelNum, const uint16_t _numOfLevels);
+  EditorRenderer(SdlWindow &sdlWindow, Level &level, uint16_t _levelNum, uint16_t _numOfLevels);
   ~EditorRenderer();
 
   void render() const;
@@ -53,7 +53,7 @@ private:
   // static methods
   static void createSidedefSelect(const char *label,
     const std::vector<EditorSidedef> &sidedefs,
-    int32_t &currentItem,
+    int16_t &currentItem,
     bool hasReset = false);
   static void createSelect(const char *label,
     const std::vector<std::uint16_t> &options,
