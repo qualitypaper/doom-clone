@@ -325,7 +325,7 @@ struct EditorLevel
   void Load(uint16_t width, uint16_t height);
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
 
-  static size_t Load(Level &level, std::array<char8_t, 8> name);
+  static size_t Load(Level &level);
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;

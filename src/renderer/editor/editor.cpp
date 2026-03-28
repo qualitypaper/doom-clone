@@ -434,6 +434,7 @@ void Editor::changeLevel(const uint16_t newLevelNum) const
   state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
 
   state->reset();
+
   auto levelName = std::array<char8_t, 8>{};
   const std::string nameStr = std::format("Map{}", newLevelNum);
 

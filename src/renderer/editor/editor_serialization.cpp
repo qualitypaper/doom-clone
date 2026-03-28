@@ -331,7 +331,12 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
   }
 }
 
-size_t EditorLevel::Load(Level &level, const std::array<char8_t, 8> name)
+/**
+ *
+ * @param level an uninitialized level object with its name for look up
+ * @return number of levels in the file
+ */
+size_t EditorLevel::Load(Level &level)
 {
   FileReader fr(config::SAVED_LEVEL_PATH);
 
@@ -341,7 +346,7 @@ size_t EditorLevel::Load(Level &level, const std::array<char8_t, 8> name)
   uint32_t offset = UINT32_MAX;
 
   for (const auto &entry : directory) {
-    if (entry.name == name) {
+    if (entry.name == level.name) {
       offset = entry.offset;
     }
   }
