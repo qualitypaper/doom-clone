@@ -26,10 +26,29 @@ struct Seg
   {}
 
   bool operator==(const Seg &other) const
-  { return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex; }
+  {
+    return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex;
+  }
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    w.WriteRaw(startVertex);
+    w.WriteRaw(endVertex);
+    w.WriteRaw(angle);
+    w.WriteRaw(linedefIndex);
+    w.WriteRaw(side);
+    w.WriteRaw(offset);
+  }
+
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    r.ReadRaw(startVertex);
+    r.ReadRaw(endVertex);
+    r.ReadRaw(angle);
+    r.ReadRaw(linedefIndex);
+    r.ReadRaw(side);
+    r.ReadRaw(offset);
+  }
 };
 
 struct BspNode
@@ -42,8 +61,33 @@ struct BspNode
   std::array<int16_t, 4> rightBoundingBox{ INT16_MAX, INT16_MIN, INT16_MIN, INT16_MAX };
   int16_t leftChild = -1, rightChild = -1;
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    w.WriteRaw(x);
+    w.WriteRaw(y);
+    w.WriteRaw(dx);
+    w.WriteRaw(dy);
+
+    w.WriteRaw(leftBoundingBox);
+    w.WriteRaw(rightBoundingBox);
+
+    w.WriteRaw(leftChild);
+    w.WriteRaw(rightChild);
+  }
+
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    r.ReadRaw(x);
+    r.ReadRaw(y);
+    r.ReadRaw(dx);
+    r.ReadRaw(dy);
+
+    r.ReadRaw(leftBoundingBox);
+    r.ReadRaw(rightBoundingBox);
+
+    r.ReadRaw(leftChild);
+    r.ReadRaw(rightChild);
+  }
 };
 
 inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
@@ -61,8 +105,16 @@ struct SubSector
   SubSector(const int16_t _segCount, const int16_t _firstSegIndex) : segCount(_segCount), firstSegIndex(_firstSegIndex)
   {}
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    w.WriteRaw(segCount);
+    w.WriteRaw(firstSegIndex);
+  }
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    r.ReadRaw(segCount);
+    r.ReadRaw(firstSegIndex);
+  }
 };
 
 struct SplitResult

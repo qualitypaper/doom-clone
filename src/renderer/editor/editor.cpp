@@ -7,6 +7,7 @@
 #include "math_utils.h"
 
 #include <algorithm>
+#include <cstring>
 #include <limits>
 #include <memory>
 #include <ranges>
@@ -76,7 +77,9 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
 }
 
 ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
-{ return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height); }
+{
+  return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height);
+}
 
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 {
@@ -183,7 +186,7 @@ EditorState::EditorState(Level &_level,
     std::move(editorLinedefs),
     std::move(editorSectors),
     std::move(editorSidedefs),
-    _levelNum);
+    _levelNum, _level.name);
 }
 
 void EditorState::reset()
@@ -271,7 +274,9 @@ Editor::Editor(Level &_level,
   const uint16_t _height)
   : m_history(std::make_shared<CommandHistory>()),
     state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, _width, _height))
-{ this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history); }
+{
+  this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
+}
 
 /**
  * function resets the state, the must be set to default on each frame
@@ -410,10 +415,15 @@ void Editor::TransformVertices() const
 
 void Editor::addEmptyLevel() const
 {
-  state->level->Save(nullptr, state->numOfLevels, this->state->width, this->state->height);
+  state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
   state->numOfLevels++;
+  auto levelName = std::array<char8_t, 8>{};
+  const std::string nameStr = std::format("Map{}", state->numOfLevels);
 
-  state->level = std::make_unique<EditorLevel>(state->numOfLevels);
+  const size_t copyLen = std::min(nameStr.size(), size_t{8});
+  std::memcpy(levelName.data(), nameStr.data(), copyLen);
+
+  state->level = std::make_unique<EditorLevel>(state->numOfLevels, levelName);
 }
 
 void Editor::changeLevel(const uint16_t newLevelNum) const
@@ -421,10 +431,15 @@ void Editor::changeLevel(const uint16_t newLevelNum) const
   if (state->level->levelNum == newLevelNum)
     return;
 
-  state->level->Save(nullptr, state->numOfLevels, this->state->width, this->state->height);
+  state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
 
   state->reset();
+  auto levelName = std::array<char8_t, 8>{};
+  const std::string nameStr = std::format("Map{}", newLevelNum);
 
-  state->level = std::make_unique<EditorLevel>(newLevelNum);
+  const size_t copyLen = std::min(nameStr.size(), size_t{8});
+  std::memcpy(levelName.data(), nameStr.data(), copyLen);
+
+  state->level = std::make_unique<EditorLevel>(newLevelNum, levelName);
   state->level->Load(state->width, state->height);
 }

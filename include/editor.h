@@ -29,7 +29,9 @@ struct AABB
   int16_t minX, minY;
 
   [[nodiscard]] bool contains(const int16_t x, const int16_t y) const
-  { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
+  {
+    return x >= minX && x <= maxX && y >= minY && y <= maxY;
+  }
 };
 
 struct header
@@ -38,18 +40,18 @@ struct header
   uint32_t numDirectories;
   uint32_t directoryOffset;
 
-  void serialize(FileWriter &fw) const
+  template<typename Writer> void serialize(Writer &w) const
   {
-    fw.WriteRaw(magicNumber);
-    fw.WriteRaw(numDirectories);
-    fw.WriteRaw(directoryOffset);
+    serialization::serialize(w, magicNumber);
+    serialization::serialize(w, numDirectories);
+    serialization::serialize(w, directoryOffset);
   }
 
-  void deserialize(FileReader &fr)
+  template<typename Reader> void deserialize(Reader &r)
   {
-    fr.ReadRaw(magicNumber);
-    fr.ReadRaw(numDirectories);
-    fr.ReadRaw(directoryOffset);
+    serialization::deserialize(r, magicNumber);
+    serialization::deserialize(r, numDirectories);
+    serialization::deserialize(r, directoryOffset);
   }
 };
 
@@ -58,20 +60,20 @@ struct directoryEntry
 {
   uint32_t offset;
   uint32_t size;
-  char8_t name[8];
+  std::array<char8_t, 8> name;
 
-  void serialize(FileWriter &fw) const
+  template<typename Writer> void serialize(Writer &w) const
   {
-    fw.WriteRaw(offset);
-    fw.WriteRaw(size);
-    fw.WriteRaw(name);
+    serialization::serialize(w, offset);
+    serialization::serialize(w, size);
+    serialization::serialize(w, name);
   }
 
-  void deserialize(FileReader &fr)
+  template<typename Reader> void deserialize(Reader &r)
   {
-    fr.ReadRaw(offset);
-    fr.ReadRaw(size);
-    fr.ReadRaw(name);
+    serialization::deserialize(r, offset);
+    serialization::deserialize(r, size);
+    serialization::deserialize(r, name);
   }
 };
 
@@ -82,10 +84,14 @@ constexpr uint32_t kObjectTypeShift = 30;
 constexpr uint32_t kObjectIndexMask = (1u << kObjectTypeShift) - 1u;
 
 constexpr uint32_t makeObjectId(EditorObjectType type, const uint32_t index)
-{ return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask); }
+{
+  return (static_cast<uint32_t>(type) << kObjectTypeShift) | (index & kObjectIndexMask);
+}
 
 constexpr EditorObjectType getObjectType(const uint32_t objectId)
-{ return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u); }
+{
+  return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u);
+}
 
 constexpr uint32_t getObjectIndex(const uint32_t objectId) { return objectId & kObjectIndexMask; }
 
@@ -165,9 +171,13 @@ struct EditorVertex : public EditorObject
   EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
 
   EditorVertex operator+(const ImVec2 &other) const
-  { return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) }; }
+  {
+    return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) };
+  }
   EditorVertex operator-(const ImVec2 &other) const
-  { return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) }; }
+  {
+    return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) };
+  }
 
   EditorVertex operator*(const double c) const { return { static_cast<int32_t>(x * c), static_cast<int32_t>(y * c) }; }
   EditorVertex operator/(const double c) const { return { static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
@@ -223,8 +233,24 @@ struct EditorSidedef : EditorObject
   int16_t bottomWallTexture = -1;
 
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    serialization::serialize(w, sectorId);
+    serialization::serialize(w, upperWallTexture);
+    serialization::serialize(w, middleWallTexture);
+    serialization::serialize(w, bottomWallTexture);
+    serialization::serialize(w, xOffset);
+    serialization::serialize(w, yOffset);
+  }
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    serialization::deserialize(r, sectorId);
+    serialization::deserialize(r, upperWallTexture);
+    serialization::deserialize(r, middleWallTexture);
+    serialization::deserialize(r, bottomWallTexture);
+    serialization::deserialize(r, xOffset);
+    serialization::deserialize(r, yOffset);
+  }
 };
 
 struct EditorSector : EditorObject
@@ -251,8 +277,29 @@ struct EditorSector : EditorObject
   AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    serialization::serialize(w, floorHeight);
+    serialization::serialize(w, ceilingHeight);
+    serialization::serialize(w, floorTextureIndex);
+    serialization::serialize(w, ceilingTextureIndex);
+    serialization::serialize(w, lightLevel);
+    serialization::serialize(w, specialType);
+    serialization::serialize(w, tag);
+    serialization::serialize(w, color);
+  }
+
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    serialization::deserialize(r, floorHeight);
+    serialization::deserialize(r, ceilingHeight);
+    serialization::deserialize(r, floorTextureIndex);
+    serialization::deserialize(r, ceilingTextureIndex);
+    serialization::deserialize(r, lightLevel);
+    serialization::deserialize(r, specialType);
+    serialization::deserialize(r, tag);
+    serialization::deserialize(r, color);
+  }
 };
 
 struct EditorLevel
@@ -262,19 +309,23 @@ struct EditorLevel
     std::vector<EditorLineDef> _lines,
     std::vector<EditorSector> _sectors,
     std::vector<EditorSidedef> _sidedefs,
-    const size_t _levelNum)
+    const size_t _levelNum,
+    const std::array<char8_t, 8> _name)
     : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)),
-      sidedefs(std::move(_sidedefs)), levelNum(_levelNum)
+      sidedefs(std::move(_sidedefs)), levelNum(_levelNum), name(_name)
   {}
-  explicit EditorLevel(const size_t _levelNum) : levelNum(_levelNum) {}
+  explicit EditorLevel(const size_t _levelNum, const std::array<char8_t, 8> _name) : levelNum(_levelNum), name(_name) {}
 
   void SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const;
-  void SaveLevelToFile(const char8_t name[8], uint16_t &numberOfLevels, const std::unique_ptr<BspLevel> &bspLevel) const;
-  void Save(const char8_t name[], uint16_t &numberOfLevels, uint16_t width, uint16_t height);
+  void
+    SaveLevelToFile(std::array<char8_t, 8> _name,
+    uint16_t &numberOfLevels,
+    const std::unique_ptr<BspLevel> &bspLevel) const;
+  void Save(std::array<char8_t, 8> _name, uint16_t &numberOfLevels, uint16_t width, uint16_t height);
   void Load(uint16_t width, uint16_t height);
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
 
-  static size_t Load(Level &level, const char name[]);
+  static size_t Load(Level &level, std::array<char8_t, 8> name);
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;
@@ -282,7 +333,7 @@ struct EditorLevel
   std::vector<EditorSidedef> sidedefs;
   // equals to zero when level is the first lump
   uint16_t levelNum = 0;
-  const char8_t name[8]{};
+  std::array<char8_t, 8> name{};
 };
 
 struct EditorState

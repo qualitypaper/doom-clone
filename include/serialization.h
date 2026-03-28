@@ -7,6 +7,60 @@
 #include <utility>
 #include <vector>
 
+namespace serialization {
+
+template<typename Writer, typename Arg>
+concept HasWriteRaw = requires(Writer &writer, const Arg &data) { writer.template WriteRaw<Arg>(data); };
+
+template<typename Reader, typename Arg>
+concept HasReadRaw = requires(Reader &reader, Arg &data) {
+  { reader.ReadRaw(data) } -> std::same_as<void>;
+};
+
+template<typename Writer, typename Data>
+void serialize(Writer &writer, const Data &data)
+  requires HasWriteRaw<Writer, Data>
+{
+  writer.WriteRaw(data);
+}
+
+template<typename Reader, typename Data>
+void deserialize(Reader &reader, Data &data)
+  requires HasReadRaw<Reader, Data>
+{
+  reader.ReadRaw(data);
+}
+
+}// namespace serialization
+
+class VectorWriter
+{
+public:
+  explicit VectorWriter(std::vector<uint8_t> &_buffer) : buffer(_buffer) {}
+
+  std::vector<uint8_t> &buffer;
+
+public:
+  template<typename T> void WriteRaw(const T &data)
+  {
+    static_assert(std::is_trivially_copyable_v<T>);
+
+    const uint8_t *src = reinterpret_cast<const uint8_t *>(&data);
+    buffer.insert(buffer.end(), src, src + sizeof(T));
+  }
+
+  template<typename T> void WriteVector(const std::vector<T> &data, const bool writeSize = true)
+  {
+    if (writeSize) {
+      WriteRaw(data.size());
+    }
+
+    for (const T &elem : data) {
+      elem.serialize(*this);
+    }
+  }
+};
+
 class FileWriter
 {
 public:
@@ -25,19 +79,15 @@ public:
   template<typename T> void WriteVector(const std::vector<T> &vec, const bool writeSize = true)
   {
     if (writeSize) {
-      WriteRaw((uint64_t)vec.size());
+      WriteRaw(static_cast<uint64_t>(vec.size()));
     }
 
-    for (auto &elem : vec) {
+    for (const T &elem : vec) {
       elem.serialize(*this);
     }
   }
 
-  template<typename T> void WriteObject(T &obj)
-  {
-    FileWriter &fw = *this;
-    obj.serialize(fw);
-  }
+  template<typename T> void WriteObject(T &obj) { obj.serialize(*this); }
 
   void WriteData(const char *data, const size_t size)
   {
@@ -105,14 +155,15 @@ struct Serializable
   virtual ~Serializable() = default;
 
   virtual void serialize(FileWriter &fw) const
-  { throw std::runtime_error("serialize method is unimplemented for the custom type."); }
-  virtual void deserialize(FileReader &fr)
-  { throw std::runtime_error("deserialize method is unimplemented for the custom type."); }
-
-  static size_t serializationSize()
   {
-    return 0;
+    throw std::runtime_error("serialize method is unimplemented for the custom type.");
   }
+  virtual void deserialize(FileReader &fr)
+  {
+    throw std::runtime_error("deserialize method is unimplemented for the custom type.");
+  }
+
+  static size_t serializationSize() { return 0; }
 };
 
 #endif// DOOMCLONE_SERIALIZATION_H

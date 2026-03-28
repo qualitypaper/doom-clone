@@ -37,7 +37,7 @@ struct Vertex
   int32_t y = 0;
 
   Vertex() = default;
-  Vertex(int32_t _x, int32_t _y) : x(_x), y(_y) {}
+  Vertex(const int32_t _x, const int32_t _y) : x(_x), y(_y) {}
 
   Vertex operator+(const Vertex &other) const { return Vertex{ x + other.x, y + other.y }; }
   Vertex operator-(const Vertex &other) const { return Vertex{ x - other.x, y - other.y }; }
@@ -48,8 +48,18 @@ struct Vertex
 
   bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer>
+  void serialize(Writer &w) const
+    requires serialization::HasWriteRaw<Writer, Vertex>
+  {
+    serialization::serialize(w, x);
+    serialization::serialize(w, y);
+  }
+  template<typename Reader> void deserialize(Reader &fr)
+  {
+    serialization::deserialize<Reader, decltype(x)>(fr, x);
+    serialization::deserialize(fr, y);
+  }
 };
 
 struct SideDef
@@ -73,8 +83,25 @@ struct SideDef
       middleWallTexture(_middleWallTexture), bottomWallTexture(_bottomWallTexture)
   {}
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    serialization::serialize(w, sectorId);
+    serialization::serialize(w, upperWallTexture);
+    serialization::serialize(w, middleWallTexture);
+    serialization::serialize(w, bottomWallTexture);
+    serialization::serialize(w, xOffset);
+    serialization::serialize(w, yOffset);
+  }
+
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    serialization::deserialize(r, sectorId);
+    serialization::deserialize(r, upperWallTexture);
+    serialization::deserialize(r, middleWallTexture);
+    serialization::deserialize(r, bottomWallTexture);
+    serialization::deserialize(r, xOffset);
+    serialization::deserialize(r, yOffset);
+  }
 };
 
 enum class LineDefType { REGULAR, DOOR };
@@ -92,8 +119,31 @@ struct LineDef
     : start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
   {}
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    serialization::serialize(w, start);
+    serialization::serialize(w, end);
+
+    const int8_t intType = static_cast<int8_t>(type);
+
+    serialization::serialize(w, intType);
+
+    serialization::serialize(w, frontSidedef);
+    serialization::serialize(w, backSidedef);
+  }
+
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    serialization::deserialize(r, start);
+    serialization::deserialize(r, end);
+
+    int8_t intType;
+    serialization::deserialize(r, intType);
+    type = static_cast<LineDefType>(intType);
+
+    serialization::deserialize(r, frontSidedef);
+    serialization::deserialize(r, backSidedef);
+  }
 };
 
 struct Sector
@@ -125,8 +175,29 @@ struct Sector
   // default - BLACK
   uint32_t color = 0xFFFFFFFF;
 
-  void serialize(FileWriter &fw) const;
-  void deserialize(FileReader &fr);
+  template<typename Writer> void serialize(Writer &w) const
+  {
+    serialization::serialize(w, floorHeight);
+    serialization::serialize(w, ceilingHeight);
+    serialization::serialize(w, floorTextureIndex);
+    serialization::serialize(w, ceilingTextureIndex);
+    serialization::serialize(w, lightLevel);
+    serialization::serialize(w, specialType);
+    serialization::serialize(w, tag);
+    serialization::serialize(w, color);
+  }
+
+  template<typename Reader> void deserialize(Reader &r)
+  {
+    serialization::deserialize(r, floorHeight);
+    serialization::deserialize(r, ceilingHeight);
+    serialization::deserialize(r, floorTextureIndex);
+    serialization::deserialize(r, ceilingTextureIndex);
+    serialization::deserialize(r, lightLevel);
+    serialization::deserialize(r, specialType);
+    serialization::deserialize(r, tag);
+    serialization::deserialize(r, color);
+  }
 };
 
 struct Level
@@ -138,6 +209,7 @@ struct Level
   std::vector<BspNode> nodes;
   std::vector<SubSector> subsectors;
   std::vector<Seg> segments;
+  std::array<char8_t, 8> name{};
 
   void InitializeBspParams(std::unique_ptr<BspLevel> bspLevel);
   void Load(FileReader &fr);
@@ -145,3 +217,15 @@ struct Level
 void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);
 void SetEngineMode(GameState &gameState, InputState &input, EngineMode newMode, const SdlWindow &sdlWindow);
+
+inline std::array<char8_t, 8> MakeLevelName(uint16_t number)
+{
+  const std::string s = std::format("Map{}", number);
+  std::array<char8_t, 8> arr{};
+
+  const size_t len = std::min(s.size(), size_t{8});
+  for (size_t i = 0; i < len; ++i) {
+    arr[i] = static_cast<char8_t>(s[i]);
+  }
+  return arr;
+}

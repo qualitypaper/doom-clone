@@ -14,6 +14,7 @@
 #include <SDL_events.h>
 
 #include <cassert>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 
@@ -107,13 +108,14 @@ int main(int argc, char *argv[])
   std::shared_ptr<Level> level;
   size_t numOfLevels;
 
-  if (true) {
+  if (false) {
     Level tempLevel;
-    numOfLevels = EditorLevel::Load(tempLevel, "");
+    numOfLevels = EditorLevel::Load(tempLevel, MakeLevelName(1));
     level = std::make_shared<Level>(tempLevel);
   } else {
     numOfLevels = 1;
     level = std::make_shared<Level>(vertices, linedefs, sidedefs, sectors);
+    level->name = MakeLevelName(1);
   }
 
   // setup sdl window
@@ -154,21 +156,26 @@ int main(int argc, char *argv[])
 
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
-      if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
+      if (elapsed < dt) {
+        SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0));
+      }
       continue;
     } else if (gameState.currentMode == EngineMode::BSP_VIEWER) {
-      //bspBuilder.Visualize(sdlWindow, input);
+      // bspBuilder.Visualize(sdlWindow, input);
 
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
-      if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
+      if (elapsed < dt) {
+        SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0));
+      }
       continue;
     }
 
     uint64_t now = SDL_GetPerformanceCounter();
     double_t frameTime = static_cast<double>(now - prev) / perfFreq;
     prev = now;
-    if (frameTime > 0.25) frameTime = 0.25;
+    if (frameTime > 0.25)
+      frameTime = 0.25;
     acc += frameTime;
 
     while (acc >= dt) {
@@ -189,7 +196,9 @@ int main(int argc, char *argv[])
 
     const uint64_t frameEnd = SDL_GetPerformanceCounter();
     const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
-    if (elapsed < dt) { SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0)); }
+    if (elapsed < dt) {
+      SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0));
+    }
   }
 
 
@@ -204,7 +213,7 @@ void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
     ImGui_ImplSDL2_ProcessEvent(&event);
 
     if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
-        && event.window.windowID == SDL_GetWindowID(window.getWindow())) {
+      && event.window.windowID == SDL_GetWindowID(window.getWindow())) {
       running = false;
       continue;
     } else if (event.type == SDL_QUIT) {
