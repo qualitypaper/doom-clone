@@ -11,6 +11,7 @@
 #include <set>
 #include <vector>
 
+class BSPBuilder;
 // forward declarations
 struct CommandHistory;
 struct Command;
@@ -18,6 +19,7 @@ struct Command;
 // forward declaractions
 struct EditorState;
 struct EditorInputHandler;
+
 
 struct AABB
 {
@@ -28,6 +30,49 @@ struct AABB
 
   [[nodiscard]] bool contains(const int16_t x, const int16_t y) const
   { return x >= minX && x <= maxX && y >= minY && y <= maxY; }
+};
+
+struct header
+{
+  std::array<char8_t, 4> magicNumber;
+  uint32_t numDirectories;
+  uint32_t directoryOffset;
+
+  void serialize(FileWriter &fw) const
+  {
+    fw.WriteRaw(magicNumber);
+    fw.WriteRaw(numDirectories);
+    fw.WriteRaw(directoryOffset);
+  }
+
+  void deserialize(FileReader &fr)
+  {
+    fr.ReadRaw(magicNumber);
+    fr.ReadRaw(numDirectories);
+    fr.ReadRaw(directoryOffset);
+  }
+};
+
+
+struct directoryEntry
+{
+  uint32_t offset;
+  uint32_t size;
+  char8_t name[8];
+
+  void serialize(FileWriter &fw) const
+  {
+    fw.WriteRaw(offset);
+    fw.WriteRaw(size);
+    fw.WriteRaw(name);
+  }
+
+  void deserialize(FileReader &fr)
+  {
+    fr.ReadRaw(offset);
+    fr.ReadRaw(size);
+    fr.ReadRaw(name);
+  }
 };
 
 enum class EditorObjectType { LINEDEF, VERTEX, SECTOR, SIDEDEF };
@@ -223,14 +268,13 @@ struct EditorLevel
   {}
   explicit EditorLevel(const size_t _levelNum) : levelNum(_levelNum) {}
 
-
-  void Save(uint16_t &numberOfLevels, uint16_t width, uint16_t height);
+  void SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const;
+  void SaveLevelToFile(const char8_t name[8], uint16_t &numberOfLevels, const std::unique_ptr<BspLevel> &bspLevel) const;
+  void Save(const char8_t name[], uint16_t &numberOfLevels, uint16_t width, uint16_t height);
   void Load(uint16_t width, uint16_t height);
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
-  static size_t Load(Level &level, uint16_t levelNum);
-  static size_t ReadHeaderAndSkipLevels(FileReader &fr, uint16_t levelNum);
-  static void SkipLevels(FileReader &fr, uint16_t levelNum);
 
+  static size_t Load(Level &level, const char name[]);
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;
@@ -238,11 +282,12 @@ struct EditorLevel
   std::vector<EditorSidedef> sidedefs;
   // equals to zero when level is the first lump
   uint16_t levelNum = 0;
+  const char8_t name[8]{};
 };
 
 struct EditorState
 {
-  EditorState(Level &_level, const uint16_t _levelNum, const uint16_t _numOfLevels, uint16_t _width, uint16_t _height);
+  EditorState(Level &_level, uint16_t _levelNum, uint16_t _numOfLevels, uint16_t _width, uint16_t _height);
   void reset();
 
   uint16_t width, height;

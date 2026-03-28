@@ -6,6 +6,38 @@
 #include "serialization.h"
 
 #include "ranges"
+#include <cstring>
+#include <sstream>
+
+struct LevelData
+{
+  std::vector<uint8_t> rawData;
+  directoryEntry entry;
+};
+
+struct LevelData ReadLevelData(FileReader &fr, const directoryEntry &entry)
+{
+  LevelData levelData;
+  levelData.entry = entry;
+
+  fr.SetPos(entry.offset);
+  uint32_t lumpSize = 0;
+  fr.ReadRaw(lumpSize);
+
+  levelData.rawData.resize(lumpSize);
+  fr.ReadData(reinterpret_cast<char *>(levelData.rawData.data()), lumpSize);
+
+  return levelData;
+}
+
+void WriteLevelData(FileWriter &fw, LevelData &levelData)
+{
+  levelData.entry.offset = static_cast<uint32_t>(fw.Cursor());
+  levelData.entry.size = static_cast<uint32_t>(levelData.rawData.size());
+
+  fw.WriteRaw(levelData.entry.size);
+  fw.WriteData(reinterpret_cast<const char *>(levelData.rawData.data()), levelData.rawData.size());
+}
 
 void EditorLineDef::serialize(FileWriter &fw) const
 {
@@ -32,30 +64,6 @@ void EditorLineDef::deserialize(FileReader &fr)
 
   fr.ReadRaw(frontSideDef);
   fr.ReadRaw(backSideDef);
-}
-
-void EditorSector::serialize(FileWriter &fw) const
-{
-  fw.WriteRaw(floorHeight);
-  fw.WriteRaw(ceilingHeight);
-  fw.WriteRaw(floorTextureIndex);
-  fw.WriteRaw(ceilingTextureIndex);
-  fw.WriteRaw(lightLevel);
-  fw.WriteRaw(specialType);
-  fw.WriteRaw(tag);
-  fw.WriteRaw(color);
-}
-
-void EditorSector::deserialize(FileReader &fr)
-{
-  fr.ReadRaw(floorHeight);
-  fr.ReadRaw(ceilingHeight);
-  fr.ReadRaw(floorTextureIndex);
-  fr.ReadRaw(ceilingTextureIndex);
-  fr.ReadRaw(lightLevel);
-  fr.ReadRaw(specialType);
-  fr.ReadRaw(tag);
-  fr.ReadRaw(color);
 }
 
 void EditorVertex::serialize(FileWriter &fw) const
@@ -90,7 +98,262 @@ void EditorSidedef::deserialize(FileReader &fr)
   fr.ReadRaw(yOffset);
 }
 
-void EditorLevel::Save(uint16_t &numberOfLevels, const uint16_t width, const uint16_t height)
+void EditorSector::serialize(FileWriter &fw) const
+{
+  fw.WriteRaw(floorHeight);
+  fw.WriteRaw(ceilingHeight);
+  fw.WriteRaw(floorTextureIndex);
+  fw.WriteRaw(ceilingTextureIndex);
+  fw.WriteRaw(lightLevel);
+  fw.WriteRaw(specialType);
+  fw.WriteRaw(tag);
+  fw.WriteRaw(color);
+}
+
+void EditorSector::deserialize(FileReader &fr)
+{
+  fr.ReadRaw(floorHeight);
+  fr.ReadRaw(ceilingHeight);
+  fr.ReadRaw(floorTextureIndex);
+  fr.ReadRaw(ceilingTextureIndex);
+  fr.ReadRaw(lightLevel);
+  fr.ReadRaw(specialType);
+  fr.ReadRaw(tag);
+  fr.ReadRaw(color);
+}
+
+std::vector<directoryEntry> ReadDirectory(FileReader &fr, const header &hdr)
+{
+  std::vector<directoryEntry> entries;
+  entries.reserve(hdr.numDirectories);
+
+  fr.SetPos(sizeof(header) + hdr.directoryOffset);
+
+  for (uint32_t i = 0; i < hdr.numDirectories && fr.IsStreamGood(); ++i) {
+    directoryEntry entry{};
+    fr.ReadRaw(entry);
+    entries.push_back(entry);
+  }
+
+  return entries;
+}
+
+size_t WriteDirectoryAndGetOffset(FileWriter &fw, const std::vector<directoryEntry> &entries)
+{
+  const size_t dirOffset = fw.Cursor();
+
+  for (const auto &entry : entries) {
+    fw.WriteRaw(entry);
+  }
+
+  return dirOffset;
+}
+
+void EditorLevel::SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const
+{
+  auto writeSize = [&buffer](const uint64_t size) {
+    uint8_t bytes[8];
+    std::memcpy(bytes, &size, sizeof(uint64_t));
+    buffer.insert(buffer.end(), bytes, bytes + sizeof(uint64_t));
+  };
+
+  auto writeVector = [&](const auto &vec, auto &&serializer) {
+    writeSize(vec.size());
+    for (const auto &elem : vec) {
+      std::vector<uint8_t> elemData = serializer(elem);
+      buffer.insert(buffer.end(), elemData.begin(), elemData.end());
+    }
+  };
+
+  auto serializeLinedef = [](const LineDef &ld) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    int16_t start = ld.start;
+    int16_t end = ld.end;
+    int8_t type = static_cast<int8_t>(ld.type);
+    int16_t front = ld.frontSidedef;
+    int16_t back = ld.backSidedef;
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&start), reinterpret_cast<uint8_t *>(&start) + sizeof(int16_t));
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&end), reinterpret_cast<uint8_t *>(&end) + sizeof(int16_t));
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&type), reinterpret_cast<uint8_t *>(&type) + sizeof(int8_t));
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&front), reinterpret_cast<uint8_t *>(&front) + sizeof(int16_t));
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&back), reinterpret_cast<uint8_t *>(&back) + sizeof(int16_t));
+    return data;
+  };
+
+  auto serializeSidedef = [](const EditorSidedef &sd) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    int16_t sectorId = static_cast<int16_t>(sd.sectorId);
+    int16_t upperWallTexture = static_cast<int16_t>(sd.upperWallTexture);
+    int16_t middleWallTexture = static_cast<int16_t>(sd.middleWallTexture);
+    int16_t bottomWallTexture = static_cast<int16_t>(sd.bottomWallTexture);
+    int16_t xOffset = static_cast<int16_t>(sd.xOffset);
+    int16_t yOffset = static_cast<int16_t>(sd.yOffset);
+    auto add = [&](const auto &v) {
+      data.insert(data.end(), reinterpret_cast<const uint8_t *>(&v), reinterpret_cast<const uint8_t *>(&v) + sizeof(v));
+    };
+    add(sectorId);
+    add(upperWallTexture);
+    add(middleWallTexture);
+    add(bottomWallTexture);
+    add(xOffset);
+    add(yOffset);
+    return data;
+  };
+
+  auto serializeVertex = [](const Vertex &v) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    float x = v.x;
+    float y = v.y;
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&x), reinterpret_cast<uint8_t *>(&x) + sizeof(float));
+    data.insert(data.end(), reinterpret_cast<uint8_t *>(&y), reinterpret_cast<uint8_t *>(&y) + sizeof(float));
+    return data;
+  };
+
+  auto serializeSeg = [](const Seg &seg) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    auto add = [&](const auto &v) {
+      data.insert(data.end(), reinterpret_cast<const uint8_t *>(&v), reinterpret_cast<const uint8_t *>(&v) + sizeof(v));
+    };
+    add(seg.startVertex);
+    add(seg.endVertex);
+    add(seg.angle);
+    add(seg.linedefIndex);
+    add(seg.side);
+    add(seg.offset);
+    return data;
+  };
+
+  auto serializeSubsector = [](const SubSector &ss) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    auto add = [&](const auto &v) {
+      data.insert(data.end(), reinterpret_cast<const uint8_t *>(&v), reinterpret_cast<const uint8_t *>(&v) + sizeof(v));
+    };
+    add(ss.segCount);
+    add(ss.firstSegIndex);
+    return data;
+  };
+
+  auto serializeNode = [](const BspNode &node) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    auto add = [&](const auto &v) {
+      data.insert(data.end(), reinterpret_cast<const uint8_t *>(&v), reinterpret_cast<const uint8_t *>(&v) + sizeof(v));
+    };
+    add(node.x);
+    add(node.y);
+    add(node.dx);
+    add(node.dy);
+    add(node.leftBoundingBox);
+    add(node.rightBoundingBox);
+    add(node.leftChild);
+    add(node.rightChild);
+    return data;
+  };
+
+  auto serializeSector = [](const EditorSector &s) -> std::vector<uint8_t> {
+    std::vector<uint8_t> data;
+    auto add = [&](const auto &v) {
+      data.insert(data.end(), reinterpret_cast<const uint8_t *>(&v), reinterpret_cast<const uint8_t *>(&v) + sizeof(v));
+    };
+    add(s.floorHeight);
+    add(s.ceilingHeight);
+    add(s.floorTextureIndex);
+    add(s.ceilingTextureIndex);
+    add(s.lightLevel);
+    add(s.specialType);
+    add(s.tag);
+    add(s.color);
+    return data;
+  };
+
+  writeVector(bspLevel->linedefs, serializeLinedef);
+  writeVector(sidedefs, serializeSidedef);
+  writeVector(bspLevel->vertices, serializeVertex);
+  writeVector(bspLevel->segments, serializeSeg);
+  writeVector(bspLevel->subsectors, serializeSubsector);
+  writeVector(bspLevel->nodes, serializeNode);
+  writeVector(sectors, serializeSector);
+}
+
+void EditorLevel::SaveLevelToFile(const char8_t name[8],
+  uint16_t &numberOfLevels,
+  const std::unique_ptr<BspLevel> &bspLevel) const
+{
+  const bool fileExists = std::filesystem::exists(config::SAVED_LEVEL_PATH);
+
+  std::vector<LevelData> allLevels;
+  header _header{};
+  int32_t targetLevelIndex = -1;
+
+  if (fileExists) {
+    FileReader fr(config::SAVED_LEVEL_PATH);
+    fr.ReadRaw(_header);
+
+    std::vector<directoryEntry> entries = ReadDirectory(fr, _header);
+
+    for (size_t i = 0; i < entries.size(); ++i) {
+      LevelData levelData = ReadLevelData(fr, entries[i]);
+      allLevels.push_back(levelData);
+
+      if (strncmp(reinterpret_cast<const char *>(levelData.entry.name), reinterpret_cast<const char *>(name), 8) == 0) {
+        targetLevelIndex = static_cast<int32_t>(i);
+      }
+    }
+  } else {
+    _header = { { 'P', 'W', 'A', 'D' }, 0, 0 };
+  }
+
+  std::vector<uint8_t> newLevelBuffer;
+  SerializeLevelToBuffer(bspLevel, newLevelBuffer);
+
+  LevelData newLevelData;
+  newLevelData.rawData = std::move(newLevelBuffer);
+  directoryEntry newEntry{};
+  std::memcpy(newEntry.name, name, 8);
+  newLevelData.entry = newEntry;
+
+  if (targetLevelIndex >= 0) {
+    allLevels[targetLevelIndex] = std::move(newLevelData);
+  } else {
+    allLevels.push_back(std::move(newLevelData));
+    targetLevelIndex = static_cast<int32_t>(allLevels.size() - 1);
+  }
+
+  FileWriter fw(config::SAVED_LEVEL_PATH, std::ios::binary | std::ios::trunc);
+
+  std::cout << "Saving level\n";
+
+  if (!fw.IsStreamGood()) {
+    throw std::runtime_error("Failed to open file for saving.\n");
+  }
+
+  fw.WriteRaw(_header);
+
+  std::vector<directoryEntry> finalEntries;
+  for (auto &levelData : allLevels) {
+    levelData.entry.offset = static_cast<uint32_t>(fw.Cursor());
+    levelData.entry.size = static_cast<uint32_t>(levelData.rawData.size());
+
+    fw.WriteData(reinterpret_cast<const char *>(levelData.rawData.data()), levelData.rawData.size());
+
+    finalEntries.push_back(levelData.entry);
+  }
+
+  const size_t directoryOffset = fw.Cursor() - sizeof(header);
+  for (const auto &entry : finalEntries) {
+    fw.WriteRaw(entry);
+  }
+
+  _header.numDirectories = static_cast<uint32_t>(finalEntries.size());
+  _header.directoryOffset = static_cast<uint32_t>(directoryOffset);
+
+  fw.SetPos(0);
+  fw.WriteRaw(_header);
+
+  numberOfLevels = static_cast<uint16_t>(allLevels.size());
+  std::cout << "saved level" << std::endl;
+}
+
+void EditorLevel::Save(const char8_t name[8], uint16_t &numberOfLevels, const uint16_t width, const uint16_t height)
 {
   if (levelNum <= 0) {
     throw std::runtime_error("Level number must be greater than zero.");
@@ -114,135 +377,9 @@ void EditorLevel::Save(uint16_t &numberOfLevels, const uint16_t width, const uin
   bspBuilder.BuildBSPTree();
   bspBuilder.PrintTree();
 
-
-  // create file if doesn't exist
-  std::ios::openmode openmode;
-  const bool fileExists = std::filesystem::exists(config::SAVED_LEVEL_PATH);
-
-  if (!fileExists) {
-    openmode = std::ios::binary | std::ios::out;
-  } else {
-    // open in "in" mode in order to avoid truncating the file
-    openmode = std::ios::binary | std::ios::out | std::ios::in;
-  }
-
-  FileWriter fw(config::SAVED_LEVEL_PATH, openmode);
-  fw.SetPos(0);
-
-  std::cout << "Saving level\n";
-  std::cout << std::filesystem::current_path() << '\n';
-
-  if (!fw.IsStreamGood()) {
-    std::cerr << "Failed to open file for saving." << '\n';
-    return;
-  }
-
-  // if file is new write file identification
-  if (!fileExists) {
-    fw.WriteRaw(static_cast<char8_t>('W'));
-    fw.WriteRaw(static_cast<char8_t>('A'));
-    fw.WriteRaw(static_cast<char8_t>('D'));
-  } else {
-    fw.Skip(3 * sizeof(char8_t));
-  }
-
-  // write number of lumps in the file
-  // currently it supports only one level per file
-  fw.WriteRaw(static_cast<size_t>(numberOfLevels));
-
-  if (levelNum > 1) {
-    std::cout << "Skipping " << levelNum - 1 << " levels in the file.\n";
-    FileReader fr(config::SAVED_LEVEL_PATH);
-    fr.SetPos(fw.Cursor());
-
-    SkipLevels(fr, levelNum);
-
-    fw.SetPos(fr.Cursor());
-  }
-
-  std::unique_ptr<BspLevel> bspLevel = bspBuilder.TakeConstructedLevel();
-
-  const size_t lumpSizePos = fw.Cursor();
-  size_t lumpSize = 0;
-  fw.WriteRaw(lumpSize);
-
-  fw.WriteVector(bspLevel->linedefs);
-  fw.WriteVector(sidedefs);
-  fw.WriteVector(bspLevel->vertices);
-  fw.WriteVector(bspLevel->segments);
-  fw.WriteVector(bspLevel->subsectors);
-  fw.WriteVector(bspLevel->nodes);
-  fw.WriteVector(sectors);
-
-  lumpSize = fw.Cursor() - lumpSizePos;
-  fw.SetPos(lumpSizePos);
-  fw.WriteRaw(lumpSize);
-  fw.SetPos(fw.Cursor() + lumpSize);
+  SaveLevelToFile(name, numberOfLevels, bspBuilder.TakeConstructedLevel());
 }
 
-
-/**
- * after calling the method the cursor of the reader is right at the beginning of the data of @param levelNum
- * @param fr initialized FileReader
- * @param levelNum number of the level to skip to
- */
-void EditorLevel::SkipLevels(FileReader &fr, uint16_t levelNum)
-{
-  // if levelNum is already at start, there is no need to skip levels
-  if (levelNum <= 1) {
-    // skipping the lump size, because the cursor is expected right at the start of the serialized data
-    fr.Skip(sizeof(size_t));
-    return;
-  }
-
-  size_t lumpSize = 0;
-  while (fr.IsStreamGood() && levelNum > 1) {
-    fr.ReadRaw(lumpSize);
-    // read the size of the following lump
-    fr.Skip(lumpSize);
-    levelNum--;
-  }
-
-  // skipping lump size bytes after reaching the needed level
-  fr.Skip(sizeof(size_t));
-}
-
-size_t EditorLevel::Load(Level &level, const uint16_t levelNum)
-{
-  FileReader fr(config::SAVED_LEVEL_PATH);
-
-  const size_t numOfLevels = ReadHeaderAndSkipLevels(fr, levelNum);
-
-  level.Load(fr);
-
-  return numOfLevels;
-}
-
-size_t EditorLevel::ReadHeaderAndSkipLevels(FileReader &fr, const uint16_t levelNum)
-{
-  // skip the file identification
-  fr.Skip(3 * sizeof(char8_t));
-
-  // read number of levels
-  size_t numLevels;
-  fr.ReadRaw(numLevels);
-
-  if (levelNum > numLevels) {
-    throw std::runtime_error("Level number exceeds the current number of levels.");
-  }
-
-  if (!fr.IsStreamGood()) {
-    throw std::runtime_error("Stream failed while reading the header.");
-  }
-
-  SkipLevels(fr, levelNum);
-
-  if (!fr.IsStreamGood()) {
-    throw std::runtime_error("Stream failed while skipping lumps");
-  }
-
-  return numLevels;
-}
 
 void EditorLevel::Load(const uint16_t width, const uint16_t height)
 {
@@ -252,7 +389,23 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
     return;
   }
 
-  ReadHeaderAndSkipLevels(fr, this->levelNum);
+  header _header{};
+  fr.ReadRaw(_header);
+
+  std::vector<directoryEntry> directory = ReadDirectory(fr, _header);
+  uint32_t offset = UINT32_MAX;
+
+  for (auto &entry : directory) {
+    if (strncmp((const char *)entry.name, (const char *)name, 8) == 0) {
+      offset = entry.offset;
+    }
+  }
+
+  if (offset == UINT32_MAX) {
+    throw std::runtime_error("Level couldn't be found.");
+  }
+
+  fr.SetPos(sizeof(header) + offset);
 
   fr.ReadVector(linedefs);
   std::cout << "Read linedefs\n";
@@ -274,17 +427,17 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
   // skip segments
   size_t segSize = 0;
   fr.ReadRaw(segSize);
-  fr.Skip(segSize * Seg::SerializationSize());
+  fr.Skip(segSize * sizeof(Seg));
 
   // skip subsectors
   size_t subsectorSize = 0;
   fr.ReadRaw(subsectorSize);
-  fr.Skip(subsectorSize * SubSector::SerializationSize());
+  fr.Skip(subsectorSize * sizeof(SubSector));
 
   // skip nodes
   size_t nodesSize = 0;
   fr.ReadRaw(nodesSize);
-  fr.Skip(nodesSize * BspNode::SerializationSize());
+  fr.Skip(nodesSize * sizeof(BspNode));
 
   // read sectors
   fr.ReadVector(sectors);
@@ -330,4 +483,29 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
       sector.tag,
       sector.color);
   }
+}
+
+size_t EditorLevel::Load(Level &level, const char name[8])
+{
+  FileReader fr(config::SAVED_LEVEL_PATH);
+
+  header _header{};
+  fr.ReadRaw(_header);
+  std::vector<directoryEntry> directory = ReadDirectory(fr, _header);
+  uint32_t offset = UINT32_MAX;
+
+  for (const auto &entry : directory) {
+    if (strncmp((const char *)entry.name, name, 8) == 0) {
+      offset = entry.offset;
+    }
+  }
+  if (offset == UINT32_MAX) {
+    throw std::runtime_error("Level couldn't be found.");
+  }
+
+  fr.SetPos(offset);
+
+  level.Load(fr);
+
+  return _header.numDirectories;
 }

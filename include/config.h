@@ -31,5 +31,5 @@ constexpr const float MOUSE_SENSITIVITY = 0.01f;
 constexpr uint8_t FOV = 90;
 
 
-constexpr const char *SAVED_LEVEL_PATH = "levels.wad";
+constexpr const char *SAVED_LEVEL_PATH = "levels_old.wad";
 }// namespace config

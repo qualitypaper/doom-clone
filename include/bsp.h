@@ -9,13 +9,13 @@
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 
-struct Seg : public Serializable
+struct Seg
 {
   int16_t startVertex = -1;
   int16_t endVertex = -1;
   int16_t angle = 0;
   int16_t linedefIndex = -1;
-  int8_t side = -1;// 0 for front, 1 for back
+  int16_t side = -1;// 0 for front, 1 for back
   int16_t offset = 0;
 
   Seg() = default;
@@ -28,12 +28,11 @@ struct Seg : public Serializable
   bool operator==(const Seg &other) const
   { return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex; }
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
-  static size_t SerializationSize();
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
-struct BspNode : public Serializable
+struct BspNode
 {
   BspNode() = default;
   BspNode(int16_t _x, int16_t _y, int16_t _dx, int16_t _dy);
@@ -43,9 +42,8 @@ struct BspNode : public Serializable
   std::array<int16_t, 4> rightBoundingBox{ INT16_MAX, INT16_MIN, INT16_MIN, INT16_MAX };
   int16_t leftChild = -1, rightChild = -1;
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
-  static size_t SerializationSize();
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
 inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
@@ -54,7 +52,7 @@ inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
               << "), Children: (" << node.leftChild << "," << node.rightChild << ")";
 }
 
-struct SubSector : public Serializable
+struct SubSector
 {
   int16_t segCount;
   int16_t firstSegIndex;
@@ -63,9 +61,8 @@ struct SubSector : public Serializable
   SubSector(const int16_t _segCount, const int16_t _firstSegIndex) : segCount(_segCount), firstSegIndex(_firstSegIndex)
   {}
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
-  static size_t SerializationSize();
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
 struct SplitResult

@@ -7,17 +7,15 @@
 #include <utility>
 #include <vector>
 
-template<typename T>
-concept HasSkip = requires(T t, size_t bytesToSkip) { t.Skip(bytesToSkip); };
-
 class FileWriter
 {
 public:
   explicit FileWriter(const std::filesystem::path &path, std::ios::openmode _openmode);
   explicit FileWriter(const std::filesystem::path &path);
+  explicit FileWriter();
   ~FileWriter();
 
-  bool IsStreamGood() const { return !m_fos.fail(); }
+  bool IsStreamGood() const { return m_fos && !m_fos.fail(); }
   template<typename T> void WriteRaw(const T &data) { WriteData(reinterpret_cast<const char *>(&data), sizeof(T)); }
 
   void Skip(const size_t bytesToSkip) { m_fos.seekp(bytesToSkip, std::ios::cur); }
@@ -48,8 +46,11 @@ public:
     }
   }
 
+  std::vector<uint8_t> GetBuffer() const { return m_buffer; }
+
 private:
   std::ofstream m_fos;
+  std::vector<uint8_t> m_buffer;
 };
 
 class FileReader

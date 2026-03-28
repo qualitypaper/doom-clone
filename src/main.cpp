@@ -107,9 +107,9 @@ int main(int argc, char *argv[])
   std::shared_ptr<Level> level;
   size_t numOfLevels;
 
-  if (false) {
+  if (true) {
     Level tempLevel;
-    numOfLevels = EditorLevel::Load(tempLevel, 1);
+    numOfLevels = EditorLevel::Load(tempLevel, "");
     level = std::make_shared<Level>(tempLevel);
   } else {
     numOfLevels = 1;

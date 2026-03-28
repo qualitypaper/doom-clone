@@ -31,7 +31,7 @@ struct GameState
   uint16_t levelNum;
 };
 
-struct Vertex : public Serializable
+struct Vertex
 {
   int32_t x = 0;
   int32_t y = 0;
@@ -48,11 +48,11 @@ struct Vertex : public Serializable
 
   bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
-struct SideDef : public Serializable
+struct SideDef
 {
   int16_t sectorId = -1;
   int16_t xOffset = 0;
@@ -73,13 +73,13 @@ struct SideDef : public Serializable
       middleWallTexture(_middleWallTexture), bottomWallTexture(_bottomWallTexture)
   {}
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
 enum class LineDefType { REGULAR, DOOR };
 
-struct LineDef : public Serializable
+struct LineDef
 {
   int16_t start = -1;
   int16_t end = -1;
@@ -92,11 +92,11 @@ struct LineDef : public Serializable
     : start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
   {}
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
-struct Sector : public Serializable
+struct Sector
 {
   int16_t floorHeight = 0;
   int16_t ceilingHeight = 0;
@@ -109,20 +109,15 @@ struct Sector : public Serializable
   Sector() = default;
 
   Sector(int16_t _floorHeight,
-         int16_t _ceilingHeight,
-         int16_t _floorTextureIndex,
-         int16_t _ceilingTextureIndex,
-         int16_t _lightLevel,
-         int16_t _specialType,
-         int16_t _tag,
-         uint32_t _color = 0xFFFFFFFF)
-    : floorHeight(_floorHeight),
-      ceilingHeight(_ceilingHeight),
-      floorTextureIndex(_floorTextureIndex),
-      ceilingTextureIndex(_ceilingTextureIndex),
-      lightLevel(_lightLevel),
-      specialType(_specialType),
-      tag(_tag),
+    int16_t _ceilingHeight,
+    int16_t _floorTextureIndex,
+    int16_t _ceilingTextureIndex,
+    int16_t _lightLevel,
+    int16_t _specialType,
+    int16_t _tag,
+    uint32_t _color = 0xFFFFFFFF)
+    : floorHeight(_floorHeight), ceilingHeight(_ceilingHeight), floorTextureIndex(_floorTextureIndex),
+      ceilingTextureIndex(_ceilingTextureIndex), lightLevel(_lightLevel), specialType(_specialType), tag(_tag),
       color(_color)
   {}
 
@@ -130,8 +125,8 @@ struct Sector : public Serializable
   // default - BLACK
   uint32_t color = 0xFFFFFFFF;
 
-  void serialize(FileWriter &fw) const override;
-  void deserialize(FileReader &fr) override;
+  void serialize(FileWriter &fw) const;
+  void deserialize(FileReader &fr);
 };
 
 struct Level
