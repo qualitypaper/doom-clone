@@ -36,11 +36,23 @@ void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode
     SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_FALSE);
     SDL_SetWindowPosition(sdlWindow.getWindow(), SDL_WINDOWPOS_CENTERED_DISPLAY(1), SDL_WINDOWPOS_CENTERED_DISPLAY(1));
     SDL_SetWindowSize(sdlWindow.getWindow(), config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
+  } else if (newMode == EngineMode::BSP_VIEWER) {
+    // in order to use mouse cursor
+    SDL_SetRelativeMouseMode(SDL_FALSE);
+    SDL_SetWindowSize(sdlWindow.getWindow(), config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    // SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
+
+    // wiping clean the state, in order to prevent unexpected key and mouse inputs
+    memset(input.keys, false, sizeof(input.keys));
+    memset(input.mouse_buttons, false, sizeof(input.mouse_buttons));
+
+    input.mouse_dx = 0;
+    input.mouse_dy = 0;
   } else {
     // in order to use mouse cursor
     SDL_SetRelativeMouseMode(SDL_FALSE);
     SDL_SetWindowSize(sdlWindow.getWindow(), config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-    SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
+    // SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
 
     // wiping clean the state, in order to prevent unexpected key and mouse inputs
     memset(input.keys, false, sizeof(input.keys));
@@ -78,4 +90,16 @@ void Level::Load(FileReader &fr)
   fr.ReadVector(this->subsectors);
   fr.ReadVector(this->nodes);
   fr.ReadVector(this->sectors);
+
+  // adding sector into each subsector, for easier access during rendering
+  for (auto &ssector : subsectors) {
+    const Seg &segment = segments[ssector.firstSegIndex];
+    int16_t ldIndex = segment.linedefIndex;
+
+    if (segment.side) {
+      ssector.sector = &sectors[sidedefs[linedefs[ldIndex].backSidedef].sectorId];
+    } else {
+      ssector.sector = &sectors[sidedefs[linedefs[ldIndex].frontSidedef].sectorId];
+    }
+  }
 }

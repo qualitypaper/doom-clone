@@ -32,7 +32,8 @@ void EditorInputHandler::captureMouseDragging() const
 void EditorInputHandler::processMouseDragging() const
 {
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   const ImGuiIO &io = ImGui::GetIO();
   const ImVec2 mousePos = io.MousePos;
@@ -77,10 +78,12 @@ void EditorInputHandler::processMouseDragging() const
 void EditorInputHandler::processMouseRelatedInput() const
 {
   const ImGuiIO &io = ImGui::GetIO();
-  if (io.WantCaptureMouse) return;
+  if (io.WantCaptureMouse)
+    return;
 
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   const ImVec2 mousePos = ImGui::GetMousePos();
 
@@ -116,19 +119,24 @@ void EditorInputHandler::processMouseRelatedInput() const
       // state scrolling
       state->isScrolling = true;
       // state->scrollingOffset = { 0, 0 };
-      if (state->scrollingStart.x == 0 && state->scrollingStart.y == 0) { state->scrollingStart = mousePos; }
+      if (state->scrollingStart.x == 0 && state->scrollingStart.y == 0) {
+        state->scrollingStart = mousePos;
+      }
     }
   } else if (state->isScrolling && ImGui::IsMouseReleased(ImGuiMouseButton_Middle)) {
     state->isScrolling = false;
   }
 
-  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) { resetSelection(); }
+  if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+    resetSelection();
+  }
 }
 
 void EditorInputHandler::flushBlockSelecting() const
 {
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   const AABB selectionBounds(
     { static_cast<int32_t>(state->blockSelectionStart.x), static_cast<int32_t>(state->blockSelectionStart.y) },
@@ -149,8 +157,8 @@ void EditorInputHandler::flushBlockSelecting() const
     auto &ld = state->level->linedefs[i];
 
     if (std::ranges::find(state->selection, makeObjectId(EditorObjectType::VERTEX, ld.end)) != state->selection.end()
-        || std::ranges::find(state->selection, makeObjectId(EditorObjectType::VERTEX, ld.start))
-             != state->selection.end()) {
+      || std::ranges::find(state->selection, makeObjectId(EditorObjectType::VERTEX, ld.start))
+        != state->selection.end()) {
       state->selection.emplace(makeObjectId(EditorObjectType::LINEDEF, i));
       ld.selected = true;
     }
@@ -160,16 +168,20 @@ void EditorInputHandler::flushBlockSelecting() const
 void EditorInputHandler::flushDragging() const
 {
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
   // early return if there is no dragging offset
-  if (state->draggingOffset.x == 0 && state->draggingOffset.y == 0) return;
+  if (state->draggingOffset.x == 0 && state->draggingOffset.y == 0)
+    return;
 
   const auto history = m_commandHistory.lock();
-  if (!history) return;
+  if (!history)
+    return;
 
   for (const uint32_t id : state->selection) {
     const auto object = state->findObject(id);
-    if (!object) continue;
+    if (!object)
+      continue;
 
     object->drag(id, state.get(), history.get());
   }
@@ -179,13 +191,17 @@ void EditorInputHandler::processKeyboardInputs() const
 {
   const ImGuiIO &io = ImGui::GetIO();
 
-  if (io.WantCaptureKeyboard) return;
+  if (io.WantCaptureKeyboard)
+    return;
 
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   // reset the state when pressing escape
-  if (ImGui::IsKeyPressed(ImGuiKey_Escape)) { state->reset(); }
+  if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    state->reset();
+  }
 
   const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
 
@@ -223,7 +239,8 @@ void EditorInputHandler::processKeyboardInputs() const
 std::pair<uint32_t, float> EditorInputHandler::findNearestVertices(const float vertexRadius) const
 {
   const auto state = m_state.lock();
-  if (!state) return { UINT32_MAX, FLT_MAX };
+  if (!state)
+    return { UINT32_MAX, FLT_MAX };
 
   uint32_t bestVertexIndex = UINT32_MAX;
   float bestVertexDist = FLT_MAX;
@@ -245,13 +262,14 @@ std::pair<uint32_t, float> EditorInputHandler::findNearestVertices(const float v
 std::pair<uint32_t, float> EditorInputHandler::findNearestLinedefs() const
 {
   const auto state = m_state.lock();
-  if (!state) return { UINT32_MAX, FLT_MAX };
+  if (!state)
+    return { UINT32_MAX, FLT_MAX };
 
   uint32_t bestLineIndex = UINT32_MAX;
   float_t bestLineDist = FLT_MAX;
 
   // finding the nearest lines which can be hovered/selected
-  for (size_t i = 0; i < state->level->linedefs.size(); i++) {
+  for (size_t i = 0; state->level && i < state->level->linedefs.size(); i++) {
     const auto &ld = state->level->linedefs[i];
 
     const ImVec2 start = state->findTransformedVertex(ld.start);
@@ -294,16 +312,19 @@ uint32_t EditorInputHandler::findNearestPastThreshold(const float vertexRadius,
 
 void EditorInputHandler::processNearestObject(const uint32_t bestObjectId) const
 {
-  if (bestObjectId == UINT32_MAX) return;
+  if (bestObjectId == UINT32_MAX)
+    return;
 
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   const bool lmbClicked = !ImGui::GetIO().WantCaptureMouse && ImGui::IsMouseClicked(ImGuiMouseButton_Left);
 
   EditorObject *object = state->findObject(bestObjectId);
 
-  if (!object) return;
+  if (!object)
+    return;
 
   if (lmbClicked) {
     if (object->type == EditorObjectType::VERTEX && state->isCreatingLine) {
@@ -321,16 +342,20 @@ void EditorInputHandler::processNearestObject(const uint32_t bestObjectId) const
 
 void EditorInputHandler::createLine(const uint32_t toObjectId) const
 {
-  if (getObjectType(toObjectId) != EditorObjectType::VERTEX) return;
+  if (getObjectType(toObjectId) != EditorObjectType::VERTEX)
+    return;
 
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   // draw a line between the start vertex and the hovered vertex
   const EditorLineDef lineDef(state->lineStartVertexId, toObjectId, LineDefType::REGULAR, -1, -1);
 
   auto cmd = std::make_unique<AddLineDefCommand>(lineDef);
-  if (const auto history = m_commandHistory.lock()) { history->execute(std::move(cmd), *state); }
+  if (const auto history = m_commandHistory.lock()) {
+    history->execute(std::move(cmd), *state);
+  }
 
   state->isCreatingLine = false;
   state->lineStartVertexId = 0;
@@ -341,7 +366,8 @@ void EditorInputHandler::processMouseInteractions(const float_t vertexRadius) co
   static float_t s_hoveringThresholdSq = 25.0f * 25.0f;
 
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   // no linedefs shall be selectable when user is drawing a line
   const bool shouldProcessLinedefs = !state->isCreatingLine;
@@ -358,7 +384,9 @@ void EditorInputHandler::ProcessInput(const float_t vertexRadius) const
 
   const ImVec2 mousePos = ImGui::GetMousePos();
 
-  if (mousePos.x == -FLT_MAX || mousePos.y == -FLT_MAX) { return; }
+  if (mousePos.x == -FLT_MAX || mousePos.y == -FLT_MAX) {
+    return;
+  }
 
   processMouseInteractions(vertexRadius);
   processMouseRelatedInput();
@@ -368,7 +396,8 @@ void EditorInputHandler::ProcessInput(const float_t vertexRadius) const
 void EditorInputHandler::updateSelection(uint32_t id, const bool selected) const
 {
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   const ImGuiIO &io = ImGui::GetIO();
 
@@ -381,19 +410,23 @@ void EditorInputHandler::updateSelection(uint32_t id, const bool selected) const
   } else {
     resetSelection();
 
-    if (selected) { state->selection.emplace(id); }
+    if (selected) {
+      state->selection.emplace(id);
+    }
   }
 }
 
 void EditorInputHandler::resetSelection() const
 {
   const auto state = m_state.lock();
-  if (!state) return;
+  if (!state)
+    return;
 
   for (const uint32_t id : state->selection) {
     EditorObject *object = state->findObject(id);
 
-    if (object) object->selected = false;
+    if (object)
+      object->selected = false;
   }
   state->selection.clear();
 }

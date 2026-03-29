@@ -220,11 +220,6 @@ void EditorState::reset()
 
   renderOptionsWindow = false;
   optionsWindowPos = { 0, 0 };
-
-  level.reset();
-  transformedVertices = std::vector<ImVec2>();
-
-  // reset all the editor state  scrolling
 }
 
 void Editor::updateAABB(const uint32_t sectorID) const

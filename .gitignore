@@ -10,3 +10,5 @@ out/
 build/
 .imgui/
 .cache/
+
+cmake-*/

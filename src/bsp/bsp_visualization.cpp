@@ -29,15 +29,15 @@ void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root
   SDL_RenderDrawRect(sdlWindow.getRenderer(), &right);
 }
 
-void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow) const
+void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
 {
   SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
 
-  for (const auto &subsector : subsectors) {
+  for (const auto &subsector : level.subsectors) {
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
-      const auto &seg = segments[i];
-      const auto &startVertex = vertices[seg.startVertex];
-      const auto &endVertex = vertices[seg.endVertex];
+      const auto &seg = level.segments[i];
+      const auto &startVertex = level.vertices[seg.startVertex];
+      const auto &endVertex = level.vertices[seg.endVertex];
 
       const ImVec2 mappedStart = math_utils::fromCenterCoordinates(
         ImVec2{ static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) },
@@ -75,28 +75,30 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &ro
     static_cast<int>(lineEnd.y));
 }
 
-void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input) const
+void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const Level &level)
 {
   static size_t s_nodesIndex = 0;
 
   SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
   SDL_RenderClear(sdlWindow.getRenderer());
 
-  DrawSubsectors(sdlWindow);
+  DrawSubsectors(sdlWindow, level);
 
   if (input.keys[SDL_SCANCODE_LEFT]) {
-    if (s_nodesIndex > 0) s_nodesIndex--;
+    if (s_nodesIndex > 0)
+      s_nodesIndex--;
   } else if (input.keys[SDL_SCANCODE_RIGHT]) {
-    if (!nodes.empty() && s_nodesIndex < nodes.size() - 1) s_nodesIndex++;
+    if (!level.nodes.empty() && s_nodesIndex < level.nodes.size() - 1)
+      s_nodesIndex++;
     input.keys[SDL_SCANCODE_RIGHT] = false;
   }
 
-  if (nodes.empty()) {
+  if (level.nodes.empty()) {
     SDL_RenderPresent(sdlWindow.getRenderer());
     return;
   }
 
-  const BspNode &root = nodes[s_nodesIndex];
+  const BspNode &root = level.nodes[s_nodesIndex];
 
   DrawSplittingLine(sdlWindow, root);
   DrawBoundingBox(sdlWindow, root);
@@ -108,7 +110,8 @@ size_t BSPBuilder::MaxDepth() const { return MaxDepthRecursive(0); }
 
 size_t BSPBuilder::MaxDepthRecursive(const int16_t currentIndex) const
 {
-  if (currentIndex & 0x8000 || static_cast<size_t>(currentIndex) >= nodes.size() || currentIndex < 0) return 0;
+  if (currentIndex & 0x8000 || static_cast<size_t>(currentIndex) >= nodes.size() || currentIndex < 0)
+    return 0;
 
   const size_t left = MaxDepthRecursive(nodes[currentIndex].leftChild);
   const size_t right = MaxDepthRecursive(nodes[currentIndex].rightChild);
@@ -120,7 +123,9 @@ std::vector<std::vector<std::string>> BSPBuilder::BuildRows() const
 {
   const size_t maxDepth = MaxDepth();
   std::vector<std::vector<std::string>> rows;
-  if (maxDepth == 0) { return std::vector<std::vector<std::string>>(); }
+  if (maxDepth == 0) {
+    return std::vector<std::vector<std::string>>();
+  }
 
   rows.resize(maxDepth);
 
@@ -135,7 +140,8 @@ void BSPBuilder::BuildRowsRecursive(const int16_t index,
   const size_t currentDepth,
   std::vector<std::vector<std::string>> &rows) const
 {
-  if (currentDepth >= rows.size()) return;
+  if (currentDepth >= rows.size())
+    return;
   if (index & 0x8000) {
 
     rows[currentDepth].push_back(std::to_string(index));
@@ -147,9 +153,13 @@ void BSPBuilder::BuildRowsRecursive(const int16_t index,
   rows[currentDepth].push_back(std::to_string(left));
   rows[currentDepth].push_back(std::to_string(right));
 
-  if (!(left & 0x8000)) { BuildRowsRecursive(left, currentDepth + 1, rows); }
+  if (!(left & 0x8000)) {
+    BuildRowsRecursive(left, currentDepth + 1, rows);
+  }
 
-  if (!(right & 0x8000)) { BuildRowsRecursive(right, currentDepth + 1, rows); }
+  if (!(right & 0x8000)) {
+    BuildRowsRecursive(right, currentDepth + 1, rows);
+  }
 }
 
 std::vector<std::string> BSPBuilder::FormatRows(const std::vector<std::vector<std::string>> &rows)
@@ -161,15 +171,19 @@ std::vector<std::string> BSPBuilder::FormatRows(const std::vector<std::vector<st
 
   for (const auto &row_disp : rows) {
     for (const auto &cell : row_disp) {
-      if (!cell.empty() && cell.length() > cell_width) { cell_width = cell.length(); }
+      if (!cell.empty() && cell.length() > cell_width) {
+        cell_width = cell.length();
+      }
     }
   }
 
   // make sure the cell_width is an odd number
-  if (cell_width % 2 == 0) ++cell_width;
+  if (cell_width % 2 == 0)
+    ++cell_width;
 
   // allows leaf nodes to be connected when they are all with size of a single character
-  if (cell_width < 3) cell_width = 3;
+  if (cell_width < 3)
+    cell_width = 3;
 
   // formatted_rows will hold the results
   std::vector<std::string> formatted_rows;
@@ -222,7 +236,8 @@ std::vector<std::string> BSPBuilder::FormatRows(const std::vector<std::vector<st
     formatted_rows.push_back(row);
 
     // The root has been added, so this loop is finished
-    if (row_elem_count == 1) break;
+    if (row_elem_count == 1)
+      break;
 
     // Add rows of forward- and back- slash characters, spaced apart
     // to "connect" two rows' Node value strings.
@@ -261,5 +276,7 @@ void BSPBuilder::PrintTree() const
   const std::vector<std::vector<std::string>> rows = BuildRows();
   const std::vector<std::string> formattedRows = FormatRows(rows);
 
-  for (const auto &row : formattedRows) { std::cout << ' ' << row << '\n'; }
+  for (const auto &row : formattedRows) {
+    std::cout << ' ' << row << '\n';
+  }
 }

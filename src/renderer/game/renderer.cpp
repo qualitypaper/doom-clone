@@ -27,14 +27,14 @@ template<HasXY T> void clipNearPlane(T &vecToClip, const T &endVec)
   vecToClip.y = config::NEAR_CLIPPING;
 }
 
-template<HasXY T> static void rotate(const T &vec, const double_t angle, T &res)
+template<HasXY T> void rotate(const T &vec, const double_t angle, T &res)
 {
   res.x = vec.x * std::cos(angle) - vec.y * std::sin(angle);
   res.y = vec.x * std::sin(angle) + vec.y * std::cos(angle);
 }
 
 template<HasXY T, HasXY V>
-void applyTransformations(const entity::Player &playerState,
+void applyTransformations(const Player &playerState,
   const V &start,
   const V &end,
   const Sector &floorCeilingSector,
@@ -65,7 +65,8 @@ Renderer::Renderer(FrameBuffer &_fb,
 {
   m_ceilingClipping.resize(canvasWidth);
   m_floorClipping.resize(canvasWidth);
-  m_solidSegs.resize(canvasWidth);
+  m_visplanes.reserve(MAX_VISPLANES);
+  m_solidsegs.resize(MAX_SEGMENTS);
 
   FOCAL_LENGTH = (canvasWidth / 2.0) / TAN_HALF_FOV;
 }
@@ -74,8 +75,8 @@ void Renderer::ResetClippingArrays()
 {
   std::ranges::fill(m_ceilingClipping, 0);
   std::ranges::fill(m_floorClipping, m_canvasHeight - 1);
-
-  for (size_t i = 0; i < m_solidSegs.size(); i++) { m_solidSegs[i] = false; }
+  std::ranges::fill(m_solidsegs, ClipRange{});
+  std::ranges::fill(m_visplanes, Visplane{});
 }
 
 void Renderer::DrawColumn(const int32_t x, const int32_t y0, const int32_t y1, const uint32_t color) const
@@ -86,11 +87,12 @@ void Renderer::DrawColumn(const int32_t x, const int32_t y0, const int32_t y1, c
   int32_t transformedY1 = static_cast<int32_t>(config::SCALE_Y * y1);
 
   if (scaledX < 0 || scaledX > config::WINDOW_WIDTH - 1 || transformedY0 < 0
-      || transformedY0 > config::WINDOW_HEIGHT - 1 || transformedY1 < 0 || transformedY1 > config::WINDOW_HEIGHT - 1) {
+    || transformedY0 > config::WINDOW_HEIGHT - 1 || transformedY1 < 0 || transformedY1 > config::WINDOW_HEIGHT - 1) {
     return;
   }
 
-  if (transformedY0 > transformedY1) std::swap(transformedY0, transformedY1);
+  if (transformedY0 > transformedY1)
+    std::swap(transformedY0, transformedY1);
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
@@ -109,13 +111,16 @@ void Renderer::DrawColumn(const int32_t x, const int32_t y0, const int32_t y1, c
   }
 }
 
-void Renderer::DrawSolidWall(const int32_t x, const int32_t projectedCeilingZ, const int32_t projectedFloorZ)
+void Renderer::DrawSolidWall(const int32_t x,
+  const int32_t projectedCeilingZ,
+  const int32_t projectedFloorZ,
+  const uint32_t color)
 {
   const int32_t drawTop = std::max(projectedCeilingZ, m_ceilingClipping[x]);
   const int32_t drawBottom = std::min(projectedFloorZ, m_floorClipping[x]);
 
   if (drawTop <= drawBottom) {
-    this->DrawColumn(x, drawTop, drawBottom, mapColor(0, 255, 255, 255));
+    DrawColumn(x, drawTop, drawBottom, color);
 
     m_ceilingClipping[x] = drawBottom;
     m_floorClipping[x] = drawTop;
@@ -128,18 +133,88 @@ void Renderer::Render(const GameState &gameState)
     // Entire level is a single subsector (no BSP splits were needed)
     if (!m_level->subsectors.empty()) {
       const SubSector &subsector = m_level->subsectors[0];
+
       for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
-        RenderSegment(m_level->segments[i], gameState);
+        RenderSegment(m_level->segments[i], gameState.playerState);
       }
     }
   } else {
     RenderBSPNode(gameState, 0);
   }
 
+  RenderVisPlanes();
+
   m_fb.update();
 }
 
-void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
+bool Renderer::ClipSolidWall(int16_t start, int16_t end, const Seg &seg, const SideDef &sidedef, const Player &player)
+{
+  // clip with solid segs
+  ClipRange *clipStart = m_solidsegs.data();
+  ClipRange *next;
+
+  while (clipStart->end < start) {
+    clipStart++;
+  }
+
+  if (start < clipStart->start) {
+    if (end < clipStart->start - 1) {
+      // no solid segs in the way, render the whole seg
+      StoreWallRange({ start, end }, seg, sidedef, player);
+
+      m_solidsegs.emplace({});
+      next = m_solidsegs.data() + m_solidsegs.size();
+
+      // moves everything to the right by one
+      // and creates an empty slot exactly at "start"
+      while (next != clipStart) {
+        *next = *(next - 1);
+        next--;
+      }
+
+      next->start = start;
+      next->end = end;
+    }
+
+    // there is a fragment above *start
+    StoreWallRange({ start, static_cast<int16_t>(clipStart->start - 1) }, seg, sidedef, player);
+    clipStart->start = start;
+  }
+
+  // bottom contained in start
+  if (end <= clipStart->end) {
+    return true;
+  }
+
+  next = clipStart;
+
+  while (end >= (next + 1)->start - 1) {
+    // there is a fragment between two posts
+    StoreWallRange(
+      { static_cast<int16_t>(next->end + 1), static_cast<int16_t>((next + 1)->start - 1) }, seg, sidedef, player);
+    next++;
+
+    if (end <= next->end) {
+      // bottom is contained in next
+      clipStart->end = next->end;
+
+      // crunch
+      if (next == clipStart)
+        return true;
+
+      while (next++ != m_solidsegs.data() + m_solidsegs.size()) {
+        // remove a post
+        *(++clipStart) = *next;
+      }
+    }
+  }
+
+  // there is a fragment after next
+  StoreWallRange({ static_cast<int16_t>(next->end + 1), end }, seg, sidedef, player);
+  next->end = end;
+  return false;
+}
+void Renderer::RenderSegment(const Seg &seg, const Player &player)
 {
   const LineDef &ld = m_level->linedefs[seg.linedefIndex];
 
@@ -159,7 +234,7 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
   glm::dvec2 view1 = { 0, 0 }, view2 = { 0, 0 };
   int16_t floorZ = 0, ceilingZ = 0;
 
-  applyTransformations(gameState.playerState,
+  applyTransformations(player,
     m_level->vertices[seg.startVertex],
     m_level->vertices[seg.endVertex],
     sector,
@@ -169,7 +244,8 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     ceilingZ);
 
   // near plane clipping
-  if (view1.y < config::NEAR_CLIPPING && view2.y < config::NEAR_CLIPPING) return;
+  if (view1.y < config::NEAR_CLIPPING && view2.y < config::NEAR_CLIPPING)
+    return;
 
   if (view1.y < config::NEAR_CLIPPING) {
     clipNearPlane(view1, view2);
@@ -177,10 +253,10 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     clipNearPlane(view2, view1);
   }
 
-  const int32_t projectedStartX = ProjectX(view1.x, 1 / view1.y);
-  const int32_t projectedEndX = ProjectX(view2.x, 1 / view2.y);
+  const int16_t projectedStartX = ProjectX(view1.x, 1 / view1.y);
+  const int16_t projectedEndX = ProjectX(view2.x, 1 / view2.y);
 
-  int32_t start, end;
+  int16_t start, end;
   double_t inv_y1, inv_y2;
 
   if (projectedStartX > projectedEndX) {
@@ -195,67 +271,93 @@ void Renderer::RenderSegment(const Seg &seg, const GameState &gameState)
     inv_y2 = 1 / view2.y;
   }
 
-  if (start < 0 && end < 0) return;
+  if (start < 0 && end < 0)
+    return;
 
-  for (int32_t i = std::max(0, start); i <= std::min(m_canvasWidth - 1, end); i++) {
-    if (m_solidSegs[i]) continue;
+  if (backSidedefIndex == -1) {
+    ClipSolidWall(start, end, seg, sidedef, player);
+  } else {
+  }
 
+  const int16_t loopStart = std::max(static_cast<int16_t>(0), start);
+  const int16_t loopEnd = std::min(static_cast<int16_t>(m_canvasWidth - 1), end);
+
+  for (int16_t i = loopStart; i <= loopEnd; i++) {
     const double_t t = static_cast<double>(i - start) / (end - start);
     const double_t inv_y = std::lerp(inv_y1, inv_y2, t);
 
     // represent ceiling and floor in screen coordinates
-    const int32_t projectedFloorY = std::min(m_canvasHeight - 1, ProjectZ(floorZ, inv_y));
-    const int32_t projectedCeilingY = std::max(0, ProjectZ(ceilingZ, inv_y));
-
-    DrawFloor(i, projectedFloorY, sector.color);
-    DrawCeiling(i, projectedCeilingY, sector.color);
+    const int16_t projectedFloorY = std::min(static_cast<int16_t>(m_canvasHeight - 1), ProjectZ(floorZ, inv_y));
+    const int16_t projectedCeilingY = std::max(static_cast<int16_t>(0), ProjectZ(ceilingZ, inv_y));
 
     if (backSidedefIndex == -1) {
       // solid wall
-      DrawSolidWall(i, projectedCeilingY, projectedFloorY);
-
-      m_solidSegs[i] = true;
+      DrawSolidWall(i, projectedCeilingY, projectedFloorY, sector.color);
     } else {
       // portal
       const SideDef backSidedef = m_level->sidedefs[backSidedefIndex];
       const Sector nextSector = m_level->sectors[backSidedef.sectorId];
 
-      const int16_t nextCeilZ =
-        static_cast<int16_t>(static_cast<float>(nextSector.ceilingHeight) - gameState.playerState.z);
-      const int16_t nextFloorZ =
-        static_cast<int16_t>(static_cast<float>(nextSector.floorHeight) - gameState.playerState.z);
+      const int16_t nextCeilZ = static_cast<int16_t>(static_cast<float>(nextSector.ceilingHeight) - player.z);
+      const int16_t nextFloorZ = static_cast<int16_t>(static_cast<float>(nextSector.floorHeight) - player.z);
 
       // screen Y coordinates
-      const int32_t nextCeilY = std::max(0, ProjectZ(nextCeilZ, inv_y));
-      const int32_t nextFloorY = std::min(m_canvasHeight - 1, ProjectZ(nextFloorZ, inv_y));
+      const int16_t nextCeilY = std::max(static_cast<int16_t>(0), ProjectZ(nextCeilZ, inv_y));
+      const int16_t nextFloorY = std::min(static_cast<int16_t>(m_canvasHeight - 1), ProjectZ(nextFloorZ, inv_y));
 
       if (ld.type == LineDefType::REGULAR) {
         DrawDefaultPortal(i, projectedFloorY, projectedCeilingY, nextFloorY, nextCeilY);
       } else if (ld.type == LineDefType::DOOR) {
         // TODO: create a drawing function for door portal
       }
-
-      if (m_ceilingClipping[i] >= m_floorClipping[i]) { m_solidSegs[i] = true; }
     }
+  }
+}
+
+void Renderer::CheckVisPlane() {}
+
+void Renderer::RenderVisPlanes() {}
+
+void Renderer::StoreWallRange(const ClipRange &range, const Seg &seg, const SideDef &sd, const Player &player) {}
+
+void Renderer::RenderSSector(const Player &player, const SubSector &subsector)
+{
+  int count = subsector.segCount;
+  const Sector *frontsector = subsector.sector;
+  const Seg *seg = &m_level->segments[subsector.firstSegIndex];
+
+  if (frontsector->floorHeight < player.z) {
+    m_floorplane = FindVisPlane(frontsector->floorHeight, frontsector->color, frontsector->lightLevel);
+  } else {
+    m_floorplane = nullptr;
+  }
+
+  if (frontsector->ceilingHeight > player.z) {
+    m_ceilplane = FindVisPlane(frontsector->ceilingHeight, frontsector->color, frontsector->lightLevel);
+  } else {
+    m_ceilplane = nullptr;
+  }
+
+  // render segments
+  while (count--) {
+    RenderSegment(*seg, player);
+    seg++;
   }
 }
 
 void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex)
 {
-  if (nodeIndex & 0x8000) {
+  if (nodeIndex & NF_SUBSECTOR) {
     // leaf node
-    const SubSector &subsector = m_level->subsectors[nodeIndex & 0x7FFF];
+    const SubSector &subsector = m_level->subsectors[nodeIndex & (0x7FFF)];
 
-    for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
-      RenderSegment(m_level->segments[i], gameState);
-    }
+    RenderSSector(gameState.playerState, subsector);
 
     return;
   }
 
   const BspNode &node = m_level->nodes[nodeIndex];
-  const bool side =
-    PointOnSide({ static_cast<int32_t>(gameState.playerState.x), static_cast<int32_t>(gameState.playerState.y) }, node);
+  const bool side = PointOnSide(gameState.playerState, node);
 
   if (side) {
     RenderBSPNode(gameState, node.leftChild);
@@ -269,33 +371,14 @@ void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex
   RenderBSPNode(gameState, farNodeIndex);
 }
 
-/**
- *
- * @param v
- * @param node
- * @return true if point is to the left, false when to the right
- */
-bool Renderer::PointOnSide(const Vertex v, const BspNode &node)
+int16_t Renderer::ProjectZ(const double_t z, const double_t inv_y) const
 {
-  // Calculate vector from the partition line's origin to the player
-  const double_t dx = v.x - node.x;
-  const double_t dy = v.y - node.y;
-
-  // 2D Cross Product
-  const double_t leftSide = (node.dx * dy) - (node.dy * dx);
-
-  return leftSide > 0;
+  return static_cast<int16_t>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y);
 }
 
-
-int32_t Renderer::ProjectZ(const double_t z, const double_t inv_y) const
+int16_t Renderer::ProjectX(const double_t x, const double_t inv_y) const
 {
-  return static_cast<int32_t>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y);
-}
-
-int32_t Renderer::ProjectX(const double_t x, const double_t inv_y) const
-{
-  return static_cast<int32_t>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y);
+  return static_cast<int16_t>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y);
 }
 
 void Renderer::DrawDefaultPortal(const int32_t x,
@@ -331,18 +414,19 @@ void Renderer::DrawDefaultPortal(const int32_t x,
   }
 }
 
-void Renderer::DrawCeiling(const int32_t x, const int32_t projectedCeilingY, const uint32_t color = 0xFF00FFFF)
+// TODO: change color to texture implementation
+Visplane *Renderer::FindVisPlane(const int16_t height, const uint32_t color, const int16_t lightLevel)
 {
-  if (m_ceilingClipping[x] <= projectedCeilingY) {
-    this->DrawColumn(x, m_ceilingClipping[x], projectedCeilingY, color);
-    m_ceilingClipping[x] = projectedCeilingY;
+  for (Visplane &vp : m_visplanes) {
+    if (vp.height == height && vp.color == color && vp.lightLevel == lightLevel) {
+      return &vp;
+    }
   }
-}
 
-void Renderer::DrawFloor(const int32_t x, const int32_t projectedFloorY, const uint32_t color = 0xFF00FF00)
-{
-  if (m_floorClipping[x] >= projectedFloorY) {
-    this->DrawColumn(x, m_floorClipping[x], projectedFloorY, color);
-    m_floorClipping[x] = projectedFloorY;
-  }
+  m_visplanes.emplace_back(height, color, lightLevel, config::CANVAS_WIDTH, -1);
+  Visplane *newPlane = &m_visplanes.back();
+
+  memset(newPlane->top, 0xff, sizeof(newPlane->top));
+
+  return newPlane;
 }

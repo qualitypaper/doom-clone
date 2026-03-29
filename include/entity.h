@@ -1,36 +1,26 @@
 #pragma once
-#include <cstdint>
 #include "glm/glm.hpp"
+#include <cstdint>
 
-namespace entity
+struct Player
 {
+  int16_t x{};
+  int16_t y{};
+  int16_t z{};
+  float_t velocity{};
+  float_t angle{};
+  uint8_t health{ 100 };
+  uint8_t armor{};
+  uint8_t current_weapon{};
+};
 
-    struct Player
-    {
-        double_t x;
-        double_t y;
-        double_t z;
-        double_t velocity;
-        double_t angle;
-        uint8_t health{100};
-        uint8_t armor;
-        uint8_t current_weapon;
-    };
+enum class EntityType { Imp, Projectile, Pickup };
 
-    enum class EntityType
-    {
-        Imp,
-        Projectile,
-        Pickup
-    };
-
-    struct EntityState
-    {
-        EntityType type;
-        glm::vec2 position;
-        float z;
-        glm::vec2 velocity;
-        int health;
-    };
-
-}
+struct EntityState
+{
+  EntityType type;
+  glm::vec2 position;
+  float z;
+  glm::vec2 velocity;
+  int health;
+};

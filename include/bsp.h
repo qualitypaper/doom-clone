@@ -98,6 +98,7 @@ inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
 
 struct SubSector
 {
+  Sector *sector = nullptr;
   int16_t segCount;
   int16_t firstSegIndex;
 
@@ -154,7 +155,6 @@ private:
   [[nodiscard]] bool IsConvex(const std::vector<Seg> &segs) const;
 
   void AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const;
-  void DrawSubsectors(const SdlWindow &sdlWindow) const;
 
   [[nodiscard]] size_t MaxDepth() const;
   [[nodiscard]] size_t MaxDepthRecursive(int16_t currentIndex) const;
@@ -163,6 +163,7 @@ private:
   void BuildRowsRecursive(int16_t index, size_t currentDepth, std::vector<std::vector<std::string>> &rows) const;
 
 private:
+  static void DrawSubsectors(const SdlWindow &sdlWindow, const Level &level);
   static void DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root);
   static void DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &root);
 
@@ -172,6 +173,8 @@ public:
   void BuildBSPTree();
   int BuildBSPTree(std::vector<Seg> &segs);
   void PrintTree() const;
-  void Visualize(const SdlWindow &sdlWindow, InputState &input) const;
   [[nodiscard]] std::unique_ptr<BspLevel> TakeConstructedLevel();
+
+public:
+  static void Visualize(const SdlWindow &sdlWindow, InputState &input, const Level &level);
 };

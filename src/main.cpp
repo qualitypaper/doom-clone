@@ -20,7 +20,7 @@
 
 int main(int argc, char *argv[]);
 
-void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window);
+void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &window);
 
 bool running;
 
@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
   InputState input{};
   GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
 
-  gameState.playerState = entity::Player{
+  gameState.playerState = Player{
     .x = 0, .y = 0, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
   };
 
@@ -150,6 +150,7 @@ int main(int argc, char *argv[])
     renderer.ResetClippingArrays();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
+    fb.reset();
 
     poll_sdl_events(gameState, input, sdlWindow);
 
@@ -163,7 +164,7 @@ int main(int argc, char *argv[])
       }
       continue;
     } else if (gameState.currentMode == EngineMode::BSP_VIEWER) {
-      // bspBuilder.Visualize(sdlWindow, input);
+      BSPBuilder::Visualize(sdlWindow, input, *level);
 
       const uint64_t frameEnd = SDL_GetPerformanceCounter();
       const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
@@ -207,7 +208,7 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-void poll_sdl_events(GameState &gameState, InputState &input, SdlWindow &window)
+void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &window)
 {
   SDL_Event event;
 

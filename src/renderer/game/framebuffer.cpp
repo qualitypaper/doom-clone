@@ -20,4 +20,4 @@ void FrameBuffer::update() const
   sdlWindow.updateScreen();
 }
 
-void FrameBuffer::reset() const { memset(this->pixels, 0, width * height * sizeof(uint32_t)); }
+void FrameBuffer::reset() const { memset(this->pixels, UINT32_MAX, width * height * sizeof(uint32_t)); }

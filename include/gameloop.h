@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config.h"
 #include "entity.h"
 #include "sdl_window.h"
 #include "serialization.h"
@@ -18,17 +19,37 @@ struct SubSector;
 struct BspLevel;
 struct BspNode;
 
-
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
+
+struct Visplane
+{
+  int16_t height = 0;
+  // TODO: change to texture index
+  uint32_t color = -1;
+  int16_t lightLevel = 0;
+  int16_t minX = 0;
+  int16_t maxX = 0;
+  int8_t top[config::CANVAS_WIDTH]{};
+  int8_t bottom[config::CANVAS_WIDTH]{};
+};
+
+struct ClipRange
+{
+  int16_t start = 0;
+  int16_t end = 0;
+
+  ClipRange() = default;
+  ClipRange(int16_t _start, int16_t _end) : start(_start), end(_end) {}
+};
 
 struct GameState
 {
-  entity::Player playerState;
-  std::vector<entity::EntityState> entityState;
-  uint32_t rng_seed;
-  time_t gameTime;
+  Player playerState{};
+  std::vector<EntityState> entityState{};
+  uint32_t rng_seed{};
+  time_t gameTime{};
   EngineMode currentMode;
-  uint16_t levelNum;
+  uint16_t levelNum{};
 };
 
 struct Vertex
@@ -214,6 +235,7 @@ struct Level
   void InitializeBspParams(std::unique_ptr<BspLevel> bspLevel);
   void Load(FileReader &fr);
 };
+
 void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);
 void SetEngineMode(GameState &gameState, InputState &input, EngineMode newMode, const SdlWindow &sdlWindow);
@@ -223,7 +245,7 @@ inline std::array<char8_t, 8> MakeLevelName(uint16_t number)
   const std::string s = std::format("Map{}", number);
   std::array<char8_t, 8> arr{};
 
-  const size_t len = std::min(s.size(), size_t{8});
+  const size_t len = std::min(s.size(), size_t{ 8 });
   for (size_t i = 0; i < len; ++i) {
     arr[i] = static_cast<char8_t>(s[i]);
   }
