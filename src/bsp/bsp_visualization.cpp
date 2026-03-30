@@ -36,16 +36,14 @@ void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
   for (const auto &subsector : level.subsectors) {
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
       const auto &seg = level.segments[i];
-      const auto &startVertex = level.vertices[seg.startVertex];
-      const auto &endVertex = level.vertices[seg.endVertex];
 
-      const ImVec2 mappedStart = math_utils::fromCenterCoordinates(
-        ImVec2{ static_cast<float>(startVertex.x), static_cast<float>(startVertex.y) },
-        sdlWindow.width,
-        sdlWindow.height);
+      const ImVec2 mappedStart =
+        math_utils::fromCenterCoordinates(ImVec2{ static_cast<float>(seg.start->x), static_cast<float>(seg.start->y) },
+          sdlWindow.width,
+          sdlWindow.height);
 
       const ImVec2 mappedEnd = math_utils::fromCenterCoordinates(
-        ImVec2{ static_cast<float>(endVertex.x), static_cast<float>(endVertex.y) }, sdlWindow.width, sdlWindow.height);
+        ImVec2{ static_cast<float>(seg.end->x), static_cast<float>(seg.end->y) }, sdlWindow.width, sdlWindow.height);
 
       SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
     }

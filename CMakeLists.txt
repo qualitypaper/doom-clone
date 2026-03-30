@@ -41,7 +41,10 @@ add_executable(${PROJECT_NAME}
         src/core/serialization.cpp
         src/renderer/editor/editor_serialization.cpp
         src/bsp/bsp_visualization.cpp
-        include/utils.h)
+        include/utils.h
+        include/defs.h
+        include/tables.h
+)
 
 target_include_directories(${PROJECT_NAME}
         PRIVATE

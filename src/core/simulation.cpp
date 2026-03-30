@@ -11,7 +11,7 @@ void update(GameState &gameState, const InputState &input, const double_t dt)
   const double_t angleDiff = std::atan(config::MOUSE_SENSITIVITY * input.mouse_dx / config::PROJECTION_PLANE_DISTANCE);
   gameState.playerState.angle += angleDiff;
 
-  double_t &x = gameState.playerState.x, &y = gameState.playerState.y;
+  double_t x = gameState.playerState.x, y = gameState.playerState.y;
 
   const double_t sin = std::sin(gameState.playerState.angle);
   const double_t cos = std::cos(gameState.playerState.angle);

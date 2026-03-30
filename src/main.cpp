@@ -101,9 +101,8 @@ int main(int argc, char *argv[])
   InputState input{};
   GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
 
-  gameState.playerState = Player{
-    .x = 0, .y = 0, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0
-  };
+  gameState.playerState =
+    Player{ .x = 0, .y = 0, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0 };
 
   std::shared_ptr<Level> level;
   size_t numOfLevels;
@@ -116,7 +115,10 @@ int main(int argc, char *argv[])
     level = std::make_shared<Level>(tempLevel);
   } else {
     numOfLevels = 1;
-    level = std::make_shared<Level>(vertices, linedefs, sidedefs, sectors);
+    level = std::make_shared<Level>();
+    level->vertices = std::move(vertices);
+    level->sectors = std::move(sectors);
+    Level::Init(*level, linedefs, sidedefs, std::vector<Seg>{});
     level->name = MakeLevelName(1);
   }
 

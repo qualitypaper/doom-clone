@@ -1,45 +1,42 @@
 #pragma once
 
-#include "config.h"
-#include "entity.h"
+#include "defs.h"
 #include "sdl_window.h"
-#include "serialization.h"
 
 #include <array>
+#include <cmath>
 #include <vector>
 
 /*
  X, Y - horizontal planes, X - east-west, Y - north-south
  Z - vertical plane,
 */
-
-// forward declarations
-struct Seg;
-struct SubSector;
-struct BspLevel;
-struct BspNode;
+std::array<int16_t, FINE_ANGLES/2> viewangletox;
+std::array<int16_t, config::CANVAS_WIDTH + 1> xtoviewangle;
 
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
 
-struct Visplane
+struct Player
 {
-  int16_t height = 0;
-  // TODO: change to texture index
-  uint32_t color = -1;
-  int16_t lightLevel = 0;
-  int16_t minX = 0;
-  int16_t maxX = 0;
-  int8_t top[config::CANVAS_WIDTH]{};
-  int8_t bottom[config::CANVAS_WIDTH]{};
+  int16_t x{};
+  int16_t y{};
+  int16_t z{};
+  float_t velocity{};
+  float_t angle{};
+  uint8_t health{ 100 };
+  uint8_t armor{};
+  uint8_t current_weapon{};
 };
 
-struct ClipRange
-{
-  int16_t start = 0;
-  int16_t end = 0;
+enum class EntityType { Imp, Projectile, Pickup };
 
-  ClipRange() = default;
-  ClipRange(int16_t _start, int16_t _end) : start(_start), end(_end) {}
+struct EntityState
+{
+  EntityType type;
+  Vertex position;
+  float z;
+  Vertex velocity;
+  int health;
 };
 
 struct GameState
@@ -52,188 +49,23 @@ struct GameState
   uint16_t levelNum{};
 };
 
-struct Vertex
-{
-  int32_t x = 0;
-  int32_t y = 0;
-
-  Vertex() = default;
-  Vertex(const int32_t _x, const int32_t _y) : x(_x), y(_y) {}
-
-  Vertex operator+(const Vertex &other) const { return Vertex{ x + other.x, y + other.y }; }
-  Vertex operator-(const Vertex &other) const { return Vertex{ x - other.x, y - other.y }; }
-  // dot product
-  int32_t operator*(const Vertex &other) const { return x * other.x + y * other.y; }
-  Vertex operator*(const double c) const { return Vertex{ static_cast<int32_t>(c * x), static_cast<int32_t>(c * y) }; }
-  Vertex operator/(const double c) const { return Vertex{ static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
-
-  bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
-
-  template<typename Writer>
-  void serialize(Writer &w) const
-    requires serialization::HasWriteRaw<Writer, Vertex>
-  {
-    serialization::serialize(w, x);
-    serialization::serialize(w, y);
-  }
-  template<typename Reader> void deserialize(Reader &fr)
-  {
-    serialization::deserialize<Reader, decltype(x)>(fr, x);
-    serialization::deserialize(fr, y);
-  }
-};
-
-struct SideDef
-{
-  int16_t sectorId = -1;
-  int16_t xOffset = 0;
-  int16_t yOffset = 0;
-  int16_t upperWallTexture = -1;
-  int16_t middleWallTexture = -1;
-  int16_t bottomWallTexture = -1;
-
-  SideDef() = default;
-
-  SideDef(int16_t _sectorId,
-    int16_t _xOffset,
-    int16_t _yOffset,
-    int16_t _upperWallTexture,
-    int16_t _middleWallTexture,
-    int16_t _bottomWallTexture)
-    : sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset), upperWallTexture(_upperWallTexture),
-      middleWallTexture(_middleWallTexture), bottomWallTexture(_bottomWallTexture)
-  {}
-
-  template<typename Writer> void serialize(Writer &w) const
-  {
-    serialization::serialize(w, sectorId);
-    serialization::serialize(w, upperWallTexture);
-    serialization::serialize(w, middleWallTexture);
-    serialization::serialize(w, bottomWallTexture);
-    serialization::serialize(w, xOffset);
-    serialization::serialize(w, yOffset);
-  }
-
-  template<typename Reader> void deserialize(Reader &r)
-  {
-    serialization::deserialize(r, sectorId);
-    serialization::deserialize(r, upperWallTexture);
-    serialization::deserialize(r, middleWallTexture);
-    serialization::deserialize(r, bottomWallTexture);
-    serialization::deserialize(r, xOffset);
-    serialization::deserialize(r, yOffset);
-  }
-};
-
-enum class LineDefType { REGULAR, DOOR };
-
-struct LineDef
-{
-  int16_t start = -1;
-  int16_t end = -1;
-  LineDefType type = LineDefType::REGULAR;
-  int16_t frontSidedef = -1;
-  int16_t backSidedef = -1;
-
-  LineDef() = default;
-  LineDef(int16_t _start, int16_t _end, LineDefType _type, int16_t _frontSidedef, int16_t _backSidedef)
-    : start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
-  {}
-
-  template<typename Writer> void serialize(Writer &w) const
-  {
-    serialization::serialize(w, start);
-    serialization::serialize(w, end);
-
-    const int8_t intType = static_cast<int8_t>(type);
-
-    serialization::serialize(w, intType);
-
-    serialization::serialize(w, frontSidedef);
-    serialization::serialize(w, backSidedef);
-  }
-
-  template<typename Reader> void deserialize(Reader &r)
-  {
-    serialization::deserialize(r, start);
-    serialization::deserialize(r, end);
-
-    int8_t intType;
-    serialization::deserialize(r, intType);
-    type = static_cast<LineDefType>(intType);
-
-    serialization::deserialize(r, frontSidedef);
-    serialization::deserialize(r, backSidedef);
-  }
-};
-
-struct Sector
-{
-  int16_t floorHeight = 0;
-  int16_t ceilingHeight = 0;
-  int16_t floorTextureIndex = -1;
-  int16_t ceilingTextureIndex = -1;
-  int16_t lightLevel = 0;
-  int16_t specialType = 0;
-  int16_t tag = 0;
-
-  Sector() = default;
-
-  Sector(int16_t _floorHeight,
-    int16_t _ceilingHeight,
-    int16_t _floorTextureIndex,
-    int16_t _ceilingTextureIndex,
-    int16_t _lightLevel,
-    int16_t _specialType,
-    int16_t _tag,
-    uint32_t _color = 0xFFFFFFFF)
-    : floorHeight(_floorHeight), ceilingHeight(_ceilingHeight), floorTextureIndex(_floorTextureIndex),
-      ceilingTextureIndex(_ceilingTextureIndex), lightLevel(_lightLevel), specialType(_specialType), tag(_tag),
-      color(_color)
-  {}
-
-  // temporary, till textures will not be added, RGBA format
-  // default - BLACK
-  uint32_t color = 0xFFFFFFFF;
-
-  template<typename Writer> void serialize(Writer &w) const
-  {
-    serialization::serialize(w, floorHeight);
-    serialization::serialize(w, ceilingHeight);
-    serialization::serialize(w, floorTextureIndex);
-    serialization::serialize(w, ceilingTextureIndex);
-    serialization::serialize(w, lightLevel);
-    serialization::serialize(w, specialType);
-    serialization::serialize(w, tag);
-    serialization::serialize(w, color);
-  }
-
-  template<typename Reader> void deserialize(Reader &r)
-  {
-    serialization::deserialize(r, floorHeight);
-    serialization::deserialize(r, ceilingHeight);
-    serialization::deserialize(r, floorTextureIndex);
-    serialization::deserialize(r, ceilingTextureIndex);
-    serialization::deserialize(r, lightLevel);
-    serialization::deserialize(r, specialType);
-    serialization::deserialize(r, tag);
-    serialization::deserialize(r, color);
-  }
-};
-
 struct Level
 {
   std::vector<Vertex> vertices;
-  std::vector<LineDef> linedefs;
-  std::vector<SideDef> sidedefs;
+  std::vector<line_t> linedefs;
+  std::vector<side_t> sidedefs;
   std::vector<Sector> sectors;
   std::vector<BspNode> nodes;
   std::vector<SubSector> subsectors;
-  std::vector<Seg> segments;
+  std::vector<seg_t> segments;
   std::array<char8_t, 8> name{};
 
-  void InitializeBspParams(std::unique_ptr<BspLevel> bspLevel);
   void Load(FileReader &fr);
+
+  static void Init(Level &level,
+    const std::vector<LineDef> &_lines,
+    const std::vector<SideDef> &_sides,
+    const std::vector<Seg> &_segs);
 };
 
 void HandleMouseMovement(const SDL_Event &event, InputState &input);

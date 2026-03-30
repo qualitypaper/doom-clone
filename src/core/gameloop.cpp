@@ -62,44 +62,68 @@ void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode
   }
 }
 
-void Level::InitializeBspParams(std::unique_ptr<BspLevel> bspLevel)
-{
-  this->nodes = std::move(bspLevel->nodes);
-  this->segments = std::move(bspLevel->segments);
-  this->subsectors = std::move(bspLevel->subsectors);
-
-  if (this->vertices.size() != bspLevel->vertices.size()) {
-    this->vertices = std::move(bspLevel->vertices);
-  }
-
-  if (this->linedefs.size() != bspLevel->linedefs.size()) {
-    this->linedefs = std::move(bspLevel->linedefs);
-  }
-}
-
 void Level::Load(FileReader &fr)
 {
   if (!fr.IsStreamGood()) {
     throw std::runtime_error("Failed to open file for loading.");
   }
 
-  fr.ReadVector(this->linedefs);
-  fr.ReadVector(this->sidedefs);
+  std::vector<LineDef> linedefs;
+  std::vector<SideDef> sidedefs;
+  std::vector<Seg> segs;
+
+  fr.ReadVector(linedefs);
+  fr.ReadVector(sidedefs);
   fr.ReadVector(this->vertices);
-  fr.ReadVector(this->segments);
+  fr.ReadVector(segs);
   fr.ReadVector(this->subsectors);
   fr.ReadVector(this->nodes);
   fr.ReadVector(this->sectors);
 
+  Level::Init(*this, linedefs, sidedefs, segs);
+
   // adding sector into each subsector, for easier access during rendering
   for (auto &ssector : subsectors) {
-    const Seg &segment = segments[ssector.firstSegIndex];
-    int16_t ldIndex = segment.linedefIndex;
+    const seg_t *segment = &segments[ssector.firstSegIndex];
 
-    if (segment.side) {
-      ssector.sector = &sectors[sidedefs[linedefs[ldIndex].backSidedef].sectorId];
+    if (segment->side) {
+      ssector.sector = segment->line->backSide->sector;
     } else {
-      ssector.sector = &sectors[sidedefs[linedefs[ldIndex].frontSidedef].sectorId];
+      ssector.sector = segment->line->frontSide->sector;
     }
+  }
+}
+void Level::Init(Level &level,
+  const std::vector<LineDef> &_lines,
+  const std::vector<SideDef> &_sides,
+  const std::vector<Seg> &_segs)
+{
+  level.linedefs.reserve(_lines.size());
+  level.sidedefs.reserve(_sides.size());
+
+  for (const SideDef &side : _sides) {
+    level.sidedefs.emplace_back(&level.sectors[side.sectorId],
+      side.xOffset,
+      side.yOffset,
+      side.upperWallTexture,
+      side.middleWallTexture,
+      side.bottomWallTexture);
+  }
+
+  for (const LineDef &line : _lines) {
+    level.linedefs.emplace_back(&level.vertices[line.start],
+      &level.vertices[line.end],
+      line.type,
+      line.frontSidedef == -1 ? nullptr : &level.sidedefs[line.frontSidedef],
+      line.backSidedef == -1 ? nullptr : &level.sidedefs[line.backSidedef]);
+  }
+
+  for (const Seg &seg : _segs) {
+    level.segments.emplace_back(&level.vertices[seg.startVertex],
+      &level.vertices[seg.endVertex],
+      seg.angle,
+      &level.linedefs[seg.linedefIndex],
+      seg.side,
+      seg.offset);
   }
 }

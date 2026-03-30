@@ -149,26 +149,16 @@ EditorState::EditorState(Level &_level,
   editorSidedefs.reserve(_level.sidedefs.size());
 
 
-  std::unordered_map<size_t, uint32_t> vertexIdMap;
-  vertexIdMap.reserve(_level.vertices.size());
+  std::unordered_map<const Vertex *, uint32_t> vertexIdxMap;
+  vertexIdxMap.reserve(_level.vertices.size());
 
   // process vertices
   for (size_t i = 0; i < _level.vertices.size(); ++i) {
-    const auto &v = _level.vertices[i];
+    const Vertex *v = &_level.vertices[i];
 
-    const auto [x, y] = math_utils::fromCenterCoordinates(v, _width, _height);
+    const auto [x, y] = math_utils::fromCenterCoordinates(*v, _width, _height);
     editorVertices.emplace_back(x, y);
-    vertexIdMap[i] = makeObjectId(EditorObjectType::VERTEX, editorVertices.size() - 1);
-  }
-
-  // process linedefs
-  for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
-    editorLinedefs.emplace_back(vertexIdMap[start], vertexIdMap[end], type, frontSidedef, backSidedef);
-
-    editorVertices[start].connectedLineDefs.emplace_back(
-      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
-    editorVertices[end].connectedLineDefs.emplace_back(
-      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
+    vertexIdxMap[v] = editorVertices.size() - 1;
   }
 
   // process sectors
@@ -179,14 +169,31 @@ EditorState::EditorState(Level &_level,
 
   // process sidedefs
   for (const auto &sd : _level.sidedefs) {
-    editorSidedefs.emplace_back(sd.sectorId, sd.xOffset, sd.yOffset);
+    editorSidedefs.emplace_back(sd.sector - _level.sectors.data(), sd.xOffset, sd.yOffset);
   }
+
+  // process linedefs
+  for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
+    editorLinedefs.emplace_back(makeObjectId(EditorObjectType::VERTEX, vertexIdxMap[start]),
+      makeObjectId(EditorObjectType::VERTEX, vertexIdxMap[end]),
+      type,
+      frontSidedef - _level.sidedefs.data(),
+      backSidedef - _level.sidedefs.data());
+
+
+    editorVertices[vertexIdxMap[start]].connectedLineDefs.emplace_back(
+      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
+    editorVertices[vertexIdxMap[end]].connectedLineDefs.emplace_back(
+      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
+  }
+
 
   this->level = std::make_unique<EditorLevel>(std::move(editorVertices),
     std::move(editorLinedefs),
     std::move(editorSectors),
     std::move(editorSidedefs),
-    _levelNum, _level.name);
+    _levelNum,
+    _level.name);
 }
 
 void EditorState::reset()
@@ -415,7 +422,7 @@ void Editor::addEmptyLevel() const
   auto levelName = std::array<char8_t, 8>{};
   const std::string nameStr = std::format("Map{}", state->numOfLevels);
 
-  const size_t copyLen = std::min(nameStr.size(), size_t{8});
+  const size_t copyLen = std::min(nameStr.size(), size_t{ 8 });
   std::memcpy(levelName.data(), nameStr.data(), copyLen);
 
   state->level = std::make_unique<EditorLevel>(state->numOfLevels, levelName);
@@ -433,7 +440,7 @@ void Editor::changeLevel(const uint16_t newLevelNum) const
   auto levelName = std::array<char8_t, 8>{};
   const std::string nameStr = std::format("Map{}", newLevelNum);
 
-  const size_t copyLen = std::min(nameStr.size(), size_t{8});
+  const size_t copyLen = std::min(nameStr.size(), size_t{ 8 });
   std::memcpy(levelName.data(), nameStr.data(), copyLen);
 
   state->level = std::make_unique<EditorLevel>(newLevelNum, levelName);

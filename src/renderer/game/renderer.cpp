@@ -5,57 +5,140 @@
 #include "framebuffer.h"
 #include "gameloop.h"
 #include "math_utils.h"
+#include "tables.h"
 
 #include <algorithm>
 #include <fmt/core.h>
 #include <utility>
 
-static const double_t TAN_HALF_FOV = std::tan((config::FOV / 2.0) * (M_PI / 180.0));
+static constexpr int16_t HEIGHT_BITS = 12;
+static constexpr int16_t HEIGHT_UNIT = 1 << HEIGHT_BITS;
+
 static double_t FOCAL_LENGTH;
 
-static constexpr uint32_t mapColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t alpha)
+static void InitTanToAngle()
+{
+  for (uint32_t i = 0; i <= tantoangle.size(); i++) {
+    const double tan = static_cast<double>(i) / tantoangle.size();
+    const double angle = std::atan(tan) * (180.0 / M_PI);
+
+    tantoangle[i] = static_cast<angle_t>(angle * (ANG90 / 90.0));
+  }
+}
+
+static void InitViewAngleToX()
+{
+  for (uint32_t i = 0; i < viewangletox.size(); i++) {
+    const double_t angle = (static_cast<double_t>(i) / viewangletox.size()) * (M_PI / 2.0);
+    const double_t x = FOCAL_LENGTH * std::tan(angle);
+
+    viewangletox[i] = static_cast<int16_t>(x);
+  }
+}
+
+static void InitFineSine()
+{
+  for (uint32_t i = 0; i < finesine.size(); i++) {
+    const double_t angle = (static_cast<double_t>(i) / finesine.size()) * (M_PI * 2);
+
+    finesine[i] = std::sin(angle);
+  }
+}
+
+static void InitFineTan()
+{
+  for (uint32_t i = 0; i < finetangent.size(); i++) {
+    const double_t angle = (static_cast<double_t>(i) / finetangent.size()) * M_PI * 2;
+
+    finetangent[i] = std::tan(angle);
+  }
+}
+
+static uint32_t SlopeDiv(const uint32_t num, const uint32_t den)
+{
+  uint32_t result;
+  if (den > num) {
+    uint32_t quotient = den / num;
+    const uint32_t remainder = den % num;
+    if (remainder >= num / 2) {
+      quotient++;
+    }
+    result = quotient;
+  } else {
+    result = 0xFFFFFFFF;
+  }
+  return result;
+}
+
+static uint32_t PointToAngle(int32_t x, int32_t y, const int32_t playerX, const int32_t playerY)
+{
+  x -= playerX;
+  y -= playerY;
+
+  if (!x && !y) {
+    return 0;
+  }
+
+  if (x >= 0) {
+    if (y >= 0) {
+      if (x > y) {
+        return tantoangle[SlopeDiv(y, x)];
+      } else {
+        return ANG90 - 1 - tantoangle[SlopeDiv(x, y)];
+      }
+    } else {
+      y = -y;
+      if (x > y) {
+        return -tantoangle[SlopeDiv(y, x)];
+      } else {
+        return ANG270 + tantoangle[SlopeDiv(x, y)];
+      }
+    }
+  } else {
+    x = -x;
+    if (y >= 0) {
+      if (x > y) {
+        return ANG180 - 1 - tantoangle[SlopeDiv(y, x)];
+      } else {
+        return ANG90 + tantoangle[SlopeDiv(x, y)];
+      }
+    } else {
+      y = -y;
+      if (x > y) {
+        return ANG180 + tantoangle[SlopeDiv(y, x)];
+      } else {
+        return ANG270 - 1 - tantoangle[SlopeDiv(x, y)];
+      }
+    }
+  }
+
+  return 0;
+}
+
+static uint32_t PointToDist(const int16_t x, const int16_t y, const Player &player)
+{
+  int32_t dx = std::abs(player.x - x);
+  int32_t dy = std::abs(player.y - y);
+
+  if (dy > dx) {
+    std::swap(dx, dy);
+  }
+
+  if (dx == 0)
+    return 0;
+
+  const angle_t angle = (tantoangle[(dy << 11) / dx] + ANG90) >> ANGLE_TO_FINE_SHIFT;
+
+  // uses cosine
+  return dx / finesine[angle];
+}
+
+static float_t ScaleFromGlobalAngle(angle_t angle) {}
+
+static constexpr uint32_t MapColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t alpha)
 {
   return (r << 24) | (g << 16) | (b << 8) | alpha;
 }
-
-namespace {
-template<HasXY T> void clipNearPlane(T &vecToClip, const T &endVec)
-{
-  const double_t t = (config::NEAR_CLIPPING - vecToClip.y) / (endVec.y - vecToClip.y);
-
-  vecToClip.x += t * (endVec.x - vecToClip.x);
-  vecToClip.y = config::NEAR_CLIPPING;
-}
-
-template<HasXY T> void rotate(const T &vec, const double_t angle, T &res)
-{
-  res.x = vec.x * std::cos(angle) - vec.y * std::sin(angle);
-  res.y = vec.x * std::sin(angle) + vec.y * std::cos(angle);
-}
-
-template<HasXY T, HasXY V>
-void applyTransformations(const Player &playerState,
-  const V &start,
-  const V &end,
-  const Sector &floorCeilingSector,
-  T &view1,
-  T &view2,
-  int16_t &floorZ,
-  int16_t &ceilingZ)
-{
-  const double_t startX = start.x - playerState.x;
-  const double_t startY = start.y - playerState.y;
-
-  const double_t endX = end.x - playerState.x;
-  const double_t endY = end.y - playerState.y;
-
-  floorZ = floorCeilingSector.floorHeight - playerState.z;
-  ceilingZ = floorCeilingSector.ceilingHeight - playerState.z;
-
-  rotate(T(startX, startY), playerState.angle, view1);
-  rotate(T(endX, endY), playerState.angle, view2);
-}
-}// namespace
 
 Renderer::Renderer(FrameBuffer &_fb,
   std::shared_ptr<Level> _level,
@@ -68,7 +151,10 @@ Renderer::Renderer(FrameBuffer &_fb,
   m_visplanes.reserve(MAX_VISPLANES);
   m_solidsegs.resize(MAX_SEGMENTS);
 
-  FOCAL_LENGTH = (canvasWidth / 2.0) / TAN_HALF_FOV;
+  FOCAL_LENGTH = (canvasWidth / 2.0) / finetangent[FINE_ANGLES / 4 + HALF_FOV >> ANGLE_TO_FINE_SHIFT];
+
+  InitTanToAngle();
+  InitViewAngleToX();
 }
 
 void Renderer::ResetClippingArrays()
@@ -135,7 +221,7 @@ void Renderer::Render(const GameState &gameState)
       const SubSector &subsector = m_level->subsectors[0];
 
       for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
-        RenderSegment(m_level->segments[i], gameState.playerState);
+        AddSegment(m_level->segments.data() + i, gameState.playerState);
       }
     }
   } else {
@@ -147,7 +233,7 @@ void Renderer::Render(const GameState &gameState)
   m_fb.update();
 }
 
-bool Renderer::ClipSolidWall(int16_t start, int16_t end, const Seg &seg, const SideDef &sidedef, const Player &player)
+void Renderer::ClipSolidWall(int16_t start, int16_t end, const seg_t *seg, const side_t *sidedef, const Player &player)
 {
   // clip with solid segs
   ClipRange *clipStart = m_solidsegs.data();
@@ -183,7 +269,7 @@ bool Renderer::ClipSolidWall(int16_t start, int16_t end, const Seg &seg, const S
 
   // bottom contained in start
   if (end <= clipStart->end) {
-    return true;
+    return;
   }
 
   next = clipStart;
@@ -200,7 +286,7 @@ bool Renderer::ClipSolidWall(int16_t start, int16_t end, const Seg &seg, const S
 
       // crunch
       if (next == clipStart)
-        return true;
+        return;
 
       while (next++ != m_solidsegs.data() + m_solidsegs.size()) {
         // remove a post
@@ -212,119 +298,226 @@ bool Renderer::ClipSolidWall(int16_t start, int16_t end, const Seg &seg, const S
   // there is a fragment after next
   StoreWallRange({ static_cast<int16_t>(next->end + 1), end }, seg, sidedef, player);
   next->end = end;
-  return false;
 }
-void Renderer::RenderSegment(const Seg &seg, const Player &player)
+
+void Renderer::ClipPassWall(const int16_t start,
+  const int16_t end,
+  const seg_t *seg,
+  const side_t *side,
+  const Player &player)
 {
-  const LineDef &ld = m_level->linedefs[seg.linedefIndex];
 
-  const bool isBackSide = seg.side;
+  // Find the first range that touches the range
+  //  (adjacent pixels are touching).
+  ClipRange *clipStart = m_solidsegs.data();
 
-  const int16_t frontSidedefIndex = isBackSide ? ld.backSidedef : ld.frontSidedef;
-  const int16_t backSidedefIndex = isBackSide ? ld.frontSidedef : ld.backSidedef;
+  while (clipStart->end < start - 1) {
+    clipStart++;
+  }
 
-  if (frontSidedefIndex == -1) {
-    throw std::runtime_error("frontSidedefIndex == -1 -> The frontSidedef mustn't be empty.");
+  if (start < clipStart->start) {
+    if (end < clipStart->start - 1) {
+      // Post is entirely visible (above start).
+      StoreWallRange({ start, end }, seg, side, player);
+      return;
+    }
+
+    // There is a fragment above *start.
+    StoreWallRange({ start, static_cast<int16_t>(clipStart->start - 1) }, seg, side, player);
+  }
+
+  // Bottom contained in start?
+  if (end <= clipStart->end) {
     return;
   }
 
-  const SideDef &sidedef = m_level->sidedefs[frontSidedefIndex];
-  const Sector &sector = m_level->sectors[sidedef.sectorId];
+  while (end >= (clipStart + 1)->start - 1) {
+    // There is a fragment between two posts.
+    StoreWallRange({ static_cast<int16_t>(clipStart->end + 1), static_cast<int16_t>((clipStart + 1)->start - 1) },
+      seg,
+      side,
+      player);
+    clipStart++;
 
-  glm::dvec2 view1 = { 0, 0 }, view2 = { 0, 0 };
-  int16_t floorZ = 0, ceilingZ = 0;
-
-  applyTransformations(player,
-    m_level->vertices[seg.startVertex],
-    m_level->vertices[seg.endVertex],
-    sector,
-    view1,
-    view2,
-    floorZ,
-    ceilingZ);
-
-  // near plane clipping
-  if (view1.y < config::NEAR_CLIPPING && view2.y < config::NEAR_CLIPPING)
-    return;
-
-  if (view1.y < config::NEAR_CLIPPING) {
-    clipNearPlane(view1, view2);
-  } else if (view2.y < config::NEAR_CLIPPING) {
-    clipNearPlane(view2, view1);
-  }
-
-  const int16_t projectedStartX = ProjectX(view1.x, 1 / view1.y);
-  const int16_t projectedEndX = ProjectX(view2.x, 1 / view2.y);
-
-  int16_t start, end;
-  double_t inv_y1, inv_y2;
-
-  if (projectedStartX > projectedEndX) {
-    start = projectedEndX;
-    end = projectedStartX;
-    inv_y1 = 1 / view2.y;
-    inv_y2 = 1 / view1.y;
-  } else {
-    start = projectedStartX;
-    end = projectedEndX;
-    inv_y1 = 1 / view1.y;
-    inv_y2 = 1 / view2.y;
-  }
-
-  if (start < 0 && end < 0)
-    return;
-
-  if (backSidedefIndex == -1) {
-    ClipSolidWall(start, end, seg, sidedef, player);
-  } else {
-  }
-
-  const int16_t loopStart = std::max(static_cast<int16_t>(0), start);
-  const int16_t loopEnd = std::min(static_cast<int16_t>(m_canvasWidth - 1), end);
-
-  for (int16_t i = loopStart; i <= loopEnd; i++) {
-    const double_t t = static_cast<double>(i - start) / (end - start);
-    const double_t inv_y = std::lerp(inv_y1, inv_y2, t);
-
-    // represent ceiling and floor in screen coordinates
-    const int16_t projectedFloorY = std::min(static_cast<int16_t>(m_canvasHeight - 1), ProjectZ(floorZ, inv_y));
-    const int16_t projectedCeilingY = std::max(static_cast<int16_t>(0), ProjectZ(ceilingZ, inv_y));
-
-    if (backSidedefIndex == -1) {
-      // solid wall
-      DrawSolidWall(i, projectedCeilingY, projectedFloorY, sector.color);
-    } else {
-      // portal
-      const SideDef backSidedef = m_level->sidedefs[backSidedefIndex];
-      const Sector nextSector = m_level->sectors[backSidedef.sectorId];
-
-      const int16_t nextCeilZ = static_cast<int16_t>(static_cast<float>(nextSector.ceilingHeight) - player.z);
-      const int16_t nextFloorZ = static_cast<int16_t>(static_cast<float>(nextSector.floorHeight) - player.z);
-
-      // screen Y coordinates
-      const int16_t nextCeilY = std::max(static_cast<int16_t>(0), ProjectZ(nextCeilZ, inv_y));
-      const int16_t nextFloorY = std::min(static_cast<int16_t>(m_canvasHeight - 1), ProjectZ(nextFloorZ, inv_y));
-
-      if (ld.type == LineDefType::REGULAR) {
-        DrawDefaultPortal(i, projectedFloorY, projectedCeilingY, nextFloorY, nextCeilY);
-      } else if (ld.type == LineDefType::DOOR) {
-        // TODO: create a drawing function for door portal
-      }
+    if (end <= clipStart->end) {
+      // Bottom is contained in next.
+      return;
     }
   }
+
+  // There is a fragment after *next.
+  StoreWallRange({ static_cast<int16_t>(clipStart->end + 1), end }, seg, side, player);
 }
 
-void Renderer::CheckVisPlane() {}
+void Renderer::AddSegment(const seg_t *seg, const Player &player)
+{
+  const line_t &ld = *seg->line;
+
+  angle_t angle1 = PointToAngle(seg->start->x, seg->start->y, player.x, player.y);
+  angle_t angle2 = PointToAngle(seg->end->x, seg->end->y, player.x, player.y);
+
+  const angle_t span = angle1 - angle2;
+
+  if (span >= ANG180) {
+    return;
+  }
+
+  m_rw_angle1 = angle1;
+  angle1 -= player.angle;
+  angle2 -= player.angle;
+
+  angle_t tspan = angle1 + HALF_FOV;
+
+  if (tspan > FOV) {
+    // totally of the left edge?
+    if (tspan - FOV >= span) {
+      return;
+    }
+
+    angle1 = HALF_FOV;
+  }
+
+  tspan = HALF_FOV - angle2;
+  if (tspan > FOV) {
+    // totally of the right edge?
+    if (tspan - FOV >= span) {
+      return;
+    }
+
+    angle2 = -HALF_FOV;
+  }
+
+  angle1 = (angle1 + HALF_FOV) >> ANGLE_TO_FINE_SHIFT;
+  angle2 = (angle2 + HALF_FOV) >> ANGLE_TO_FINE_SHIFT;
+
+  const int16_t x1 = viewangletox[angle1];
+  const int16_t x2 = viewangletox[angle2];
+
+  const bool isBackSide = seg->side;
+
+  const side_t *frontSide = isBackSide ? ld.backSide : ld.frontSide;
+  const side_t *backSide = isBackSide ? ld.frontSide : ld.backSide;
+
+  if (!frontSide) {
+    throw std::runtime_error("frontSidedefIndex == -1 -> The frontSidedef mustn't be empty.");
+  }
+
+  if (!backSide) {
+    ClipSolidWall(x1, x2, seg, frontSide, player);
+  } else {
+    ClipPassWall(x1, x2, seg, backSide, player);
+  }
+}
+
+Visplane *Renderer::CheckVisPlane(Visplane *visplane, const int16_t start, const int16_t end) { return visplane; }
 
 void Renderer::RenderVisPlanes() {}
 
-void Renderer::StoreWallRange(const ClipRange &range, const Seg &seg, const SideDef &sd, const Player &player) {}
+void Renderer::RenderSegLoop(const seg_t *seg, int16_t topStep, int16_t topFrac, int16_t bottomStep, int16_t bottomFrac)
+{
+  int16_t top, bottom;
+
+  for (int16_t x = m_rwx; x <= m_rw_stopx; x++) {
+    int16_t yl = topFrac;
+
+    if (yl < m_ceilingClipping[x] + 1) {
+      yl = m_ceilingClipping[x] + 1;
+    }
+
+    // mark ceiling
+    top = m_ceilingClipping[x] + 1;
+    bottom = yl - 1;
+
+    if (bottom >= m_floorClipping[x]) {
+      bottom = m_floorClipping[x] - 1;
+    }
+
+    if (top <= bottom) {
+      m_ceilplane->top[x] = top;
+      m_ceilplane->bottom[x] = bottom;
+    }
+
+
+    int16_t yh = bottomFrac;
+
+    if (yh >= m_floorClipping[x]) {
+      yh = m_floorClipping[x] - 1;
+    }
+
+    // mark floor
+    top = yh + 1;
+    bottom = m_floorClipping[x] - 1;
+
+    if (top <= m_ceilingClipping[x]) {
+      top = m_ceilingClipping[x] + 1;
+    }
+
+    if (top <= bottom) {
+      m_floorplane->top[x] = top;
+      m_floorplane->bottom[x] = bottom;
+    }
+
+
+    if (!seg->line->backSide ^ !seg->line->backSide) {
+      // one-sided line
+      DrawColumn(x, top, bottom, seg->line->frontSide->sector->color);
+    } else {
+      // TODO: portals
+    }
+
+    topFrac += topStep;
+    bottomFrac += bottomStep;
+  }
+}
+
+void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side, const Player &player)
+{
+  // calculate rw_distance for scale calculation
+  m_rw_normalangle = seg->angle + ANG90;
+  angle_t offsetangle;
+
+  if (m_rw_normalangle > m_rw_angle1) {
+    offsetangle = m_rw_normalangle - m_rw_angle1;
+  } else {
+    offsetangle = m_rw_angle1 - m_rw_normalangle;
+  }
+
+  if (offsetangle > ANG90) {
+    offsetangle = ANG90;
+  }
+
+  const angle_t disAngle = ANG90 - offsetangle;
+  const int16_t hyp = PointToDist(seg->line->start->x, seg->line->start->y, player);
+  const int16_t sineval = finesine[disAngle >> ANGLE_TO_FINE_SHIFT];
+  m_rw_distance = hyp * sineval;
+
+  m_rw_scale = ScaleFromGlobalAngle(player.angle + xtoviewangle[range.start]);
+
+  if (range.end > range.start) {
+    const float_t scale2 = ScaleFromGlobalAngle(player.angle + xtoviewangle[range.end]);
+    m_rw_scaleStep = (scale2 - m_rw_scale) / (range.end - range.start);
+  }
+
+  int32_t wordTop = side->sector->ceilingHeight - player.z;
+  int32_t wordBottom = side->sector->floorHeight - player.z;
+
+  int16_t topStep = -(m_rw_scaleStep * wordTop);
+  int16_t topFrac = config::CANVAS_HEIGHT / 2 - (m_rw_scaleStep * wordTop);
+
+  int16_t bottomStep = -(m_rw_scaleStep * wordBottom);
+  int16_t bottomFrac = config::CANVAS_WIDTH - (m_rw_scaleStep * wordBottom);
+
+  m_ceilplane = CheckVisPlane(m_ceilplane, m_rwx, m_rw_stopx - 1);
+  m_floorplane = CheckVisPlane(m_floorplane, m_rwx, m_rw_stopx - 1);
+
+  RenderSegLoop(seg, topStep, topFrac, bottomStep, bottomFrac);
+}
 
 void Renderer::RenderSSector(const Player &player, const SubSector &subsector)
 {
   int count = subsector.segCount;
   const Sector *frontsector = subsector.sector;
-  const Seg *seg = &m_level->segments[subsector.firstSegIndex];
+  const seg_t *seg = &m_level->segments[subsector.firstSegIndex];
 
   if (frontsector->floorHeight < player.z) {
     m_floorplane = FindVisPlane(frontsector->floorHeight, frontsector->color, frontsector->lightLevel);
@@ -340,7 +533,7 @@ void Renderer::RenderSSector(const Player &player, const SubSector &subsector)
 
   // render segments
   while (count--) {
-    RenderSegment(*seg, player);
+    AddSegment(seg, player);
     seg++;
   }
 }
@@ -393,7 +586,7 @@ void Renderer::DrawDefaultPortal(const int32_t x,
     const int32_t upperWallTop = std::min(nextCeilY, m_floorClipping[x]);
 
     if (upperWallBottom < upperWallTop) {
-      this->DrawColumn(x, upperWallBottom, upperWallTop, mapColor(0, 255, 0, 255));
+      this->DrawColumn(x, upperWallBottom, upperWallTop, MapColor(0, 255, 0, 255));
       m_ceilingClipping[x] = upperWallTop;
     } else {
       m_ceilingClipping[x] = upperWallBottom;
@@ -406,7 +599,7 @@ void Renderer::DrawDefaultPortal(const int32_t x,
     const int32_t lowerWallTop = std::min(projectedFloorY, m_floorClipping[x]);
 
     if (lowerWallBottom < lowerWallTop) {
-      this->DrawColumn(x, lowerWallBottom, lowerWallTop, mapColor(0, 255, 0, 255));
+      this->DrawColumn(x, lowerWallBottom, lowerWallTop, MapColor(0, 255, 0, 255));
       m_floorClipping[x] = lowerWallBottom;
     } else {
       m_floorClipping[x] = lowerWallTop;
