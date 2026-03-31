@@ -3,11 +3,14 @@
 
 #define _USE_MATH_DEFINES
 
+#include "core/fixed_math.h"
+#include "defs.h"
+
+#include <algorithm>
 #include <cmath>
 #include <concepts>
 #include <cstdint>
 #include <glm/glm.hpp>
-#include <cmath>
 
 template<typename T>
 concept HasXY = requires(T t) {
@@ -20,16 +23,22 @@ namespace math_utils {
 inline double toRadians(const double angle) { return M_PI * angle / 180; }
 
 template<HasXY T> constexpr T toCenterCoordinates(const T &vec, const uint16_t width, const uint16_t height)
-{ return { vec.x - width / 2, height / 2 - vec.y }; }
+{
+  return { vec.x - width / 2, height / 2 - vec.y };
+}
 
 
 template<HasXY T> constexpr T fromCenterCoordinates(const T &vec, const uint16_t width, const uint16_t height)
 {
-  return { decltype(vec.x)(std::max(0.0f, std::min(static_cast<float>(width), static_cast<float>(width) / 2 + vec.x))),
-    decltype(vec.y)(std::max(0.0f, std::min(static_cast<float>(height), static_cast<float>(height) / 2 - vec.y))) };
+  return {
+    decltype(vec.x)(std::clamp(static_cast<double>(width) / 2 + vec.x, 0.0, static_cast<double>(width))),
+    decltype(vec.y)(std::clamp(static_cast<double>(height) / 2 - vec.y, 0.0, static_cast<double>(height)))
+  };
 }
 
+
 // takes two vectors and returns the cross product (z component is always 0, since we are in 2D)
+// shouldn't be used for Vertex objects
 template<HasXY T> constexpr int32_t crossProductLengthNDir(const T v1, const T v2) { return v1.x * v2.y - v1.y * v2.x; }
 
 template<typename T> constexpr float getDistanceSq(T v1, T v2)
@@ -41,6 +50,7 @@ template<typename T> constexpr float getDistanceSq(T v1, T v2)
 }
 
 template<HasXY T> constexpr float dotProduct(T a, T b) { return a.x * b.x + a.y * b.y; }
+
 /**
  *
  * @param p1 starting point of the first line
@@ -50,19 +60,7 @@ template<HasXY T> constexpr float dotProduct(T a, T b) { return a.x * b.x + a.y 
  * @return null vector when d1 and d2 are collinear, otherwise a solution to LSE
  */
 
-template<HasXY T> inline std::pair<double, double> findLinesIntersection(const T p1, const T d1, const T p2, const T d2)
-{
-  const glm::mat2x2 A{ d1.x, d1.y, -d2.x, -d2.y };
-
-  if (glm::determinant(A) == 0) { return std::pair(0, 0); }
-
-  const glm::vec2 b{ p2.x - p1.x, p2.y - p1.y };
-
-  glm::vec2 sol = glm::inverse(A) * b;
-
-  return std::pair(sol.x, sol.y);
-}
-
+std::pair<fixed_t, fixed_t> FindLinesIntersection(Vertex p1, Vertex d1, Vertex p2, Vertex d2);
 
 template<HasXY T> T rotateAroundX(const T v, const double angleDegrees)
 {

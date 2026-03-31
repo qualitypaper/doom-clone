@@ -1,13 +1,15 @@
 #pragma once
 
-#include "gameloop.h"
-#include "imgui.h"
+#include "bsp/bsp.h"
+#include "core/gameloop.h"
+#include "core/serialization.h"
+#include "defs.h"
+#include "imgui/imgui.h"
 #include "math_utils.h"
 
 #include <fstream>
 #include <iostream>
 #include <memory>
-#include <serialization.h>
 #include <set>
 #include <vector>
 
@@ -156,7 +158,7 @@ struct EditorLineDef : public EditorObject
 struct EditorVertex : public EditorObject
 {
   EditorVertex() : EditorObject(EditorObjectType::VERTEX) {}
-  EditorVertex(const int32_t _x, const int32_t _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
+  EditorVertex(const double _x, const double _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
   explicit EditorVertex(const ImVec2 &vec)
     : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
   {}
@@ -164,35 +166,38 @@ struct EditorVertex : public EditorObject
     : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
   {}
 
-  int32_t x = 0, y = 0;
+  explicit EditorVertex(const Vertex v) : EditorObject(EditorObjectType::VERTEX)
+  {
+    this->x = FixedToDouble(v.x);
+    this->y = FixedToDouble(v.y);
+  }
+
+  double x = 0, y = 0;
   std::vector<uint32_t> connectedLineDefs = {};// Linedef object IDs (EditorObjectType::LINEDEF).
 
   EditorVertex operator+(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
   EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
 
-  EditorVertex operator+(const ImVec2 &other) const
-  {
-    return { x + static_cast<int32_t>(other.x), y + static_cast<int32_t>(other.y) };
-  }
+  EditorVertex operator+(const ImVec2 &other) const { return { x + other.x, y + other.y }; }
   EditorVertex operator-(const ImVec2 &other) const
   {
     return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) };
   }
 
-  EditorVertex operator*(const double c) const { return { static_cast<int32_t>(x * c), static_cast<int32_t>(y * c) }; }
-  EditorVertex operator/(const double c) const { return { static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
+  EditorVertex operator*(const double c) const { return { x * c, y * c }; }
+  EditorVertex operator/(const double c) const { return { x / c, y / c }; }
 
   EditorVertex &operator+=(const ImVec2 &offset)
   {
-    this->x += static_cast<int32_t>(offset.x);
-    this->y += static_cast<int32_t>(offset.y);
+    this->x += offset.x;
+    this->y += offset.y;
 
     return *this;
   }
   EditorVertex &operator-=(const ImVec2 &offset)
   {
-    this->x -= static_cast<int32_t>(offset.x);
-    this->y -= static_cast<int32_t>(offset.y);
+    this->x -= offset.x;
+    this->y -= offset.y;
 
     return *this;
   }
@@ -206,8 +211,8 @@ struct EditorVertex : public EditorObject
   {
     const double len = length();
 
-    x = static_cast<int32_t>(std::round(static_cast<double>(x) / len));
-    y = static_cast<int32_t>(std::round(static_cast<double>(y) / len));
+    x /= len;
+    y /= len;
   }
 
   static void remove(EditorState &state, uint32_t vertexId);
@@ -220,14 +225,14 @@ struct EditorVertex : public EditorObject
 
 struct EditorSidedef : EditorObject
 {
-  EditorSidedef(int16_t _sectorId, int16_t _xOffset, int16_t _yOffset)
+  EditorSidedef(const int16_t _sectorId, const double _xOffset, const double _yOffset)
     : EditorObject(EditorObjectType::SIDEDEF), sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset)
   {}
   EditorSidedef() : EditorObject(EditorObjectType::SIDEDEF) {}
 
   int16_t sectorId = -1;
-  int16_t xOffset = 0;
-  int16_t yOffset = 0;
+  double xOffset = 0;
+  double yOffset = 0;
   int16_t upperWallTexture = -1;
   int16_t middleWallTexture = -1;
   int16_t bottomWallTexture = -1;
@@ -239,8 +244,8 @@ struct EditorSidedef : EditorObject
     serialization::serialize(w, upperWallTexture);
     serialization::serialize(w, middleWallTexture);
     serialization::serialize(w, bottomWallTexture);
-    serialization::serialize(w, xOffset);
-    serialization::serialize(w, yOffset);
+    serialization::serialize(w, DoubleToFixed(xOffset));
+    serialization::serialize(w, DoubleToFixed(yOffset));
   }
   template<typename Reader> void deserialize(Reader &r)
   {
@@ -248,8 +253,14 @@ struct EditorSidedef : EditorObject
     serialization::deserialize(r, upperWallTexture);
     serialization::deserialize(r, middleWallTexture);
     serialization::deserialize(r, bottomWallTexture);
-    serialization::deserialize(r, xOffset);
-    serialization::deserialize(r, yOffset);
+
+    fixed_t tempXOffset, tempYOffset;
+
+    serialization::deserialize(r, tempXOffset);
+    serialization::deserialize(r, tempYOffset);
+
+    xOffset = FixedToDouble(tempXOffset);
+    yOffset = FixedToDouble(tempYOffset);
   }
 };
 
@@ -317,15 +328,14 @@ struct EditorLevel
   explicit EditorLevel(const size_t _levelNum, const std::array<char8_t, 8> _name) : levelNum(_levelNum), name(_name) {}
 
   void SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const;
-  void
-    SaveLevelToFile(std::array<char8_t, 8> _name,
+  void SaveLevelToFile(std::array<char8_t, 8> _name,
     uint16_t &numberOfLevels,
     const std::unique_ptr<BspLevel> &bspLevel) const;
   void Save(std::array<char8_t, 8> _name, uint16_t &numberOfLevels, uint16_t width, uint16_t height);
   void Load(uint16_t width, uint16_t height);
   void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
 
-  static size_t Load(Level &level);
+  static size_t Load(std::unique_ptr<Level> &level);
 
   std::vector<EditorVertex> vertices;
   std::vector<EditorLineDef> linedefs;
@@ -469,7 +479,7 @@ public:
   void ProcessInput(float_t vertexRadius) const;
   void executeCommand(std::unique_ptr<Command> cmd) const;
   void addLineDef(int32_t sectorId, LineDef &linedef) const;
-  void addVertex(int32_t x, int32_t y) const;
+  void addVertex(double x, double y) const;
   void drawConnectedLine(uint32_t vertexIndex) const;
 
   void TransformVertices() const;

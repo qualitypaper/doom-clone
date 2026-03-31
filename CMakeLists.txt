@@ -26,7 +26,7 @@ target_compile_options(project_warnings INTERFACE
 )
 
 # ---- Main executable ----
-file(GLOB_RECURSE SOURCES "src/*.cpp")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 
 find_package(glm REQUIRED)
 find_package(SDL2 REQUIRED)
@@ -34,21 +34,12 @@ find_package(fmt CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME}
         ${SOURCES}
-        src/renderer/editor/commands.cpp
-        src/bsp/bsp.cpp
-        include/bsp.h
-        include/serialization.h
-        src/core/serialization.cpp
-        src/renderer/editor/editor_serialization.cpp
-        src/bsp/bsp_visualization.cpp
-        include/utils.h
-        include/defs.h
-        include/tables.h
 )
 
 target_include_directories(${PROJECT_NAME}
         PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
+        "${PROJECT_SOURCE_DIR}/src"
 )
 
 target_link_libraries(${PROJECT_NAME}

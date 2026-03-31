@@ -3,12 +3,11 @@
 #include "commands.h"
 #include "editor.h"
 #include "math_utils.h"
-#include "utils.h"
 
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
-#include "imgui_internal.h"
+#include "imgui/backends/imgui_impl_sdl2.h"
+#include "imgui/backends/imgui_impl_sdlrenderer2.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -41,7 +40,6 @@ EditorRenderer::EditorRenderer(SdlWindow &sdlWindow,
 
   // Setup Dear ImGui style
   ImGui::StyleColorsDark();
-  // ImGui::StyleColorsLight();
 
   // Setup scaling
   ImGuiStyle &style = ImGui::GetStyle();
@@ -455,10 +453,10 @@ void EditorRenderer::drawArrowForLinedef(const float_t thickness,
   const ImVec2 startVec = m_editor->state->transformedVertices[getObjectIndex(startVertexId)];
   const ImVec2 endVec = m_editor->state->transformedVertices[getObjectIndex(endVertexId)];
 
-  EditorVertex linedefDir{ static_cast<int32_t>(endVec.x - startVec.x), static_cast<int32_t>(endVec.y - startVec.y) };
+  EditorVertex linedefDir{ endVec.x - startVec.x, endVec.y - startVec.y };
   linedefDir.normalize();
 
-  const double angle = glm::acos(static_cast<double>(linedefDir.x) / 180 * M_PI) * 180 / M_PI;
+  const double angle = glm::acos(linedefDir.x / 180 * M_PI) * 180 / M_PI;
 
   const ImVec2 leftArrowDir = math_utils::rotateAroundX(linedefDir.toImVec2(), -angle + s_arrowAngle);
   const ImVec2 rightArrowDir = math_utils::rotateAroundX(linedefDir.toImVec2(), angle - s_arrowAngle);
@@ -568,18 +566,18 @@ bool EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
   ImGui::Text("LineDef params: %d", index);
 
   ImGui::SetNextItemWidth(80);
-  ImGui::InputInt(": Start X", &start.x);
+  ImGui::InputDouble(": Start X", &start.x);
   ImGui::SameLine();
   ImGui::SetNextItemWidth(80);
-  ImGui::InputInt(": Start Y", &start.y);
+  ImGui::InputDouble(": Start Y", &start.y);
 
   ImGui::NewLine();
 
   ImGui::SetNextItemWidth(80);
-  ImGui::InputInt("End X: ", &end.x);
+  ImGui::InputDouble("End X: ", &end.x);
   ImGui::SameLine();
   ImGui::SetNextItemWidth(80);
-  ImGui::InputInt("End Y: ", &end.y);
+  ImGui::InputDouble("End Y: ", &end.y);
 
   if (ImGui::Button("Swap")) {
     const uint32_t temp = ld.start;

@@ -1,7 +1,8 @@
 #ifndef DOOMCLONE_DEFS_H
 #define DOOMCLONE_DEFS_H
 #include "config.h"
-#include "serialization.h"
+#include "core/fixed_math.h"
+#include "core/serialization.h"
 #include "tables.h"
 
 #include <array>
@@ -10,20 +11,21 @@
 
 struct Visplane
 {
-  int16_t height = 0;
+  fixed_t height = 0;
   // TODO: change to texture index
   uint32_t color = -1;
-  int16_t lightLevel = 0;
-  int16_t minX = 0;
-  int16_t maxX = 0;
+  int lightLevel = 0;
+  int minX = 0;
+  int maxX = 0;
+
   int8_t top[config::CANVAS_WIDTH]{};
   int8_t bottom[config::CANVAS_WIDTH]{};
 };
 
 struct ClipRange
 {
-  int16_t start = 0;
-  int16_t end = 0;
+  int start = 0;
+  int end = 0;
 
   ClipRange() = default;
   ClipRange(int16_t _start, int16_t _end) : start(_start), end(_end) {}
@@ -31,8 +33,8 @@ struct ClipRange
 
 struct Sector
 {
-  int16_t floorHeight = 0;
-  int16_t ceilingHeight = 0;
+  fixed_t floorHeight = 0;
+  fixed_t ceilingHeight = 0;
   int16_t floorTextureIndex = -1;
   int16_t ceilingTextureIndex = -1;
   int16_t lightLevel = 0;
@@ -41,8 +43,8 @@ struct Sector
 
   Sector() = default;
 
-  Sector(int16_t _floorHeight,
-    int16_t _ceilingHeight,
+  Sector(fixed_t _floorHeight,
+    fixed_t _ceilingHeight,
     int16_t _floorTextureIndex,
     int16_t _ceilingTextureIndex,
     int16_t _lightLevel,
@@ -85,8 +87,8 @@ struct Sector
 
 struct Vertex
 {
-  int32_t x = 0;
-  int32_t y = 0;
+  fixed_t x = 0;
+  fixed_t y = 0;
 
   Vertex() = default;
   Vertex(const int32_t _x, const int32_t _y) : x(_x), y(_y) {}
@@ -94,9 +96,23 @@ struct Vertex
   Vertex operator+(const Vertex &other) const { return Vertex{ x + other.x, y + other.y }; }
   Vertex operator-(const Vertex &other) const { return Vertex{ x - other.x, y - other.y }; }
   // dot product
-  int32_t operator*(const Vertex &other) const { return x * other.x + y * other.y; }
-  Vertex operator*(const double c) const { return Vertex{ static_cast<int32_t>(c * x), static_cast<int32_t>(c * y) }; }
-  Vertex operator/(const double c) const { return Vertex{ static_cast<int32_t>(x / c), static_cast<int32_t>(y / c) }; }
+  fixed_t operator*(const Vertex &other) const { return FixedMul(x, other.x) + FixedMul(y, other.y); }
+  Vertex operator*(const double c) const { return Vertex{ FixedMul(c, x), FixedMul(c, y) }; }
+  Vertex operator/(const double c) const { return Vertex{ FixedDiv(x, c), FixedDiv(y, c) }; }
+
+  // gives the length of cross product v \cross other
+  fixed_t cross(const Vertex &other) const { return FixedMul(x, other.y) - FixedMul(y, other.x); }
+
+  Vertex toCenterCoords(const uint16_t width, const uint16_t height) const
+  {
+    return { x - ((width / 2) << FRAC_BITS), ((height / 2) << FRAC_BITS) - y };
+  }
+
+  Vertex fromCenterCoords(const uint16_t width, const uint16_t height) const
+  {
+    return { std::clamp(((width / 2) << FRAC_BITS) + x, 0, width << FRAC_BITS),
+      std::clamp(((height / 2) << FRAC_BITS) - y, 0, height << FRAC_BITS) };
+  }
 
   bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
 
@@ -109,7 +125,7 @@ struct Vertex
   }
   template<typename Reader> void deserialize(Reader &fr)
   {
-    serialization::deserialize<Reader, decltype(x)>(fr, x);
+    serialization::deserialize(fr, x);
     serialization::deserialize(fr, y);
   }
 };
@@ -118,24 +134,30 @@ struct side_t
 {
   Sector *sector;
 
-  int16_t xOffset;
-  int16_t yOffset;
+  fixed_t xOffset;
+  fixed_t yOffset;
 
   int16_t upperWallTexture = -1;
   int16_t middlWallTexture = -1;
   int16_t bottomWallTexture = -1;
 
   side_t() = default;
-  side_t(Sector *_sector, int16_t _xOffset, int16_t _yOffset, int16_t _upper, int16_t _middle, int16_t _bottom)
-    : sector(_sector), xOffset(_xOffset), yOffset(_yOffset), upperWallTexture(_upper), middlWallTexture(_middle), bottomWallTexture(_bottom)
+  side_t(Sector *_sector,
+    const fixed_t _xOffset,
+    const fixed_t _yOffset,
+    const int16_t _upper,
+    const int16_t _middle,
+    const int16_t _bottom)
+    : sector(_sector), xOffset(_xOffset), yOffset(_yOffset), upperWallTexture(_upper), middlWallTexture(_middle),
+      bottomWallTexture(_bottom)
   {}
 };
 
 struct SideDef
 {
   int16_t sectorId = -1;
-  int16_t xOffset = 0;
-  int16_t yOffset = 0;
+  fixed_t xOffset = 0;
+  fixed_t yOffset = 0;
   int16_t upperWallTexture = -1;
   int16_t middleWallTexture = -1;
   int16_t bottomWallTexture = -1;
@@ -143,8 +165,8 @@ struct SideDef
   SideDef() = default;
 
   SideDef(int16_t _sectorId,
-    int16_t _xOffset,
-    int16_t _yOffset,
+    fixed_t _xOffset,
+    fixed_t _yOffset,
     int16_t _upperWallTexture,
     int16_t _middleWallTexture,
     int16_t _bottomWallTexture)
@@ -197,8 +219,8 @@ struct line_t
 
 struct LineDef
 {
-  int16_t start = -1;
-  int16_t end = -1;
+  int32_t start = -1;
+  int32_t end = -1;
   LineDefType type = LineDefType::REGULAR;
   int16_t frontSidedef = -1;
   int16_t backSidedef = -1;
@@ -239,10 +261,11 @@ struct seg_t
   Vertex *start{}, *end{};
   angle_t angle{};
 
-  line_t* line{};
+  line_t *line{};
 
   int16_t side = -1;
-  int16_t offset = 0;
+
+  fixed_t offset = 0;
 };
 
 
@@ -253,10 +276,10 @@ struct Seg
   angle_t angle = 0;
   int16_t linedefIndex = -1;
   int16_t side = -1;// 0 for front, 1 for back
-  int16_t offset = 0;
+  fixed_t offset = 0;
 
   Seg() = default;
-  Seg(int16_t _startVertex, int16_t _endVertex, angle_t _angle, int16_t _linedefIndex, int8_t _side, int16_t _offset)
+  Seg(int16_t _startVertex, int16_t _endVertex, angle_t _angle, int16_t _linedefIndex, int16_t _side, fixed_t _offset)
     : startVertex(_startVertex), endVertex(_endVertex), angle(_angle), linedefIndex(_linedefIndex), side(_side),
       offset(_offset)
 
@@ -291,11 +314,14 @@ struct Seg
 struct BspNode
 {
   BspNode() = default;
-  BspNode(int16_t _x, int16_t _y, int16_t _dx, int16_t _dy);
+  BspNode(fixed_t _x, fixed_t _y, fixed_t _dx, fixed_t _dy);
 
-  int16_t x = 0, y = 0, dx = 0, dy = 0;
-  std::array<int16_t, 4> leftBoundingBox{ INT16_MAX, INT16_MIN, INT16_MIN, INT16_MAX };
-  std::array<int16_t, 4> rightBoundingBox{ INT16_MAX, INT16_MIN, INT16_MIN, INT16_MAX };
+  fixed_t x = 0, y = 0;
+  fixed_t dx = 0, dy = 0;
+
+  std::array<fixed_t, 4> leftBoundingBox{ INT32_MAX, INT32_MIN, INT32_MIN, INT32_MAX };
+  std::array<fixed_t, 4> rightBoundingBox{ INT32_MAX, INT32_MIN, INT32_MIN, INT32_MAX };
+
   int16_t leftChild = -1, rightChild = -1;
 
   template<typename Writer> void serialize(Writer &w) const
@@ -326,7 +352,6 @@ struct BspNode
     r.ReadRaw(rightChild);
   }
 };
-
 
 
 struct SubSector

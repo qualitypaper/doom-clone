@@ -2,34 +2,34 @@
 
 #include "config.h"
 #include "math_utils.h"
+#include "renderer/game/renderer_helper.h"
 
-#include <format>
 #include <iostream>
 #include <queue>
 
-void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const
+void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fixed_t, 4> &boundingBox) const
 {
   for (const auto &seg : segs) {
-    const Vertex start = math_utils::fromCenterCoordinates(
-      vertices[seg.startVertex], config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
-    const Vertex end = math_utils::fromCenterCoordinates(
-      vertices[seg.endVertex], config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    const Vertex start =
+      vertices[seg.startVertex].fromCenterCoords(config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+    const Vertex end =
+      vertices[seg.endVertex].fromCenterCoords(config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
 
-    boundingBox[0] = std::min(boundingBox[0], static_cast<int16_t>(start.y));
-    boundingBox[0] = std::min(boundingBox[0], static_cast<int16_t>(end.y));
+    boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(start.y));
+    boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(end.y));
 
-    boundingBox[1] = std::max(boundingBox[1], static_cast<int16_t>(start.x));
-    boundingBox[1] = std::max(boundingBox[1], static_cast<int16_t>(end.x));
+    boundingBox[1] = std::max(boundingBox[1], static_cast<fixed_t>(start.x));
+    boundingBox[1] = std::max(boundingBox[1], static_cast<fixed_t>(end.x));
 
-    boundingBox[2] = std::max(boundingBox[2], static_cast<int16_t>(start.y));
-    boundingBox[2] = std::max(boundingBox[2], static_cast<int16_t>(end.y));
+    boundingBox[2] = std::max(boundingBox[2], static_cast<fixed_t>(start.y));
+    boundingBox[2] = std::max(boundingBox[2], static_cast<fixed_t>(end.y));
 
-    boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(start.x));
-    boundingBox[3] = std::min(boundingBox[3], static_cast<int16_t>(end.x));
+    boundingBox[3] = std::min(boundingBox[3], static_cast<fixed_t>(start.x));
+    boundingBox[3] = std::min(boundingBox[3], static_cast<fixed_t>(end.x));
   }
 }
 
-BspNode::BspNode(const int16_t _x, const int16_t _y, const int16_t _dx, const int16_t _dy)
+BspNode::BspNode(const fixed_t _x, const fixed_t _y, const fixed_t _dx, const fixed_t _dy)
   : x(_x), y(_y), dx(_dx), dy(_dy)
 {}
 
@@ -41,18 +41,21 @@ BSPBuilder::BSPBuilder(std::vector<Vertex> _vertices, std::vector<LineDef> _line
 
 void BSPBuilder::BuildBSPTree()
 {
-  std::vector<Seg> segments;
-  segments.reserve(linedefs.size());
+  std::vector<Seg> _segments;
+  _segments.reserve(linedefs.size());
 
   for (size_t i = 0; i < linedefs.size(); i++) {
     auto &ld = linedefs[i];
-    segments.emplace_back(ld.start, ld.end, 0, static_cast<int16_t>(i), 0, 0);
+
+    angle_t angle = GetLineAngle(ld);
+
+    _segments.emplace_back(ld.start, ld.end, angle, static_cast<int16_t>(i), 0, 0);
     if (ld.backSidedef != -1) {
-      segments.emplace_back(ld.end, ld.start, 0, static_cast<int16_t>(i), 1, 0);
+      _segments.emplace_back(ld.end, ld.start, angle, static_cast<int16_t>(i), 1, 0);
     }
   }
 
-  BuildBSPTree(segments);
+  BuildBSPTree(_segments);
 }
 
 
@@ -81,7 +84,7 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
         continue;
 
       const std::pair<double, double> sol =
-        math_utils::findLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
+        math_utils::FindLinesIntersection(splitterStart, splitterDirection, segStart, segDirection);
       const Vertex intersection = segStart + segDirection * sol.second;
       vertices.emplace_back(intersection);
 
@@ -175,15 +178,15 @@ int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 
 uint32_t BSPBuilder::SelectSplittingLine(const std::vector<Seg> &segs) const
 {
-  int maxX = std::numeric_limits<int>::min();
-  int maxY = std::numeric_limits<int>::min();
-  int minX = std::numeric_limits<int>::max();
-  int minY = std::numeric_limits<int>::max();
+  fixed_t maxX = std::numeric_limits<int>::min();
+  fixed_t maxY = std::numeric_limits<int>::min();
+  fixed_t minX = std::numeric_limits<int>::max();
+  fixed_t minY = std::numeric_limits<int>::max();
 
   // creating a bounding box for segments
   for (const auto &seg : segs) {
-    int x1 = vertices[seg.startVertex].x;
-    int y1 = vertices[seg.endVertex].y;
+    fixed_t x1 = vertices[seg.startVertex].x;
+    fixed_t y1 = vertices[seg.endVertex].y;
 
     maxX = std::max(maxX, x1);
     maxY = std::max(maxY, y1);
@@ -223,9 +226,8 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
   // cross product -> positive = left, negative = right, zero = collinear
   const Vertex splitterDirection = vertices[splitter.endVertex] - startSplitterVertex;
 
-  const int32_t startCross =
-    math_utils::crossProductLengthNDir(splitterDirection, startSegVertex - startSplitterVertex);
-  const int32_t endCross = math_utils::crossProductLengthNDir(splitterDirection, endSegVertex - startSplitterVertex);
+  const fixed_t startCross = splitterDirection.cross(startSegVertex - startSplitterVertex);
+  const fixed_t endCross = splitterDirection.cross(endSegVertex - startSplitterVertex);
 
   if (startCross == 0 && endCross == 0) {
     // collinear
@@ -244,16 +246,17 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
     // Check if they actually intersect
     const Vertex segDirection = endSegVertex - startSegVertex;
 
-    const std::pair<double, double> sol =
-      math_utils::findLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
+    const std::pair<fixed_t, fixed_t> sol =
+      math_utils::FindLinesIntersection(startSplitterVertex, splitterDirection, startSegVertex, segDirection);
+
     // If intersection parameter is strictly between 0 and 1 for segment to be splitted, the segments are spanning
-    if (sol.second > 0 && sol.second < 1) {
+    if (sol.second > 0 && (sol.second >> (FRAC_BITS - 1)) < 1) {
       return SegmentPosition::SPANNING;
     }
 
     // Intersection falls outside the segment — classify by whichever endpoint
     // is farther from the splitter line (larger absolute cross product).
-    const int32_t dominant = (std::abs(startCross) >= std::abs(endCross)) ? startCross : endCross;
+    const fixed_t dominant = (std::abs(startCross) >= std::abs(endCross)) ? startCross : endCross;
     return (dominant <= 0) ? SegmentPosition::FRONT : SegmentPosition::BACK;
   }
 
@@ -310,12 +313,19 @@ bool BSPBuilder::IsConvex(const std::vector<Seg> &segs) const
 
   return true;
 }
+angle_t BSPBuilder::GetLineAngle(const LineDef &ld) const
+{
+  const Vertex &start = vertices[ld.start];
+  const Vertex &end = vertices[ld.end];
+
+  return PointToAngle2(start.x, start.y, end.x, end.y);
+}
 
 /**
-* object becomes invalid to use after calling this method
-* @returns a unique pointer to a newly constructed BspLevel object, 
-* all the parameters are being initilaized through std::move calls
-*/
+ * object becomes invalid to use after calling this method
+ * @returns a unique pointer to a newly constructed BspLevel object,
+ * all the parameters are being initilaized through std::move calls
+ */
 std::unique_ptr<BspLevel> BSPBuilder::TakeConstructedLevel()
 {
   return std::make_unique<BspLevel>(

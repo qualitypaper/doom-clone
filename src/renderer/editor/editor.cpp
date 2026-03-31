@@ -1,9 +1,9 @@
 #include "editor.h"
 
 #include "commands.h"
+#include "core/gameloop.h"
 #include "editor_input_handler.h"
 #include "editor_renderer.h"
-#include "gameloop.h"
 #include "math_utils.h"
 
 #include <algorithm>
@@ -21,11 +21,13 @@ AABB::AABB(const Vertex start, const Vertex end)
   this->maxY = std::max(start.y, end.y);
   this->minY = std::min(start.y, end.y);
 }
+
 void DraggableObject::drag(uint32_t objectId, EditorState *state, CommandHistory *history)
 {
   this->dragged = true;
   state->dragged.emplace(objectId);
 }
+
 void DraggableObject::resetDraggableState(EditorState *state)
 {
   for (const uint32_t id : state->dragged) {
@@ -156,8 +158,8 @@ EditorState::EditorState(Level &_level,
   for (size_t i = 0; i < _level.vertices.size(); ++i) {
     const Vertex *v = &_level.vertices[i];
 
-    const auto [x, y] = math_utils::fromCenterCoordinates(*v, _width, _height);
-    editorVertices.emplace_back(x, y);
+    const Vertex centered = v->fromCenterCoords(width, height);
+    editorVertices.emplace_back(centered);
     vertexIdxMap[v] = editorVertices.size() - 1;
   }
 
@@ -174,11 +176,12 @@ EditorState::EditorState(Level &_level,
 
   // process linedefs
   for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
-    editorLinedefs.emplace_back(makeObjectId(EditorObjectType::VERTEX, vertexIdxMap[start]),
-      makeObjectId(EditorObjectType::VERTEX, vertexIdxMap[end]),
+
+    editorLinedefs.emplace_back(makeObjectId(EditorObjectType::VERTEX, start - _level.vertices.data()),
+      makeObjectId(EditorObjectType::VERTEX, end - _level.vertices.data()),
       type,
-      frontSidedef - _level.sidedefs.data(),
-      backSidedef - _level.sidedefs.data());
+      !frontSidedef ? -1 : frontSidedef - _level.sidedefs.data(),
+      !backSidedef ? -1 : backSidedef - _level.sidedefs.data());
 
 
     editorVertices[vertexIdxMap[start]].connectedLineDefs.emplace_back(
@@ -310,7 +313,7 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
   this->updateAABB(sectorId);
 }
 
-void Editor::addVertex(const int32_t x, const int32_t y) const
+void Editor::addVertex(const double x, const double y) const
 {
   const EditorVertex temp{ x, y };
   // const ImVec2 newVertex = transformVertex(temp);
@@ -390,17 +393,17 @@ ImVec2 Editor::UntransformVertex(ImVec2 transformed) const
  */
 void Editor::TransformVertices() const
 {
-  static float prevZoom = -1;
-  static size_t undoStackSize = 0;
-  static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
-
+  // static float prevZoom = -1;
+  // static size_t undoStackSize = 0;
+  // static ImVec2 draggingOffset = { 0, 0 }, scrollingOffset = { 0, 0 };
+  //
   // TODO: trigger transformVertices only when one of these parameters change, currently it is called on each frame, but
   // it should be optimized
 
-  prevZoom = state->canvasZoom;
-  draggingOffset = state->draggingOffset;
-  scrollingOffset = state->scrollingOffset;
-  undoStackSize = m_history->undoStack.size();
+  // prevZoom = state->canvasZoom;
+  // draggingOffset = state->draggingOffset;
+  // scrollingOffset = state->scrollingOffset;
+  // undoStackSize = m_history->undoStack.size();
 
   const std::vector<EditorVertex> &vertices = state->level->vertices;
 

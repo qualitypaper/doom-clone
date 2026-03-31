@@ -1,8 +1,5 @@
 #pragma once
 
-#include "defs.h"
-
-
 #include <cstdint>
 
 namespace config {

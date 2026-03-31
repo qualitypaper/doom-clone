@@ -1,11 +1,13 @@
 #include "renderer.h"
 
-#include "bsp.h"
 #include "config.h"
-#include "framebuffer.h"
-#include "gameloop.h"
 #include "math_utils.h"
+#include "renderer_helper.h"
 #include "tables.h"
+
+#include "bsp/bsp.h"
+#include "core/gameloop.h"
+#include "core/framebuffer.h"
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -16,16 +18,6 @@ static constexpr int16_t HEIGHT_UNIT = 1 << HEIGHT_BITS;
 
 static double_t FOCAL_LENGTH;
 
-static void InitTanToAngle()
-{
-  for (uint32_t i = 0; i <= tantoangle.size(); i++) {
-    const double tan = static_cast<double>(i) / tantoangle.size();
-    const double angle = std::atan(tan) * (180.0 / M_PI);
-
-    tantoangle[i] = static_cast<angle_t>(angle * (ANG90 / 90.0));
-  }
-}
-
 static void InitViewAngleToX()
 {
   for (uint32_t i = 0; i < viewangletox.size(); i++) {
@@ -35,104 +27,6 @@ static void InitViewAngleToX()
     viewangletox[i] = static_cast<int16_t>(x);
   }
 }
-
-static void InitFineSine()
-{
-  for (uint32_t i = 0; i < finesine.size(); i++) {
-    const double_t angle = (static_cast<double_t>(i) / finesine.size()) * (M_PI * 2);
-
-    finesine[i] = std::sin(angle);
-  }
-}
-
-static void InitFineTan()
-{
-  for (uint32_t i = 0; i < finetangent.size(); i++) {
-    const double_t angle = (static_cast<double_t>(i) / finetangent.size()) * M_PI * 2;
-
-    finetangent[i] = std::tan(angle);
-  }
-}
-
-static uint32_t SlopeDiv(const uint32_t num, const uint32_t den)
-{
-  uint32_t result;
-  if (den > num) {
-    uint32_t quotient = den / num;
-    const uint32_t remainder = den % num;
-    if (remainder >= num / 2) {
-      quotient++;
-    }
-    result = quotient;
-  } else {
-    result = 0xFFFFFFFF;
-  }
-  return result;
-}
-
-static uint32_t PointToAngle(int32_t x, int32_t y, const int32_t playerX, const int32_t playerY)
-{
-  x -= playerX;
-  y -= playerY;
-
-  if (!x && !y) {
-    return 0;
-  }
-
-  if (x >= 0) {
-    if (y >= 0) {
-      if (x > y) {
-        return tantoangle[SlopeDiv(y, x)];
-      } else {
-        return ANG90 - 1 - tantoangle[SlopeDiv(x, y)];
-      }
-    } else {
-      y = -y;
-      if (x > y) {
-        return -tantoangle[SlopeDiv(y, x)];
-      } else {
-        return ANG270 + tantoangle[SlopeDiv(x, y)];
-      }
-    }
-  } else {
-    x = -x;
-    if (y >= 0) {
-      if (x > y) {
-        return ANG180 - 1 - tantoangle[SlopeDiv(y, x)];
-      } else {
-        return ANG90 + tantoangle[SlopeDiv(x, y)];
-      }
-    } else {
-      y = -y;
-      if (x > y) {
-        return ANG180 + tantoangle[SlopeDiv(y, x)];
-      } else {
-        return ANG270 - 1 - tantoangle[SlopeDiv(x, y)];
-      }
-    }
-  }
-
-  return 0;
-}
-
-static uint32_t PointToDist(const int16_t x, const int16_t y, const Player &player)
-{
-  int32_t dx = std::abs(player.x - x);
-  int32_t dy = std::abs(player.y - y);
-
-  if (dy > dx) {
-    std::swap(dx, dy);
-  }
-
-  if (dx == 0)
-    return 0;
-
-  const angle_t angle = (tantoangle[(dy << 11) / dx] + ANG90) >> ANGLE_TO_FINE_SHIFT;
-
-  // uses cosine
-  return dx / finesine[angle];
-}
-
 static float_t ScaleFromGlobalAngle(angle_t angle) {}
 
 static constexpr uint32_t MapColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t alpha)
@@ -146,21 +40,20 @@ Renderer::Renderer(FrameBuffer &_fb,
   const uint16_t canvasHeight)
   : m_fb(_fb), m_level(std::move(_level)), m_canvasWidth(canvasWidth), m_canvasHeight(canvasHeight)
 {
-  m_ceilingClipping.resize(canvasWidth);
-  m_floorClipping.resize(canvasWidth);
+  m_ceilclip.resize(canvasWidth);
+  m_floorclip.resize(canvasWidth);
   m_visplanes.reserve(MAX_VISPLANES);
   m_solidsegs.resize(MAX_SEGMENTS);
 
   FOCAL_LENGTH = (canvasWidth / 2.0) / finetangent[FINE_ANGLES / 4 + HALF_FOV >> ANGLE_TO_FINE_SHIFT];
 
-  InitTanToAngle();
   InitViewAngleToX();
 }
 
 void Renderer::ResetClippingArrays()
 {
-  std::ranges::fill(m_ceilingClipping, 0);
-  std::ranges::fill(m_floorClipping, m_canvasHeight - 1);
+  std::ranges::fill(m_ceilclip, 0);
+  std::ranges::fill(m_floorclip, m_canvasHeight - 1);
   std::ranges::fill(m_solidsegs, ClipRange{});
   std::ranges::fill(m_visplanes, Visplane{});
 }
@@ -202,14 +95,14 @@ void Renderer::DrawSolidWall(const int32_t x,
   const int32_t projectedFloorZ,
   const uint32_t color)
 {
-  const int32_t drawTop = std::max(projectedCeilingZ, m_ceilingClipping[x]);
-  const int32_t drawBottom = std::min(projectedFloorZ, m_floorClipping[x]);
+  const int32_t drawTop = std::max(projectedCeilingZ, m_ceilclip[x]);
+  const int32_t drawBottom = std::min(projectedFloorZ, m_floorclip[x]);
 
   if (drawTop <= drawBottom) {
     DrawColumn(x, drawTop, drawBottom, color);
 
-    m_ceilingClipping[x] = drawBottom;
-    m_floorClipping[x] = drawTop;
+    m_ceilclip[x] = drawBottom;
+    m_floorclip[x] = drawTop;
   }
 }
 
@@ -420,16 +313,16 @@ void Renderer::RenderSegLoop(const seg_t *seg, int16_t topStep, int16_t topFrac,
   for (int16_t x = m_rwx; x <= m_rw_stopx; x++) {
     int16_t yl = topFrac;
 
-    if (yl < m_ceilingClipping[x] + 1) {
-      yl = m_ceilingClipping[x] + 1;
+    if (yl < m_ceilclip[x] + 1) {
+      yl = m_ceilclip[x] + 1;
     }
 
     // mark ceiling
-    top = m_ceilingClipping[x] + 1;
+    top = m_ceilclip[x] + 1;
     bottom = yl - 1;
 
-    if (bottom >= m_floorClipping[x]) {
-      bottom = m_floorClipping[x] - 1;
+    if (bottom >= m_floorclip[x]) {
+      bottom = m_floorclip[x] - 1;
     }
 
     if (top <= bottom) {
@@ -440,16 +333,16 @@ void Renderer::RenderSegLoop(const seg_t *seg, int16_t topStep, int16_t topFrac,
 
     int16_t yh = bottomFrac;
 
-    if (yh >= m_floorClipping[x]) {
-      yh = m_floorClipping[x] - 1;
+    if (yh >= m_floorclip[x]) {
+      yh = m_floorclip[x] - 1;
     }
 
     // mark floor
     top = yh + 1;
-    bottom = m_floorClipping[x] - 1;
+    bottom = m_floorclip[x] - 1;
 
-    if (top <= m_ceilingClipping[x]) {
-      top = m_ceilingClipping[x] + 1;
+    if (top <= m_ceilclip[x]) {
+      top = m_ceilclip[x] + 1;
     }
 
     if (top <= bottom) {
@@ -550,7 +443,7 @@ void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex
   }
 
   const BspNode &node = m_level->nodes[nodeIndex];
-  const bool side = PointOnSide(gameState.playerState, node);
+  const bool side = PointOnSide({gameState.playerState.x, gameState.playerState.y}, node);
 
   if (side) {
     RenderBSPNode(gameState, node.leftChild);
@@ -582,27 +475,27 @@ void Renderer::DrawDefaultPortal(const int32_t x,
 {
   // Render upper wall only if the neighbor ceiling is lower
   if (nextCeilY > projectedCeilingY) {
-    const int32_t upperWallBottom = std::max(projectedCeilingY, m_ceilingClipping[x]);
-    const int32_t upperWallTop = std::min(nextCeilY, m_floorClipping[x]);
+    const int32_t upperWallBottom = std::max(projectedCeilingY, m_ceilclip[x]);
+    const int32_t upperWallTop = std::min(nextCeilY, m_floorclip[x]);
 
     if (upperWallBottom < upperWallTop) {
       this->DrawColumn(x, upperWallBottom, upperWallTop, MapColor(0, 255, 0, 255));
-      m_ceilingClipping[x] = upperWallTop;
+      m_ceilclip[x] = upperWallTop;
     } else {
-      m_ceilingClipping[x] = upperWallBottom;
+      m_ceilclip[x] = upperWallBottom;
     }
   }
 
   // Render lower wall only when the neighbor floor is higher
   if (nextFloorY < projectedFloorY) {
-    const int32_t lowerWallBottom = std::max(nextFloorY, m_ceilingClipping[x]);// Start at neighbor's floor
-    const int32_t lowerWallTop = std::min(projectedFloorY, m_floorClipping[x]);
+    const int32_t lowerWallBottom = std::max(nextFloorY, m_ceilclip[x]);// Start at neighbor's floor
+    const int32_t lowerWallTop = std::min(projectedFloorY, m_floorclip[x]);
 
     if (lowerWallBottom < lowerWallTop) {
       this->DrawColumn(x, lowerWallBottom, lowerWallTop, MapColor(0, 255, 0, 255));
-      m_floorClipping[x] = lowerWallBottom;
+      m_floorclip[x] = lowerWallBottom;
     } else {
-      m_floorClipping[x] = lowerWallTop;
+      m_floorclip[x] = lowerWallTop;
     }
   }
 }

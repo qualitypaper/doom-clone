@@ -1,14 +1,14 @@
-#include "bsp.h"
+#include "bsp/bsp.h"
 #include "config.h"
-#include "editor.h"
-#include "editor_renderer.h"
-#include "framebuffer.h"
-#include "gameloop.h"
-#include "renderer.h"
-#include "simulation.h"
+#include "core/framebuffer.h"
+#include "core/gameloop.h"
+#include "core/simulation.h"
+#include "renderer/editor/editor.h"
+#include "renderer/editor/editor_renderer.h"
+#include "renderer/game/renderer.h"
 
-#include "imgui.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui/backends/imgui_impl_sdl2.h"
+#include "imgui/imgui.h"
 
 #include <SDL.h>
 #include <SDL_events.h>
@@ -30,13 +30,13 @@ bool running;
 static std::vector<Vertex> vertices = {
   // Sector 0 (The Starting Room)
   Vertex(0, 0),// 0
-  Vertex(50, 0),// 1
-  Vertex(50, 50),// 2
-  Vertex(0, 50),// 3
+  Vertex(50 << FRAC_BITS, 0),// 1
+  Vertex(50 << FRAC_BITS, 50 << FRAC_BITS),// 2
+  Vertex(0, 50 << FRAC_BITS),// 3
 
   // Sector 1 (The Connected Hallway - shares 1 and 2 with Sector 0)
-  Vertex(100, 0),// 4
-  Vertex(100, 50)// 5
+  Vertex(100 << FRAC_BITS, 0),// 4
+  Vertex(100 << FRAC_BITS, 50 << FRAC_BITS)// 5
 };
 
 // ==========================================
@@ -108,11 +108,11 @@ int main(int argc, char *argv[])
   size_t numOfLevels;
 
   if (true) {
-    Level tempLevel;
+    std::unique_ptr<Level> tempLevel = std::make_unique<Level>();
     std::array<char8_t, 8> levelName = MakeLevelName(1);
-    tempLevel.name = levelName;
+    tempLevel->name = levelName;
     numOfLevels = EditorLevel::Load(tempLevel);
-    level = std::make_shared<Level>(tempLevel);
+    level = std::move(tempLevel);
   } else {
     numOfLevels = 1;
     level = std::make_shared<Level>();

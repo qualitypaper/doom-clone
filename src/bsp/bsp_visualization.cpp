@@ -1,8 +1,7 @@
 #include "bsp.h"
-#include "editor_renderer.h"
 #include "math_utils.h"
-
-#include <imgui.h>
+#include "imgui/imgui.h"
+#include "renderer/editor/editor_renderer.h"
 
 void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root)
 {
@@ -77,7 +76,6 @@ void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const 
 {
   static size_t s_nodesIndex = 0;
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
   SDL_RenderClear(sdlWindow.getRenderer());
 
   DrawSubsectors(sdlWindow, level);

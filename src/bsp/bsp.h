@@ -1,8 +1,7 @@
 #pragma once
 #include "defs.h"
-#include "gameloop.h"
-#include "serialization.h"
-#include "tables.h"
+#include "core/gameloop.h"
+#include "core/serialization.h"
 
 #include <array>
 #include <fstream>
@@ -10,12 +9,12 @@
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 
-
 inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
 {
   return outs << "BSPNode{ Coords: (" << node.x << ", " << node.y << ", " << node.dx << ", " << node.dy
               << "), Children: (" << node.leftChild << "," << node.rightChild << ")";
 }
+
 struct SplitResult
 {
   BspNode node;
@@ -51,8 +50,9 @@ private:
   [[nodiscard]] uint32_t EvaluateSplitter(size_t splitterIndex, const std::vector<Seg> &segs) const;
   [[nodiscard]] SegmentPosition DetermineSegmentPosition(const Seg &splitter, const Seg &seg) const;
   [[nodiscard]] bool IsConvex(const std::vector<Seg> &segs) const;
+  [[nodiscard]] angle_t GetLineAngle(const LineDef &ld) const;
 
-  void AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<int16_t, 4> &boundingBox) const;
+  void AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fixed_t, 4> &boundingBox) const;
 
   [[nodiscard]] size_t MaxDepth() const;
   [[nodiscard]] size_t MaxDepthRecursive(int16_t currentIndex) const;

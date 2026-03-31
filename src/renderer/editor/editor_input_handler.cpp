@@ -1,7 +1,7 @@
 #include "editor_input_handler.h"
+#include "../../imgui/imgui.h"
+#include "../../imgui/imgui_internal.h"
 #include "commands.h"
-#include "imgui.h"
-#include "imgui_internal.h"
 #include "math_utils.h"
 
 #include <algorithm>

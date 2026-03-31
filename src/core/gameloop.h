@@ -1,6 +1,6 @@
 #pragma once
 
-#include "defs.h"
+#include "../../include/defs.h"
 #include "sdl_window.h"
 
 #include <array>
@@ -11,8 +11,8 @@
  X, Y - horizontal planes, X - east-west, Y - north-south
  Z - vertical plane,
 */
-std::array<int16_t, FINE_ANGLES/2> viewangletox;
-std::array<int16_t, config::CANVAS_WIDTH + 1> xtoviewangle;
+extern std::array<fixed_t, FINE_ANGLES/2> viewangletox;
+extern std::array<fixed_t, config::CANVAS_WIDTH + 1> xtoviewangle;
 
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
 

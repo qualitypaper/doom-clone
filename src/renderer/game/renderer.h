@@ -1,9 +1,9 @@
 #pragma once
 
-#include "bsp.h"
-#include "gameloop.h"
-#include "math_utils.h"
-#include "tables.h"
+#include "../../../include/math_utils.h"
+#include "../../../include/tables.h"
+#include "../../bsp/bsp.h"
+#include "../../core/gameloop.h"
 
 #include <vector>
 
@@ -42,24 +42,25 @@ private:
   void ClipSolidWall(int16_t start, int16_t end, const seg_t *seg, const side_t *sidedef, const Player &player);
   void ClipPassWall(int16_t start, int16_t end, const seg_t *seg, const side_t *side, const Player &player);
 
-  template<HasXY T> static bool PointOnSide(T v, const BspNode &node)
+  static bool PointOnSide(Vertex v, const BspNode &node)
   {
     // Calculate vector from the partition line's origin to the player
-    const double_t dx = v.x - node.x;
-    const double_t dy = v.y - node.y;
+    const fixed_t dx = v.x - node.x;
+    const fixed_t dy = v.y - node.y;
 
     // 2D Cross Product
-    const double_t leftSide = (node.dx * dy) - (node.dy * dx);
+    const fixed_t left = FixedMul(node.dy >> FRAC_BITS, dx);
+    const fixed_t right = FixedMul(dy, node.dx >> FRAC_BITS);
 
-    return leftSide > 0;
+    return left < right;
   }
 
   [[nodiscard]] int16_t ProjectZ(double_t z, double_t inv_y) const;
   [[nodiscard]] int16_t ProjectX(double_t x, double_t inv_y) const;
 
 private:
-  std::vector<int32_t> m_floorClipping;
-  std::vector<int32_t> m_ceilingClipping;
+  std::vector<int32_t> m_floorclip;
+  std::vector<int32_t> m_ceilclip;
   std::vector<ClipRange> m_solidsegs;
   std::vector<Visplane> m_visplanes;
 
@@ -67,11 +68,11 @@ private:
 
   angle_t m_rw_normalangle;
   angle_t m_rw_angle1;
-  float_t m_rw_distance;
-  float_t m_rw_scale;
-  float_t m_rw_scaleStep;
-  int16_t m_rwx;
-  int16_t m_rw_stopx;
+  fixed_t m_rw_distance;
+  fixed_t m_rw_scale;
+  fixed_t m_rw_scaleStep;
+  int m_rwx;
+  int m_rw_stopx;
 
   FrameBuffer &m_fb;
   std::shared_ptr<Level> m_level;

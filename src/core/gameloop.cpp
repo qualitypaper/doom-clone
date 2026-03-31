@@ -1,11 +1,15 @@
 #include "gameloop.h"
-#include "bsp.h"
+#include "../bsp/bsp.h"
 #include "config.h"
 #include "sdl_window.h"
 
 #include <SDL_mouse.h>
 #include <SDL_stdinc.h>
 #include <SDL_video.h>
+
+std::array<fixed_t, FINE_ANGLES / 2> viewangletox{};
+std::array<fixed_t, config::CANVAS_WIDTH + 1> xtoviewangle{};
+
 
 struct InputState;
 

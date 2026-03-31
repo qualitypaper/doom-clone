@@ -1,9 +1,9 @@
 #include "math_utils.h"
 
-#include "bsp.h"
+#include "bsp/bsp.h"
 #include "config.h"
+#include "core/serialization.h"
 #include "editor.h"
-#include "serialization.h"
 
 #include "ranges"
 #include <cstring>
@@ -210,9 +210,10 @@ void EditorLevel::Save(const std::array<char8_t, 8> _name,
   }
 
   // run bsp algorithm before saving
-  auto nativeVertices = vertices | std::views::transform([width, height](const auto &v) {
-    const auto vec = math_utils::toCenterCoordinates(v, width, height);
-    return Vertex(vec.x, vec.y);
+  auto nativeVertices = vertices | std::views::transform([width, height](const auto &ev) {
+    const Vertex v{ DoubleToFixed(ev.x), DoubleToFixed(ev.y) };
+
+    return v.toCenterCoords(width, height);
   }) | std::ranges::to<std::vector<Vertex>>();
 
   auto nativeLinedefs = linedefs | std::views::transform([](const auto &ld) {
@@ -314,11 +315,6 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
       getObjectIndex(ld.start), getObjectIndex(ld.end), ld.type, ld.frontSideDef, ld.backSideDef);
   }
 
-  for (auto &sd : sidedefs) {
-    level.sidedefs.emplace_back(
-      sd.sectorId, sd.xOffset, sd.yOffset, sd.upperWallTexture, sd.middleWallTexture, sd.bottomWallTexture);
-  }
-
   for (auto &sector : sectors) {
     level.sectors.emplace_back(sector.floorHeight,
       sector.ceilingHeight,
@@ -329,6 +325,15 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
       sector.tag,
       sector.color);
   }
+
+  for (auto &sd : sidedefs) {
+    level.sidedefs.emplace_back(&level.sectors[sd.sectorId],
+      sd.xOffset,
+      sd.yOffset,
+      sd.upperWallTexture,
+      sd.middleWallTexture,
+      sd.bottomWallTexture);
+  }
 }
 
 /**
@@ -336,7 +341,7 @@ void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t
  * @param level an uninitialized level object with its name for look up
  * @return number of levels in the file
  */
-size_t EditorLevel::Load(Level &level)
+size_t EditorLevel::Load(std::unique_ptr<Level> &level)
 {
   FileReader fr(config::SAVED_LEVEL_PATH);
 
@@ -346,7 +351,7 @@ size_t EditorLevel::Load(Level &level)
   uint32_t offset = UINT32_MAX;
 
   for (const auto &entry : directory) {
-    if (entry.name == level.name) {
+    if (entry.name == level->name) {
       offset = entry.offset;
     }
   }
@@ -356,7 +361,7 @@ size_t EditorLevel::Load(Level &level)
 
   fr.SetPos(offset);
 
-  level.Load(fr);
+  level->Load(fr);
 
   return _header.numDirectories;
 }
