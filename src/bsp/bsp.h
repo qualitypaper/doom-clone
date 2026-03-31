@@ -9,7 +9,7 @@
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 
-inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
+inline std::ostream &operator<<(std::ostream &outs, const Node &node)
 {
   return outs << "BSPNode{ Coords: (" << node.x << ", " << node.y << ", " << node.dx << ", " << node.dy
               << "), Children: (" << node.leftChild << "," << node.rightChild << ")";
@@ -17,7 +17,7 @@ inline std::ostream &operator<<(std::ostream &outs, const BspNode &node)
 
 struct SplitResult
 {
-  BspNode node;
+  Node node;
   std::vector<Seg> front;
   std::vector<Seg> back;
 };
@@ -27,7 +27,7 @@ struct BspLevel
   std::vector<Vertex> vertices;
   std::vector<LineDef> linedefs;
 
-  std::vector<BspNode> nodes;
+  std::vector<Node> nodes;
   std::vector<SubSector> subsectors;
   std::vector<Seg> segments;
 };
@@ -38,7 +38,7 @@ private:
   std::vector<Vertex> vertices;
   std::vector<LineDef> linedefs;
 
-  std::vector<BspNode> nodes;
+  std::vector<Node> nodes;
   std::vector<SubSector> subsectors;
   std::vector<Seg> segments;
 
@@ -62,8 +62,9 @@ private:
 
 private:
   static void DrawSubsectors(const SdlWindow &sdlWindow, const Level &level);
-  static void DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root);
-  static void DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &root);
+  static void DrawBoundingBox(const SdlWindow &sdlWindow, std::array<fixed_t, 4> boundingBox, int r, int g, int b, int a);
+  static void DrawBoundingBoxes(const SdlWindow &sdlWindow, const Node &root);
+  static void DrawSplittingLine(const SdlWindow &sdlWindow, const Node &root);
 
 public:
   explicit BSPBuilder(std::vector<Vertex> _vertices, std::vector<LineDef> _linedefs);

@@ -7,10 +7,6 @@
 #include <SDL_stdinc.h>
 #include <SDL_video.h>
 
-std::array<fixed_t, FINE_ANGLES / 2> viewangletox{};
-std::array<fixed_t, config::CANVAS_WIDTH + 1> xtoviewangle{};
-
-
 struct InputState;
 
 void HandleMouseMovement(const SDL_Event &event, InputState &input)
@@ -72,19 +68,19 @@ void Level::Load(FileReader &fr)
     throw std::runtime_error("Failed to open file for loading.");
   }
 
-  std::vector<LineDef> linedefs;
-  std::vector<SideDef> sidedefs;
+  std::vector<LineDef> _linedefs;
+  std::vector<SideDef> _sidedefs;
   std::vector<Seg> segs;
 
-  fr.ReadVector(linedefs);
-  fr.ReadVector(sidedefs);
+  fr.ReadVector(_linedefs);
+  fr.ReadVector(_sidedefs);
   fr.ReadVector(this->vertices);
   fr.ReadVector(segs);
   fr.ReadVector(this->subsectors);
   fr.ReadVector(this->nodes);
   fr.ReadVector(this->sectors);
 
-  Level::Init(*this, linedefs, sidedefs, segs);
+  Level::Init(*this, _linedefs, _sidedefs, segs);
 
   // adding sector into each subsector, for easier access during rendering
   for (auto &ssector : subsectors) {
@@ -106,7 +102,7 @@ void Level::Init(Level &level,
   level.sidedefs.reserve(_sides.size());
 
   for (const SideDef &side : _sides) {
-    level.sidedefs.emplace_back(&level.sectors[side.sectorId],
+    level.sidedefs.emplace_back(side.sectorId < 0 ? nullptr : &level.sectors[side.sectorId],
       side.xOffset,
       side.yOffset,
       side.upperWallTexture,

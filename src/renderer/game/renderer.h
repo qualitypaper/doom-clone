@@ -11,6 +11,9 @@ static constexpr int16_t NF_SUBSECTOR = 0x8000;
 static constexpr uint16_t MAX_VISPLANES = 128;
 static constexpr uint16_t MAX_SEGMENTS = 64;
 
+static const fixed_t FOCAL_LENGTH =
+  FixedDiv(config::CANVAS_WIDTH << (FRAC_BITS - 1), finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
+
 // Forward declaration
 class FrameBuffer;
 
@@ -22,13 +25,16 @@ public:
   void ResetClippingArrays();
 
 private:
+  void InitViewAngleToX();
+  void InitXToViewAngle();
+
   void DrawColumn(int32_t x, int32_t y0, int32_t y1, uint32_t color) const;
   void DrawSolidWall(int32_t x, int32_t projectedCeilingZ, int32_t projectedFloorZ, uint32_t color);
   void DrawDefaultPortal(int32_t x,
-    int32_t projectedFloorY,
-    int32_t projectedCeilingY,
-    int32_t nextFloorY,
-    int32_t nextCeilY);
+                         int32_t projectedFloorY,
+                         int32_t projectedCeilingY,
+                         int32_t nextFloorY,
+                         int32_t nextCeilY);
   Visplane *FindVisPlane(int16_t height, uint32_t color, int16_t lightLevel);
 
   void RenderVisPlanes();
@@ -42,7 +48,7 @@ private:
   void ClipSolidWall(int16_t start, int16_t end, const seg_t *seg, const side_t *sidedef, const Player &player);
   void ClipPassWall(int16_t start, int16_t end, const seg_t *seg, const side_t *side, const Player &player);
 
-  static bool PointOnSide(Vertex v, const BspNode &node)
+  static bool PointOnSide(const Vertex v, const Node &node)
   {
     // Calculate vector from the partition line's origin to the player
     const fixed_t dx = v.x - node.x;
@@ -63,6 +69,11 @@ private:
   std::vector<int32_t> m_ceilclip;
   std::vector<ClipRange> m_solidsegs;
   std::vector<Visplane> m_visplanes;
+
+  // maps a fine angle onto screen x
+  std::array<int, FINE_ANGLES / 2> m_viewangletox;
+  // maps a x into a fine angle
+  std::array<angle_t, config::CANVAS_WIDTH + 1> m_xtoviewangle;
 
   Visplane *m_ceilplane = nullptr, *m_floorplane = nullptr;
 

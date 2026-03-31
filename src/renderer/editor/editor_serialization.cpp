@@ -127,6 +127,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   int32_t targetLevelIndex = -1;
 
   if (fileExists) {
+    // extracting existing levels into memory
     FileReader fr(config::SAVED_LEVEL_PATH);
     fr.ReadRaw(_header);
 
@@ -145,6 +146,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   }
 
   std::vector<uint8_t> newLevelBuffer;
+  // serializing current level
   SerializeLevelToBuffer(bspLevel, newLevelBuffer);
 
   LevelData newLevelData;
@@ -158,7 +160,6 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
     allLevels[targetLevelIndex] = std::move(newLevelData);
   } else {
     allLevels.push_back(std::move(newLevelData));
-    targetLevelIndex = static_cast<int32_t>(allLevels.size() - 1);
   }
 
   FileWriter fw(config::SAVED_LEVEL_PATH, std::ios::binary | std::ios::trunc);
@@ -186,6 +187,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
     fw.WriteRaw(entry);
   }
 
+  // update header inf
   _header.numDirectories = static_cast<uint32_t>(finalEntries.size());
   _header.directoryOffset = static_cast<uint32_t>(directoryOffset);
 
@@ -284,56 +286,13 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
   // skip nodes
   size_t nodesSize = 0;
   fr.ReadRaw(nodesSize);
-  fr.Skip(nodesSize * sizeof(BspNode));
+  fr.Skip(nodesSize * sizeof(Node));
 
   // read sectors
   fr.ReadVector(sectors);
   std::cout << "Read sectors\n";
 
   std::cout << "Finished loading level from file.\n";
-}
-
-void EditorLevel::toGameLevel(Level &level, const uint16_t width, const uint16_t height) const
-{
-  level.vertices.clear();
-  level.linedefs.clear();
-  level.sidedefs.clear();
-  level.sectors.clear();
-
-  level.vertices.reserve(vertices.size());
-  level.linedefs.reserve(linedefs.size());
-  level.sidedefs.reserve(sidedefs.size());
-  level.sectors.reserve(sectors.size());
-
-  for (auto &v : vertices) {
-    EditorVertex res = math_utils::toCenterCoordinates(v, width, height);
-    level.vertices.emplace_back(res.x, res.y);
-  }
-
-  for (auto &ld : linedefs) {
-    level.linedefs.emplace_back(
-      getObjectIndex(ld.start), getObjectIndex(ld.end), ld.type, ld.frontSideDef, ld.backSideDef);
-  }
-
-  for (auto &sector : sectors) {
-    level.sectors.emplace_back(sector.floorHeight,
-      sector.ceilingHeight,
-      sector.floorTextureIndex,
-      sector.ceilingTextureIndex,
-      sector.specialType,
-      sector.lightLevel,
-      sector.tag,
-      sector.color);
-  }
-
-  for (auto &sd : sidedefs) {
-    level.sidedefs.emplace_back(&level.sectors[sd.sectorId],
-      sd.xOffset,
-      sd.yOffset,
-      sd.upperWallTexture,
-      sd.middleWallTexture,
-      sd.bottomWallTexture);
-  }
 }
 
 /**

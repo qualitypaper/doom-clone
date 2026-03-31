@@ -27,10 +27,10 @@ struct AABB
 {
   AABB() = default;
   AABB(Vertex start, Vertex end);
-  int16_t maxX, maxY;
-  int16_t minX, minY;
+  fixed_t maxX, maxY;
+  fixed_t minX, minY;
 
-  [[nodiscard]] bool contains(const int16_t x, const int16_t y) const
+  [[nodiscard]] bool contains(const fixed_t x, const fixed_t y) const
   {
     return x >= minX && x <= maxX && y >= minY && y <= maxY;
   }
@@ -42,14 +42,16 @@ struct header
   uint32_t numDirectories;
   uint32_t directoryOffset;
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     serialization::serialize(w, magicNumber);
     serialization::serialize(w, numDirectories);
     serialization::serialize(w, directoryOffset);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     serialization::deserialize(r, magicNumber);
     serialization::deserialize(r, numDirectories);
@@ -64,14 +66,16 @@ struct directoryEntry
   uint32_t size;
   std::array<char8_t, 8> name;
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     serialization::serialize(w, offset);
     serialization::serialize(w, size);
     serialization::serialize(w, name);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     serialization::deserialize(r, offset);
     serialization::deserialize(r, size);
@@ -133,10 +137,10 @@ struct EditorLineDef : public EditorObject
       frontSideDef(_linedef.frontSidedef), backSideDef(_linedef.backSidedef)
   {}
   EditorLineDef(const uint32_t _start,
-    const uint32_t _end,
-    const LineDefType _type,
-    const int16_t _frontSideDef,
-    const int16_t _backSideDef)
+                const uint32_t _end,
+                const LineDefType _type,
+                const int16_t _frontSideDef,
+                const int16_t _backSideDef)
     : EditorObject(EditorObjectType::LINEDEF), start(_start), end(_end), type(_type), frontSideDef(_frontSideDef),
       backSideDef(_backSideDef)
   {}
@@ -238,7 +242,8 @@ struct EditorSidedef : EditorObject
   int16_t bottomWallTexture = -1;
 
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     serialization::serialize(w, sectorId);
     serialization::serialize(w, upperWallTexture);
@@ -247,7 +252,8 @@ struct EditorSidedef : EditorObject
     serialization::serialize(w, DoubleToFixed(xOffset));
     serialization::serialize(w, DoubleToFixed(yOffset));
   }
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     serialization::deserialize(r, sectorId);
     serialization::deserialize(r, upperWallTexture);
@@ -266,19 +272,20 @@ struct EditorSidedef : EditorObject
 
 struct EditorSector : EditorObject
 {
-  EditorSector(const int16_t _floorHeight,
-    const int16_t _ceilingHeight,
-    const int16_t _specialType,
-    const int16_t _lightLevel,
-    const int16_t _tag,
-    const uint32_t _color = 0)
-    : EditorObject(EditorObjectType::SECTOR), floorHeight(_floorHeight), ceilingHeight(_ceilingHeight),
-      lightLevel(_lightLevel), specialType(_specialType), tag(_tag), color(_color)
+  EditorSector(const fixed_t _floorHeight,
+               const fixed_t _ceilingHeight,
+               const int16_t _specialType,
+               const int16_t _lightLevel,
+               const int16_t _tag,
+               const uint32_t _color = 0)
+    : EditorObject(EditorObjectType::SECTOR), floorHeight(FixedToDouble(_floorHeight)),
+      ceilingHeight(FixedToDouble(_ceilingHeight)), lightLevel(_lightLevel), specialType(_specialType), tag(_tag),
+      color(_color)
   {}
   EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
 
-  int16_t floorHeight = 0;
-  int16_t ceilingHeight = 0;
+  double floorHeight = 0;
+  double ceilingHeight = 0;
   int16_t floorTextureIndex = -1;
   int16_t ceilingTextureIndex = -1;
   int16_t lightLevel = 0;
@@ -288,10 +295,11 @@ struct EditorSector : EditorObject
   AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
-    serialization::serialize(w, floorHeight);
-    serialization::serialize(w, ceilingHeight);
+    serialization::serialize(w, DoubleToFixed(floorHeight));
+    serialization::serialize(w, DoubleToFixed(ceilingHeight));
     serialization::serialize(w, floorTextureIndex);
     serialization::serialize(w, ceilingTextureIndex);
     serialization::serialize(w, lightLevel);
@@ -300,10 +308,17 @@ struct EditorSector : EditorObject
     serialization::serialize(w, color);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
-    serialization::deserialize(r, floorHeight);
-    serialization::deserialize(r, ceilingHeight);
+    fixed_t floorHeightFixed, ceilHeightFixed;
+
+    serialization::deserialize(r, floorHeightFixed);
+    serialization::deserialize(r, ceilHeightFixed);
+
+    floorHeight = FixedToDouble(floorHeightFixed);
+    ceilingHeight = FixedToDouble(ceilHeightFixed);
+
     serialization::deserialize(r, floorTextureIndex);
     serialization::deserialize(r, ceilingTextureIndex);
     serialization::deserialize(r, lightLevel);
@@ -317,23 +332,23 @@ struct EditorLevel
 {
   EditorLevel() = default;
   EditorLevel(std::vector<EditorVertex> _vertices,
-    std::vector<EditorLineDef> _lines,
-    std::vector<EditorSector> _sectors,
-    std::vector<EditorSidedef> _sidedefs,
-    const size_t _levelNum,
-    const std::array<char8_t, 8> _name)
+              std::vector<EditorLineDef> _lines,
+              std::vector<EditorSector> _sectors,
+              std::vector<EditorSidedef> _sidedefs,
+              const size_t _levelNum,
+              const std::array<char8_t, 8> _name)
     : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)),
       sidedefs(std::move(_sidedefs)), levelNum(_levelNum), name(_name)
   {}
   explicit EditorLevel(const size_t _levelNum, const std::array<char8_t, 8> _name) : levelNum(_levelNum), name(_name) {}
+  EditorLevel(const Level &_level, uint16_t _levelNum, uint16_t _width, uint16_t _height_);
 
   void SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const;
   void SaveLevelToFile(std::array<char8_t, 8> _name,
-    uint16_t &numberOfLevels,
-    const std::unique_ptr<BspLevel> &bspLevel) const;
+                       uint16_t &numberOfLevels,
+                       const std::unique_ptr<BspLevel> &bspLevel) const;
   void Save(std::array<char8_t, 8> _name, uint16_t &numberOfLevels, uint16_t width, uint16_t height);
   void Load(uint16_t width, uint16_t height);
-  void toGameLevel(Level &level, uint16_t width, uint16_t height) const;
 
   static size_t Load(std::unique_ptr<Level> &level);
 
@@ -490,23 +505,26 @@ public:
   void changeLevel(uint16_t newLevelNum) const;
 
 
-  template<HasXY T> static constexpr T scale(const T &vec, const float scaleFactor)
+  template<HasXY T>
+  static constexpr T scale(const T &vec, const float scaleFactor)
   {
     return { decltype(vec.x)(scaleFactor * static_cast<float>(vec.x)),
-      decltype(vec.y)(scaleFactor * static_cast<float>(vec.y)) };
+             decltype(vec.y)(scaleFactor * static_cast<float>(vec.y)) };
   }
 
-  template<HasXY T> static constexpr T unscale(const T &vec, const float scaleFactor)
+  template<HasXY T>
+  static constexpr T unscale(const T &vec, const float scaleFactor)
   {
     assert(scaleFactor != 0);
 
     return { decltype(vec.x)(static_cast<float>(vec.x) / scaleFactor),
-      decltype(vec.y)(static_cast<float>(vec.y) / scaleFactor) };
+             decltype(vec.y)(static_cast<float>(vec.y) / scaleFactor) };
   }
 
   // zooms the vertex
   // if no zoom parameter is specified will default to state->canvasZoom
-  template<HasXY T> ImVec2 zoomVertex(const T &vertex, float zoom = -1) const
+  template<HasXY T>
+  ImVec2 zoomVertex(const T &vertex, float zoom = -1) const
   {
     if (zoom == -1) {
       zoom = state->canvasZoom;

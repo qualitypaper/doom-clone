@@ -11,7 +11,6 @@
 #include <limits>
 #include <memory>
 #include <ranges>
-#include <unordered_map>
 #include <vector>
 
 AABB::AABB(const Vertex start, const Vertex end)
@@ -40,8 +39,8 @@ void DraggableObject::resetDraggableState(EditorState *state)
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
 {
-  return std::ranges::any_of(
-    connectedLineDefs, [&](auto ldObjectId) { return state.findLinedef(getObjectIndex(ldObjectId)).selected; });
+  return std::ranges::any_of(connectedLineDefs,
+                             [&](auto ldObjectId) { return state.findLinedef(getObjectIndex(ldObjectId)).selected; });
 }
 
 void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
@@ -71,8 +70,8 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
 
     ld = lastLd;
   }
-  std::erase_if(
-    vStart.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+  std::erase_if(vStart.connectedLineDefs,
+                [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
   std::erase_if(vEnd.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
 
   state.level->linedefs.pop_back();
@@ -96,13 +95,13 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
     if (ld.start == vertexId) {
       auto &vEnd = state.findVertex(ld.end);
 
-      std::erase_if(
-        vEnd.connectedLineDefs, [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+      std::erase_if(vEnd.connectedLineDefs,
+                    [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
     } else if (ld.end == vertexId) {
       auto &vStart = state.findVertex(ld.start);
 
-      std::erase_if(
-        vStart.connectedLineDefs, [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+      std::erase_if(vStart.connectedLineDefs,
+                    [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
     }
 
     EditorLineDef::remove(state, ldId);
@@ -132,10 +131,10 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 }
 
 EditorState::EditorState(Level &_level,
-  const uint16_t _levelNum,
-  const uint16_t _numOfLevels,
-  const uint16_t _width,
-  const uint16_t _height)
+                         const uint16_t _levelNum,
+                         const uint16_t _numOfLevels,
+                         const uint16_t _width,
+                         const uint16_t _height)
   : width(_width), height(_height), numOfLevels(_numOfLevels)
 {
   std::vector<EditorVertex> editorVertices;
@@ -151,52 +150,7 @@ EditorState::EditorState(Level &_level,
   editorSidedefs.reserve(_level.sidedefs.size());
 
 
-  std::unordered_map<const Vertex *, uint32_t> vertexIdxMap;
-  vertexIdxMap.reserve(_level.vertices.size());
-
-  // process vertices
-  for (size_t i = 0; i < _level.vertices.size(); ++i) {
-    const Vertex *v = &_level.vertices[i];
-
-    const Vertex centered = v->fromCenterCoords(width, height);
-    editorVertices.emplace_back(centered);
-    vertexIdxMap[v] = editorVertices.size() - 1;
-  }
-
-  // process sectors
-  for (const auto &sector : _level.sectors) {
-    editorSectors.emplace_back(
-      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag, sector.color);
-  }
-
-  // process sidedefs
-  for (const auto &sd : _level.sidedefs) {
-    editorSidedefs.emplace_back(sd.sector - _level.sectors.data(), sd.xOffset, sd.yOffset);
-  }
-
-  // process linedefs
-  for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
-
-    editorLinedefs.emplace_back(makeObjectId(EditorObjectType::VERTEX, start - _level.vertices.data()),
-      makeObjectId(EditorObjectType::VERTEX, end - _level.vertices.data()),
-      type,
-      !frontSidedef ? -1 : frontSidedef - _level.sidedefs.data(),
-      !backSidedef ? -1 : backSidedef - _level.sidedefs.data());
-
-
-    editorVertices[vertexIdxMap[start]].connectedLineDefs.emplace_back(
-      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
-    editorVertices[vertexIdxMap[end]].connectedLineDefs.emplace_back(
-      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(editorLinedefs.size() - 1)));
-  }
-
-
-  this->level = std::make_unique<EditorLevel>(std::move(editorVertices),
-    std::move(editorLinedefs),
-    std::move(editorSectors),
-    std::move(editorSidedefs),
-    _levelNum,
-    _level.name);
+  this->level = std::make_unique<EditorLevel>(_level, _levelNum, _width, _height);
 }
 
 void EditorState::reset()
@@ -273,10 +227,10 @@ void Editor::updateAABB(const uint32_t sectorID) const
 }
 
 Editor::Editor(Level &_level,
-  const uint16_t _levelNum,
-  const uint16_t _numOfLevels,
-  const uint16_t _width,
-  const uint16_t _height)
+               const uint16_t _levelNum,
+               const uint16_t _numOfLevels,
+               const uint16_t _width,
+               const uint16_t _height)
   : m_history(std::make_shared<CommandHistory>()),
     state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, _width, _height))
 {
@@ -448,4 +402,51 @@ void Editor::changeLevel(const uint16_t newLevelNum) const
 
   state->level = std::make_unique<EditorLevel>(newLevelNum, levelName);
   state->level->Load(state->width, state->height);
+}
+
+
+EditorLevel::EditorLevel(const Level &_level, const uint16_t _levelNum, const uint16_t _width, const uint16_t _height)
+  : levelNum(_levelNum), name(_level.name)
+{
+  vertices.reserve(_level.vertices.size());
+  sidedefs.reserve(_level.sidedefs.size());
+  linedefs.reserve(_level.linedefs.size());
+  sectors.reserve(_level.sectors.size());
+
+  // process vertices
+  for (auto &vertice : _level.vertices) {
+    const Vertex *v = &vertice;
+
+    const Vertex centered = v->fromCenterCoords(_width, _height);
+    vertices.emplace_back(centered);
+  }
+
+  // process sectors
+  for (const auto &sector : _level.sectors) {
+    sectors.emplace_back(
+      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag, sector.color);
+  }
+
+  // process sidedefs
+  for (const auto &sd : _level.sidedefs) {
+    sidedefs.emplace_back(sd.sector ? sd.sector - _level.sectors.data() : -1, sd.xOffset, sd.yOffset);
+  }
+
+  // process linedefs
+  for (const auto &[start, end, type, frontSidedef, backSidedef] : _level.linedefs) {
+    const size_t startIdx = start - _level.vertices.data();
+    const size_t endIdx = end - _level.vertices.data();
+
+    linedefs.emplace_back(makeObjectId(EditorObjectType::VERTEX, startIdx),
+                          makeObjectId(EditorObjectType::VERTEX, endIdx),
+                          type,
+                          !frontSidedef ? -1 : frontSidedef - _level.sidedefs.data(),
+                          !backSidedef ? -1 : backSidedef - _level.sidedefs.data());
+
+
+    vertices[startIdx].connectedLineDefs.emplace_back(
+      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(linedefs.size() - 1)));
+    vertices[endIdx].connectedLineDefs.emplace_back(
+      makeObjectId(EditorObjectType::LINEDEF, static_cast<uint32_t>(linedefs.size() - 1)));
+  }
 }

@@ -4,10 +4,13 @@
 #include <limits.h>
 #include <stdint.h>
 
-fixed_t FixedMul(fixed_t a, fixed_t b) { return (static_cast<long long>(a) * static_cast<long long>(b)) >> FRAC_BITS; }
+constexpr fixed_t FixedMul(fixed_t a, fixed_t b)
+{
+  return (static_cast<long long>(a) * static_cast<long long>(b)) >> FRAC_BITS;
+}
 
 
-fixed_t FixedDiv(const fixed_t a, const fixed_t b)
+constexpr fixed_t FixedDiv(fixed_t a, fixed_t b)
 {
   if (std::abs(a) >> 14 >= std::abs(b)) {
     return (a ^ b) < 0 ? INT_MIN : INT_MAX;
@@ -17,7 +20,7 @@ fixed_t FixedDiv(const fixed_t a, const fixed_t b)
 }
 
 
-fixed_t FixedDiv2(const fixed_t a, const fixed_t b)
+constexpr fixed_t FixedDiv2(const fixed_t a, const fixed_t b)
 {
 
   const double c = static_cast<double>(a) / static_cast<double>(b) * FRAC_UNIT;
@@ -29,7 +32,7 @@ fixed_t FixedDiv2(const fixed_t a, const fixed_t b)
 }
 
 
-fixed_t DoubleToFixed(const double num)
+constexpr fixed_t DoubleToFixed(const double num)
 {
   const int32_t rounded = std::floor(num);
 
@@ -42,4 +45,4 @@ fixed_t DoubleToFixed(const double num)
 }
 
 
-double FixedToDouble(const fixed_t num) { return static_cast<double>(num) / FRAC_UNIT; }
+constexpr double FixedToDouble(const fixed_t num) { return static_cast<double>(num) / FRAC_UNIT; }

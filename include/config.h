@@ -1,5 +1,8 @@
 #pragma once
 
+#include "core/fixed_math.h"
+
+
 #include <cstdint>
 
 namespace config {
@@ -11,6 +14,9 @@ constexpr uint16_t EDITOR_WINDOW_HEIGHT = 1200;
 
 constexpr uint16_t CANVAS_WIDTH = 800;
 constexpr uint16_t CANVAS_HEIGHT = 600;
+
+constexpr fixed_t CANVAS_WIDTH_FRAC = CANVAS_WIDTH << FRAC_BITS;
+constexpr fixed_t CANVAS_CENTERX_FRAC = CANVAS_WIDTH << (FRAC_BITS - 1);
 
 constexpr double SCALE_X = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(CANVAS_WIDTH);
 constexpr double SCALE_Y = static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(CANVAS_HEIGHT);

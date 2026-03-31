@@ -1,31 +1,33 @@
 #include "bsp.h"
-#include "math_utils.h"
 #include "imgui/imgui.h"
+#include "math_utils.h"
 #include "renderer/editor/editor_renderer.h"
 
-void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow, const BspNode &root)
+void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow,
+                                 const std::array<fixed_t, 4> boundingBox,
+                                 const int r,
+                                 const int g,
+                                 const int b,
+                                 const int a)
 {
-  const ImVec2 leftMin{ static_cast<float>(root.leftBoundingBox[3]), static_cast<float>(root.leftBoundingBox[2]) };
-  const ImVec2 leftMax{ static_cast<float>(root.leftBoundingBox[1]), static_cast<float>(root.leftBoundingBox[0]) };
+  const ImVec2 _min{ static_cast<float>(FixedToDouble(boundingBox[3])),
+                     static_cast<float>(FixedToDouble(boundingBox[2])) };
+  const ImVec2 _max{ static_cast<float>(FixedToDouble(boundingBox[1])),
+                     static_cast<float>(FixedToDouble(boundingBox[0])) };
 
-  const SDL_Rect left{ static_cast<int>(leftMin.x),
-    static_cast<int>(leftMax.y),
-    static_cast<int>(leftMax.x - leftMin.x),
-    static_cast<int>(leftMin.y - leftMax.y) };
+  const SDL_Rect _rect{ static_cast<int>(_min.x),
+                        static_cast<int>(_max.y),
+                        static_cast<int>(_max.x - _min.x),
+                        static_cast<int>(_min.y - _max.y) };
 
-  const ImVec2 rightMin{ static_cast<float>(root.rightBoundingBox[3]), static_cast<float>(root.rightBoundingBox[2]) };
-  const ImVec2 rightMax{ static_cast<float>(root.rightBoundingBox[1]), static_cast<float>(root.rightBoundingBox[0]) };
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), r, g, b, a);
+  SDL_RenderDrawRect(sdlWindow.getRenderer(), &_rect);
+}
 
-  const SDL_Rect right{ static_cast<int>(rightMin.x),
-    static_cast<int>(rightMax.y),
-    static_cast<int>(rightMax.x - rightMin.x),
-    static_cast<int>(rightMin.y - rightMax.y) };
-
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 0, 255, 255);
-  SDL_RenderDrawRect(sdlWindow.getRenderer(), &left);
-
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 255, 255);
-  SDL_RenderDrawRect(sdlWindow.getRenderer(), &right);
+void BSPBuilder::DrawBoundingBoxes(const SdlWindow &sdlWindow, const Node &root)
+{
+  DrawBoundingBox(sdlWindow, root.leftBoundingBox, 255, 0, 255, 255);
+  DrawBoundingBox(sdlWindow, root.rightBoundingBox, 0, 255, 255, 255);
 }
 
 void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
@@ -36,46 +38,45 @@ void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
       const auto &seg = level.segments[i];
 
-      const ImVec2 mappedStart =
-        math_utils::fromCenterCoordinates(ImVec2{ static_cast<float>(seg.start->x), static_cast<float>(seg.start->y) },
-          sdlWindow.width,
-          sdlWindow.height);
-
-      const ImVec2 mappedEnd = math_utils::fromCenterCoordinates(
-        ImVec2{ static_cast<float>(seg.end->x), static_cast<float>(seg.end->y) }, sdlWindow.width, sdlWindow.height);
+      const ImVec2 mappedStart = seg.start->fromCenterCoords(sdlWindow.width, sdlWindow.height).toImVec();
+      const ImVec2 mappedEnd = seg.end->fromCenterCoords(sdlWindow.width, sdlWindow.height).toImVec();
 
       SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
     }
   }
 }
-void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const BspNode &root)
+void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const Node &root)
 {
-  constexpr float lineLen = 2000.0f;
-  const float len = std::sqrt(static_cast<float>(root.dx) * root.dx + static_cast<float>(root.dy) * root.dy);
-  const float dirX = static_cast<float>(root.dx) / len;
-  const float dirY = static_cast<float>(root.dy) / len;
+  static constexpr double lineLen = 2000.0;
+  const double len = std::sqrt(FixedToDouble(FixedMul(root.dx, root.dx) + FixedMul(root.dy, root.dy)));
+  const double dirX = FixedToDouble(root.dx) / len;
+  const double dirY = FixedToDouble(root.dy) / len;
+
+  const double rootX = FixedToDouble(root.x);
+  const double rootY = FixedToDouble(root.y);
 
   const ImVec2 lineStart = math_utils::fromCenterCoordinates(
-    ImVec2{ static_cast<float>(root.x) - dirX * lineLen, static_cast<float>(root.y) - dirY * lineLen },
+    ImVec2{ static_cast<float>(rootX - dirX * lineLen), static_cast<float>(rootY - dirY * lineLen) },
     sdlWindow.width,
     sdlWindow.height);
   const ImVec2 lineEnd = math_utils::fromCenterCoordinates(
-    ImVec2{ static_cast<float>(root.x) + dirX * lineLen, static_cast<float>(root.y) + dirY * lineLen },
+    ImVec2{ static_cast<float>(rootX + dirX * lineLen), static_cast<float>(rootY + dirY * lineLen) },
     sdlWindow.width,
     sdlWindow.height);
 
   SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 255, 0, 255);
   SDL_RenderDrawLine(sdlWindow.getRenderer(),
-    static_cast<int>(lineStart.x),
-    static_cast<int>(lineStart.y),
-    static_cast<int>(lineEnd.x),
-    static_cast<int>(lineEnd.y));
+                     static_cast<int>(lineStart.x),
+                     static_cast<int>(lineStart.y),
+                     static_cast<int>(lineEnd.x),
+                     static_cast<int>(lineEnd.y));
 }
 
 void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const Level &level)
 {
   static size_t s_nodesIndex = 0;
 
+  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
   SDL_RenderClear(sdlWindow.getRenderer());
 
   DrawSubsectors(sdlWindow, level);
@@ -94,10 +95,10 @@ void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const 
     return;
   }
 
-  const BspNode &root = level.nodes[s_nodesIndex];
+  const Node &root = level.nodes[s_nodesIndex];
 
   DrawSplittingLine(sdlWindow, root);
-  DrawBoundingBox(sdlWindow, root);
+  DrawBoundingBoxes(sdlWindow, root);
 
   SDL_RenderPresent(sdlWindow.getRenderer());
 }
@@ -133,8 +134,8 @@ std::vector<std::vector<std::string>> BSPBuilder::BuildRows() const
 }
 
 void BSPBuilder::BuildRowsRecursive(const int16_t index,
-  const size_t currentDepth,
-  std::vector<std::vector<std::string>> &rows) const
+                                    const size_t currentDepth,
+                                    std::vector<std::vector<std::string>> &rows) const
 {
   if (currentDepth >= rows.size())
     return;

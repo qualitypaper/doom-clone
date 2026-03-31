@@ -29,7 +29,7 @@ void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fi
   }
 }
 
-BspNode::BspNode(const fixed_t _x, const fixed_t _y, const fixed_t _dx, const fixed_t _dy)
+Node::Node(const fixed_t _x, const fixed_t _y, const fixed_t _dx, const fixed_t _dy)
   : x(_x), y(_y), dx(_dx), dy(_dy)
 {}
 
@@ -113,10 +113,7 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
     }
   }
 
-  res.node = { static_cast<int16_t>(splitterStart.x),
-    static_cast<int16_t>(splitterStart.y),
-    static_cast<int16_t>(splitterDirection.x),
-    static_cast<int16_t>(splitterDirection.y) };
+  res.node = Node{ splitterStart.x, splitterStart.y, splitterDirection.x, splitterDirection.y };
 
   return res;
 }
@@ -154,7 +151,7 @@ int32_t BSPBuilder::BuildBSPTree(std::vector<Seg> &segs)
 
   const int id = static_cast<int>(nodes.size() - 1);
 
-  BspNode &currentNode = nodes[id];
+  Node &currentNode = nodes[id];
 
   AdjustBoundingBoxes(split.front, currentNode.rightBoundingBox);
   AdjustBoundingBoxes(split.back, currentNode.leftBoundingBox);
@@ -214,7 +211,7 @@ SegmentPosition BSPBuilder::DetermineSegmentPosition(const Seg &splitter, const 
   if (seg == splitter)
     return SegmentPosition::FRONT;
   else if (seg.linedefIndex == splitter.linedefIndex && seg.startVertex == splitter.endVertex
-    && seg.endVertex == splitter.startVertex) {
+           && seg.endVertex == splitter.startVertex) {
     // the opposite side of the portal
     return SegmentPosition::BACK;
   }

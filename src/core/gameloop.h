@@ -55,7 +55,7 @@ struct Level
   std::vector<line_t> linedefs;
   std::vector<side_t> sidedefs;
   std::vector<Sector> sectors;
-  std::vector<BspNode> nodes;
+  std::vector<Node> nodes;
   std::vector<SubSector> subsectors;
   std::vector<seg_t> segments;
   std::array<char8_t, 8> name{};

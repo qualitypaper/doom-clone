@@ -42,7 +42,8 @@ static std::vector<Vertex> vertices = {
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static std::vector<Sector> sectors = { Sector(0, 36, -1, -1, 0, 0, 0), Sector(0, 20, -1, -1, 0, 0, 0) };
+static std::vector<Sector> sectors = { Sector(0, 36 << FRAC_BITS, -1, -1, 0, 0, 0),
+                                       Sector(0, 20 << FRAC_BITS, -1, -1, 0, 0, 0) };
 
 // ==========================================
 // 3. SIDEDEFS (Visual sides of lines)
@@ -123,7 +124,8 @@ int main(int argc, char *argv[])
   }
 
   // setup sdl window
-  SdlWindow sdlWindow("Doom Clone",
+  SdlWindow sdlWindow(
+    "Doom Clone",
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
     gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT,
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
@@ -218,7 +220,7 @@ void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &w
     ImGui_ImplSDL2_ProcessEvent(&event);
 
     if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
-      && event.window.windowID == SDL_GetWindowID(window.getWindow())) {
+        && event.window.windowID == SDL_GetWindowID(window.getWindow())) {
       running = false;
       continue;
     } else if (event.type == SDL_QUIT) {

@@ -287,8 +287,8 @@ void EditorRenderer::drawSidedefsWindow() const
         ImGui::TableSetColumnIndex(0);
 
         int sectorId = sd.sectorId;
-        int xOffset = sd.xOffset;
-        int yOffset = sd.yOffset;
+        double xOffset = sd.xOffset;
+        double yOffset = sd.yOffset;
 
         ImGui::SetNextItemWidth(100);
         if (ImGui::InputInt("Sector id", &sectorId)) {
@@ -297,14 +297,14 @@ void EditorRenderer::drawSidedefsWindow() const
         }
 
         ImGui::SetNextItemWidth(100);
-        if (ImGui::InputInt("Texture offset x", &xOffset)) {
+        if (ImGui::InputDouble("Texture offset x", &xOffset)) {
           // update texture offset x
-          sd.xOffset = static_cast<int16_t>(xOffset);
+          sd.xOffset = xOffset;
         }
         ImGui::SetNextItemWidth(100);
-        if (ImGui::InputInt("Texture offset y", &yOffset)) {
+        if (ImGui::InputDouble("Texture offset y", &yOffset)) {
           // update texture offset y
-          sd.yOffset = static_cast<int16_t>(yOffset);
+          sd.yOffset = yOffset;
         }
 
         if (ImGui::Button("Delete")) {

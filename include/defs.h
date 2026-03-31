@@ -3,11 +3,11 @@
 #include "config.h"
 #include "core/fixed_math.h"
 #include "core/serialization.h"
+#include "imgui/imgui.h"
 #include "tables.h"
 
 #include <array>
 #include <cstdint>
-
 
 struct Visplane
 {
@@ -43,14 +43,14 @@ struct Sector
 
   Sector() = default;
 
-  Sector(fixed_t _floorHeight,
-    fixed_t _ceilingHeight,
-    int16_t _floorTextureIndex,
-    int16_t _ceilingTextureIndex,
-    int16_t _lightLevel,
-    int16_t _specialType,
-    int16_t _tag,
-    uint32_t _color = 0xFFFFFFFF)
+  Sector(const fixed_t _floorHeight,
+         const fixed_t _ceilingHeight,
+         const int16_t _floorTextureIndex,
+         const int16_t _ceilingTextureIndex,
+         const int16_t _lightLevel,
+         const int16_t _specialType,
+         const int16_t _tag,
+         const uint32_t _color = 0xFFFFFFFF)
     : floorHeight(_floorHeight), ceilingHeight(_ceilingHeight), floorTextureIndex(_floorTextureIndex),
       ceilingTextureIndex(_ceilingTextureIndex), lightLevel(_lightLevel), specialType(_specialType), tag(_tag),
       color(_color)
@@ -60,7 +60,8 @@ struct Sector
   // default - BLACK
   uint32_t color = 0xFFFFFFFF;
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     serialization::serialize(w, floorHeight);
     serialization::serialize(w, ceilingHeight);
@@ -72,7 +73,8 @@ struct Sector
     serialization::serialize(w, color);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     serialization::deserialize(r, floorHeight);
     serialization::deserialize(r, ceilingHeight);
@@ -99,22 +101,27 @@ struct Vertex
   fixed_t operator*(const Vertex &other) const { return FixedMul(x, other.x) + FixedMul(y, other.y); }
   Vertex operator*(const double c) const { return Vertex{ FixedMul(c, x), FixedMul(c, y) }; }
   Vertex operator/(const double c) const { return Vertex{ FixedDiv(x, c), FixedDiv(y, c) }; }
+  bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
 
   // gives the length of cross product v \cross other
-  fixed_t cross(const Vertex &other) const { return FixedMul(x, other.y) - FixedMul(y, other.x); }
+  [[nodiscard]] fixed_t cross(const Vertex &other) const { return FixedMul(x, other.y) - FixedMul(y, other.x); }
 
-  Vertex toCenterCoords(const uint16_t width, const uint16_t height) const
+  [[nodiscard]] Vertex toCenterCoords(const uint16_t width, const uint16_t height) const
   {
     return { x - ((width / 2) << FRAC_BITS), ((height / 2) << FRAC_BITS) - y };
   }
 
-  Vertex fromCenterCoords(const uint16_t width, const uint16_t height) const
+  [[nodiscard]] Vertex fromCenterCoords(const uint16_t width, const uint16_t height) const
   {
     return { std::clamp(((width / 2) << FRAC_BITS) + x, 0, width << FRAC_BITS),
-      std::clamp(((height / 2) << FRAC_BITS) - y, 0, height << FRAC_BITS) };
+             std::clamp(((height / 2) << FRAC_BITS) - y, 0, height << FRAC_BITS) };
   }
 
-  bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
+  [[nodiscard]] ImVec2 toImVec() const
+  {
+    return { static_cast<float>(FixedToDouble(x)), static_cast<float>(FixedToDouble(y)) };
+  }
+
 
   template<typename Writer>
   void serialize(Writer &w) const
@@ -123,7 +130,8 @@ struct Vertex
     serialization::serialize(w, x);
     serialization::serialize(w, y);
   }
-  template<typename Reader> void deserialize(Reader &fr)
+  template<typename Reader>
+  void deserialize(Reader &fr)
   {
     serialization::deserialize(fr, x);
     serialization::deserialize(fr, y);
@@ -132,10 +140,10 @@ struct Vertex
 
 struct side_t
 {
-  Sector *sector;
+  Sector *sector{};
 
-  fixed_t xOffset;
-  fixed_t yOffset;
+  fixed_t xOffset{};
+  fixed_t yOffset{};
 
   int16_t upperWallTexture = -1;
   int16_t middlWallTexture = -1;
@@ -143,11 +151,11 @@ struct side_t
 
   side_t() = default;
   side_t(Sector *_sector,
-    const fixed_t _xOffset,
-    const fixed_t _yOffset,
-    const int16_t _upper,
-    const int16_t _middle,
-    const int16_t _bottom)
+         const fixed_t _xOffset,
+         const fixed_t _yOffset,
+         const int16_t _upper,
+         const int16_t _middle,
+         const int16_t _bottom)
     : sector(_sector), xOffset(_xOffset), yOffset(_yOffset), upperWallTexture(_upper), middlWallTexture(_middle),
       bottomWallTexture(_bottom)
   {}
@@ -164,17 +172,18 @@ struct SideDef
 
   SideDef() = default;
 
-  SideDef(int16_t _sectorId,
-    fixed_t _xOffset,
-    fixed_t _yOffset,
-    int16_t _upperWallTexture,
-    int16_t _middleWallTexture,
-    int16_t _bottomWallTexture)
+  SideDef(const int16_t _sectorId,
+          const fixed_t _xOffset,
+          const fixed_t _yOffset,
+          const int16_t _upperWallTexture,
+          const int16_t _middleWallTexture,
+          const int16_t _bottomWallTexture)
     : sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset), upperWallTexture(_upperWallTexture),
       middleWallTexture(_middleWallTexture), bottomWallTexture(_bottomWallTexture)
   {}
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     serialization::serialize(w, sectorId);
     serialization::serialize(w, upperWallTexture);
@@ -184,7 +193,8 @@ struct SideDef
     serialization::serialize(w, yOffset);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     serialization::deserialize(r, sectorId);
     serialization::deserialize(r, upperWallTexture);
@@ -211,9 +221,6 @@ struct line_t
   line_t(Vertex *_start, Vertex *_end, LineDefType _type, side_t *_front, side_t *_back)
     : start(_start), end(_end), type(_type), frontSide(_front), backSide(_back)
   {}
-  line_t(int16_t _start, int16_t _end, LineDefType _type, int16_t _front, int16_t _back)
-    : start(nullptr), end(nullptr), type(_type), frontSide(nullptr), backSide(nullptr)
-  {}
 };
 
 
@@ -230,7 +237,8 @@ struct LineDef
     : start(_start), end(_end), type(_type), frontSidedef(_frontSidedef), backSidedef(_backSidedef)
   {}
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     serialization::serialize(w, start);
     serialization::serialize(w, end);
@@ -243,7 +251,8 @@ struct LineDef
     serialization::serialize(w, backSidedef);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     serialization::deserialize(r, start);
     serialization::deserialize(r, end);
@@ -290,7 +299,8 @@ struct Seg
     return startVertex == other.startVertex && endVertex == other.endVertex && linedefIndex == other.linedefIndex;
   }
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     w.WriteRaw(startVertex);
     w.WriteRaw(endVertex);
@@ -300,7 +310,8 @@ struct Seg
     w.WriteRaw(offset);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     r.ReadRaw(startVertex);
     r.ReadRaw(endVertex);
@@ -311,10 +322,10 @@ struct Seg
   }
 };
 
-struct BspNode
+struct Node
 {
-  BspNode() = default;
-  BspNode(fixed_t _x, fixed_t _y, fixed_t _dx, fixed_t _dy);
+  Node() = default;
+  Node(fixed_t _x, fixed_t _y, fixed_t _dx, fixed_t _dy);
 
   fixed_t x = 0, y = 0;
   fixed_t dx = 0, dy = 0;
@@ -324,7 +335,8 @@ struct BspNode
 
   int16_t leftChild = -1, rightChild = -1;
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     w.WriteRaw(x);
     w.WriteRaw(y);
@@ -338,7 +350,8 @@ struct BspNode
     w.WriteRaw(rightChild);
   }
 
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     r.ReadRaw(x);
     r.ReadRaw(y);
@@ -357,19 +370,21 @@ struct BspNode
 struct SubSector
 {
   Sector *sector = nullptr;
-  int16_t segCount;
-  int16_t firstSegIndex;
+  int16_t segCount{};
+  int16_t firstSegIndex{};
 
   SubSector() = default;
   SubSector(const int16_t _segCount, const int16_t _firstSegIndex) : segCount(_segCount), firstSegIndex(_firstSegIndex)
   {}
 
-  template<typename Writer> void serialize(Writer &w) const
+  template<typename Writer>
+  void serialize(Writer &w) const
   {
     w.WriteRaw(segCount);
     w.WriteRaw(firstSegIndex);
   }
-  template<typename Reader> void deserialize(Reader &r)
+  template<typename Reader>
+  void deserialize(Reader &r)
   {
     r.ReadRaw(segCount);
     r.ReadRaw(firstSegIndex);

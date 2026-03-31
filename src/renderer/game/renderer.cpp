@@ -6,8 +6,8 @@
 #include "tables.h"
 
 #include "bsp/bsp.h"
-#include "core/gameloop.h"
 #include "core/framebuffer.h"
+#include "core/gameloop.h"
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -16,17 +16,51 @@
 static constexpr int16_t HEIGHT_BITS = 12;
 static constexpr int16_t HEIGHT_UNIT = 1 << HEIGHT_BITS;
 
-static double_t FOCAL_LENGTH;
-
-static void InitViewAngleToX()
+void Renderer::InitViewAngleToX()
 {
-  for (uint32_t i = 0; i < viewangletox.size(); i++) {
-    const double_t angle = (static_cast<double_t>(i) / viewangletox.size()) * (M_PI / 2.0);
-    const double_t x = FOCAL_LENGTH * std::tan(angle);
+  for (size_t i = 0; i < m_viewangletox.size(); i++) {
+    int t;
 
-    viewangletox[i] = static_cast<int16_t>(x);
+    if (finetangent[i] >= FRAC_UNIT * 2) {
+      // cover asymptotes
+      t = -1;
+    } else if (finetangent[i] < -FRAC_UNIT * 2) {
+      // cover asymptotes
+      t = config::CANVAS_WIDTH + 1;
+    } else {
+      // normal case
+      t = FixedMul(FOCAL_LENGTH, finetangent[i]);
+      // rounding up to the nearest
+      t = (config::CANVAS_CENTERX_FRAC - t + FRAC_UNIT - 1) >> FRAC_BITS;
+
+      if (t < -1) {
+        t = -1;
+      } else if (t > config::CANVAS_WIDTH + 1) {
+        t = config::CANVAS_WIDTH + 1;
+      }
+    }
+
+    m_viewangletox[i] = t;
   }
 }
+
+void Renderer::InitXToViewAngle()
+{
+  for (int x = 0; x < m_xtoviewangle.size(); x++) {
+    angle_t i = 0;
+
+    // find by brute-forcing the angle mapping to this x
+    while (viewangletox[i] > x) {
+      i++;
+    }
+
+    // transforming from fine angle into a BAM,
+    // then shifting by 90 degrees so that 0 degrees are directly in front of the player
+    m_xtoviewangle[x] = (i << ANGLE_TO_FINE_SHIFT) - ANG90;
+  }
+}
+
+
 static float_t ScaleFromGlobalAngle(angle_t angle) {}
 
 static constexpr uint32_t MapColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t alpha)
@@ -35,9 +69,9 @@ static constexpr uint32_t MapColor(const uint8_t r, const uint8_t g, const uint8
 }
 
 Renderer::Renderer(FrameBuffer &_fb,
-  std::shared_ptr<Level> _level,
-  const uint16_t canvasWidth,
-  const uint16_t canvasHeight)
+                   std::shared_ptr<Level> _level,
+                   const uint16_t canvasWidth,
+                   const uint16_t canvasHeight)
   : m_fb(_fb), m_level(std::move(_level)), m_canvasWidth(canvasWidth), m_canvasHeight(canvasHeight)
 {
   m_ceilclip.resize(canvasWidth);
@@ -45,9 +79,8 @@ Renderer::Renderer(FrameBuffer &_fb,
   m_visplanes.reserve(MAX_VISPLANES);
   m_solidsegs.resize(MAX_SEGMENTS);
 
-  FOCAL_LENGTH = (canvasWidth / 2.0) / finetangent[FINE_ANGLES / 4 + HALF_FOV >> ANGLE_TO_FINE_SHIFT];
-
   InitViewAngleToX();
+  InitXToViewAngle();
 }
 
 void Renderer::ResetClippingArrays()
@@ -66,7 +99,7 @@ void Renderer::DrawColumn(const int32_t x, const int32_t y0, const int32_t y1, c
   int32_t transformedY1 = static_cast<int32_t>(config::SCALE_Y * y1);
 
   if (scaledX < 0 || scaledX > config::WINDOW_WIDTH - 1 || transformedY0 < 0
-    || transformedY0 > config::WINDOW_HEIGHT - 1 || transformedY1 < 0 || transformedY1 > config::WINDOW_HEIGHT - 1) {
+      || transformedY0 > config::WINDOW_HEIGHT - 1 || transformedY1 < 0 || transformedY1 > config::WINDOW_HEIGHT - 1) {
     return;
   }
 
@@ -91,9 +124,9 @@ void Renderer::DrawColumn(const int32_t x, const int32_t y0, const int32_t y1, c
 }
 
 void Renderer::DrawSolidWall(const int32_t x,
-  const int32_t projectedCeilingZ,
-  const int32_t projectedFloorZ,
-  const uint32_t color)
+                             const int32_t projectedCeilingZ,
+                             const int32_t projectedFloorZ,
+                             const uint32_t color)
 {
   const int32_t drawTop = std::max(projectedCeilingZ, m_ceilclip[x]);
   const int32_t drawBottom = std::min(projectedFloorZ, m_floorclip[x]);
@@ -194,10 +227,10 @@ void Renderer::ClipSolidWall(int16_t start, int16_t end, const seg_t *seg, const
 }
 
 void Renderer::ClipPassWall(const int16_t start,
-  const int16_t end,
-  const seg_t *seg,
-  const side_t *side,
-  const Player &player)
+                            const int16_t end,
+                            const seg_t *seg,
+                            const side_t *side,
+                            const Player &player)
 {
 
   // Find the first range that touches the range
@@ -227,9 +260,9 @@ void Renderer::ClipPassWall(const int16_t start,
   while (end >= (clipStart + 1)->start - 1) {
     // There is a fragment between two posts.
     StoreWallRange({ static_cast<int16_t>(clipStart->end + 1), static_cast<int16_t>((clipStart + 1)->start - 1) },
-      seg,
-      side,
-      player);
+                   seg,
+                   side,
+                   player);
     clipStart++;
 
     if (end <= clipStart->end) {
@@ -442,8 +475,8 @@ void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex
     return;
   }
 
-  const BspNode &node = m_level->nodes[nodeIndex];
-  const bool side = PointOnSide({gameState.playerState.x, gameState.playerState.y}, node);
+  const Node &node = m_level->nodes[nodeIndex];
+  const bool side = PointOnSide({ gameState.playerState.x, gameState.playerState.y }, node);
 
   if (side) {
     RenderBSPNode(gameState, node.leftChild);
@@ -468,10 +501,10 @@ int16_t Renderer::ProjectX(const double_t x, const double_t inv_y) const
 }
 
 void Renderer::DrawDefaultPortal(const int32_t x,
-  const int32_t projectedFloorY,
-  const int32_t projectedCeilingY,
-  const int32_t nextFloorY,
-  const int32_t nextCeilY)
+                                 const int32_t projectedFloorY,
+                                 const int32_t projectedCeilingY,
+                                 const int32_t nextFloorY,
+                                 const int32_t nextCeilY)
 {
   // Render upper wall only if the neighbor ceiling is lower
   if (nextCeilY > projectedCeilingY) {
