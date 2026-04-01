@@ -10,7 +10,6 @@
 #include "imgui/imgui_internal.h"
 
 #include <algorithm>
-#include <fmt/core.h>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -587,8 +586,8 @@ bool EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
 
   ImGui::NewLine();
 
-  const std::string frontSideDefLabel = fmt::format(":Front SideDef ##LDSidedef{0}", ld.start);
-  const std::string backSideDefLabel = fmt::format(":Back SideDef ##LDSidedef{0}", ld.end);
+  const std::string frontSideDefLabel = std::format(":Front SideDef ##LDSidedef{0}", ld.start);
+  const std::string backSideDefLabel = std::format(":Back SideDef ##LDSidedef{0}", ld.end);
 
   createSidedefSelect(frontSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.frontSideDef);
   createSidedefSelect(backSideDefLabel.c_str(), m_editor->state->level->sidedefs, ld.backSideDef, true);
@@ -680,10 +679,10 @@ void EditorRenderer::createSelect(const char *label,
   const std::function<void(uint16_t)> &setCurrElem,
   const std::function<void()> &addNewElem)
 {
-  if (ImGui::BeginCombo(label, fmt::format("Level: {}", currentItem).c_str())) {
+  if (ImGui::BeginCombo(label, std::format("Level: {}", currentItem).c_str())) {
     for (const std::uint16_t &option : options) {
       const bool is_selected = currentItem == option;
-      if (ImGui::Selectable(fmt::format("Level {}", option).c_str(), is_selected)) {
+      if (ImGui::Selectable(std::format("Level {}", option).c_str(), is_selected)) {
         setCurrElem(option);
       }
       // Set the initial focus when opening the combo (scrolling to selection)

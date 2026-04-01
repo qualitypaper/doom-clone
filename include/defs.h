@@ -18,8 +18,8 @@ struct Visplane
   int minX = 0;
   int maxX = 0;
 
-  int8_t top[config::CANVAS_WIDTH]{};
-  int8_t bottom[config::CANVAS_WIDTH]{};
+  int16_t top[config::CANVAS_WIDTH]{};
+  int16_t bottom[config::CANVAS_WIDTH]{};
 };
 
 struct ClipRange
@@ -28,7 +28,7 @@ struct ClipRange
   int end = 0;
 
   ClipRange() = default;
-  ClipRange(int16_t _start, int16_t _end) : start(_start), end(_end) {}
+  ClipRange(const int _start, const int _end) : start(_start), end(_end) {}
 };
 
 struct Sector

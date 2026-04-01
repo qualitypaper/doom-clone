@@ -18,6 +18,8 @@ constexpr uint16_t CANVAS_HEIGHT = 600;
 constexpr fixed_t CANVAS_WIDTH_FRAC = CANVAS_WIDTH << FRAC_BITS;
 constexpr fixed_t CANVAS_CENTERX_FRAC = CANVAS_WIDTH << (FRAC_BITS - 1);
 
+constexpr fixed_t CANVAS_CENTERY_FRAC = CANVAS_HEIGHT << (FRAC_BITS - 1);
+
 constexpr double SCALE_X = static_cast<float>(WINDOW_WIDTH) / static_cast<float>(CANVAS_WIDTH);
 constexpr double SCALE_Y = static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(CANVAS_HEIGHT);
 
@@ -32,7 +34,7 @@ constexpr uint8_t DESIRED_FRAMERATE = 144;
 // made for fov of 90 degress, where tan(FOV/2) equals 1, if desired to change add (...)/tan(FOV/2)
 constexpr uint32_t PROJECTION_PLANE_DISTANCE = 1;
 
-constexpr float MOUSE_SENSITIVITY = 0.01f;
+constexpr double MOUSE_SENSITIVITY = 0.01;
 
 constexpr const char *SAVED_LEVEL_PATH = "levels.wad";
 }// namespace config

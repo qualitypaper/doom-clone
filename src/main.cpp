@@ -30,20 +30,20 @@ bool running;
 static std::vector<Vertex> vertices = {
   // Sector 0 (The Starting Room)
   Vertex(0, 0),// 0
-  Vertex(50 << FRAC_BITS, 0),// 1
-  Vertex(50 << FRAC_BITS, 50 << FRAC_BITS),// 2
-  Vertex(0, 50 << FRAC_BITS),// 3
+  Vertex(200 << FRAC_BITS, 0),// 1
+  Vertex(200 << FRAC_BITS, 200 << FRAC_BITS),// 2
+  Vertex(0, 200 << FRAC_BITS),// 3
 
   // Sector 1 (The Connected Hallway - shares 1 and 2 with Sector 0)
-  Vertex(100 << FRAC_BITS, 0),// 4
-  Vertex(100 << FRAC_BITS, 50 << FRAC_BITS)// 5
+  Vertex(500 << FRAC_BITS, 0),// 4
+  Vertex(500 << FRAC_BITS, 200 << FRAC_BITS)// 5
 };
 
 // ==========================================
 // 2. SECTORS (Rooms)
 // ==========================================
-static std::vector<Sector> sectors = { Sector(0, 36 << FRAC_BITS, -1, -1, 0, 0, 0),
-                                       Sector(0, 20 << FRAC_BITS, -1, -1, 0, 0, 0) };
+static std::vector<Sector> sectors = { Sector(0, 300 << FRAC_BITS, -1, -1, 0, 0, 0),
+                                       Sector(0, 200 << FRAC_BITS, -1, -1, 0, 0, 0) };
 
 // ==========================================
 // 3. SIDEDEFS (Visual sides of lines)
@@ -100,10 +100,10 @@ int main(int argc, char *argv[])
 {
   // setup inputs and states
   InputState input{};
-  GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
+  GameState gameState{ .currentMode = EngineMode::GAMEPLAY_3D };
 
   gameState.playerState =
-    Player{ .x = 0, .y = 0, .z = 10, .velocity = 15.0f, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0 };
+    Player{ .x = 0, .y = 0, .z = 100 << FRAC_BITS, .velocity = 15 << FRAC_BITS, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0 };
 
   std::shared_ptr<Level> level;
   size_t numOfLevels;

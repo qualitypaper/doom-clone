@@ -32,7 +32,7 @@ void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode
 
   if (newMode == EngineMode::GAMEPLAY_3D) {
     // disable absolute mouse
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    // SDL_SetRelativeMouseMode(SDL_TRUE);
     SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_FALSE);
     SDL_SetWindowPosition(sdlWindow.getWindow(), SDL_WINDOWPOS_CENTERED_DISPLAY(1), SDL_WINDOWPOS_CENTERED_DISPLAY(1));
     SDL_SetWindowSize(sdlWindow.getWindow(), config::WINDOW_WIDTH, config::WINDOW_HEIGHT);

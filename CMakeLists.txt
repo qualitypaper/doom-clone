@@ -28,9 +28,7 @@ target_compile_options(project_warnings INTERFACE
 # ---- Main executable ----
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 
-find_package(glm REQUIRED)
 find_package(SDL2 REQUIRED)
-find_package(fmt CONFIG REQUIRED)
 
 add_executable(${PROJECT_NAME}
         ${SOURCES}
@@ -45,10 +43,8 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
         project_warnings
-        glm::glm
         SDL2::SDL2
         SDL2::SDL2main
-        fmt::fmt
 )
 
 # ---- Install rules ----

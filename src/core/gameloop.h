@@ -11,18 +11,15 @@
  X, Y - horizontal planes, X - east-west, Y - north-south
  Z - vertical plane,
 */
-extern std::array<fixed_t, FINE_ANGLES/2> viewangletox;
-extern std::array<fixed_t, config::CANVAS_WIDTH + 1> xtoviewangle;
-
 enum class EngineMode { GAMEPLAY_3D, EDITOR_2D, BSP_VIEWER };
 
 struct Player
 {
-  int16_t x{};
-  int16_t y{};
-  int16_t z{};
-  float_t velocity{};
-  float_t angle{};
+  fixed_t x{};
+  fixed_t y{};
+  fixed_t z{};
+  fixed_t velocity{};
+  angle_t angle{};
   uint8_t health{ 100 };
   uint8_t armor{};
   uint8_t current_weapon{};
