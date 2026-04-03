@@ -59,8 +59,8 @@ private:
     return left < right;
   }
 
-  [[nodiscard]] int16_t ProjectZ(double_t z, double_t inv_y) const;
-  [[nodiscard]] int16_t ProjectX(double_t x, double_t inv_y) const;
+  [[nodiscard]] int ProjectZ(double_t z, double_t inv_y) const;
+  [[nodiscard]] int ProjectX(double_t x, double_t inv_y) const;
 
 private:
   std::vector<int16_t> m_floorClip;

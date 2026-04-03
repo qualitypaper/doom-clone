@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
   GameState gameState{ .currentMode = EngineMode::GAMEPLAY_3D };
 
   gameState.playerState =
-    Player{ .x = 0, .y = 0, .z = 100 << FRAC_BITS, .velocity = 15 << FRAC_BITS, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0 };
+    Player{ .x = 50 << FRAC_BITS, .y = 50 << FRAC_BITS, .z = 100 << FRAC_BITS, .velocity = 15 << FRAC_BITS, .angle = 0, .health = 100, .armor = 100, .current_weapon = 0 };
 
   std::shared_ptr<Level> level;
   size_t numOfLevels;

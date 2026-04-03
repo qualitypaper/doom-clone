@@ -1,6 +1,7 @@
 #include "simulation.h"
 #include "config.h"
 #include "renderer/game/renderer.h"
+#include "renderer/game/renderer_helper.h"
 
 namespace simulation {
 
@@ -8,8 +9,8 @@ namespace simulation {
 void update(GameState &gameState, const InputState &input, const double_t dt)
 {
   // mouse
-  const fixed_t mouseMovement = FixedMul(DoubleToFixed(config::MOUSE_SENSITIVITY), input.mouse_dx);
-  const angle_t angleDiff = tantoangle[FixedDiv(mouseMovement, FOCAL_LENGTH)];
+  const fixed_t mouseMovement = DoubleToFixed(input.mouse_dx * config::MOUSE_SENSITIVITY);
+  const angle_t angleDiff = tantoangle[SlopeDiv(mouseMovement, FOCAL_LENGTH)];
   gameState.playerState.angle = (gameState.playerState.angle + angleDiff);
 
   fixed_t &x = gameState.playerState.x, &y = gameState.playerState.y;
@@ -20,13 +21,13 @@ void update(GameState &gameState, const InputState &input, const double_t dt)
   fixed_t moveSide = 0, moveForward = 0;
 
   if (input.keys[SDL_SCANCODE_W])
-    moveForward += FRAC_UNIT;
+    moveForward += FRAC_UNIT << 1;
   if (input.keys[SDL_SCANCODE_S])
-    moveForward -= FRAC_UNIT;
+    moveForward -= FRAC_UNIT << 1;
   if (input.keys[SDL_SCANCODE_A])
-    moveSide -= FRAC_UNIT;
+    moveSide -= FRAC_UNIT << 1;
   if (input.keys[SDL_SCANCODE_D])
-    moveSide += FRAC_UNIT;
+    moveSide += FRAC_UNIT << 1;
 
   const fixed_t velocity = gameState.playerState.velocity;
 

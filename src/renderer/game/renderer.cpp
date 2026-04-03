@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <fmt/core.h>
+#include <iostream>
 #include <utility>
 
 static constexpr int16_t HEIGHT_BITS = 12;
@@ -117,7 +118,7 @@ void Renderer::ResetClippingArrays()
 {
   std::ranges::fill(m_ceilClip, 0);
   std::ranges::fill(m_floorClip, m_canvasHeight - 1);
-  std::ranges::fill(m_visplanes, Visplane{});
+  m_visplanes.clear();
   ResetSolidSegs();
 }
 
@@ -158,33 +159,6 @@ void Renderer::DrawColumn(const int x, const int y0, const int y1, const uint32_
   }
 }
 
-void Renderer::Render(const GameState &gameState)
-{
-  // production version, turned off to test other parts
-#if 0
-  if (m_level->nodes.empty()) {
-    // Entire level is a single subsector (no BSP splits were needed)
-    if (!m_level->subsectors.empty()) {
-      const SubSector &subsector = m_level->subsectors[0];
-
-      for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
-        RenderSeg(m_level->segments.data() + i, gameState.playerState);
-      }
-    }
-  } else {
-    RenderBSPNode(gameState, 0);
-  }
-#endif
-
-  // for testing just render every segment
-  for (seg_t &seg : m_level->segments) {
-    RenderSeg(&seg, gameState.playerState);
-  }
-
-  RenderVisPlanes();
-
-  m_fb.update();
-}
 
 void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t *sidedef, const Player &player)
 {
@@ -338,8 +312,8 @@ void Renderer::RenderSeg(const seg_t *seg, const Player &player)
     angle2 = -HALF_FOV;
   }
 
-  angle1 = (angle1 + HALF_FOV) >> ANGLE_TO_FINE_SHIFT;
-  angle2 = (angle2 + HALF_FOV) >> ANGLE_TO_FINE_SHIFT;
+  angle1 = (angle1 + FOV) >> ANGLE_TO_FINE_SHIFT;
+  angle2 = (angle2 + FOV) >> ANGLE_TO_FINE_SHIFT;
 
   const int x1 = m_viewAngleToX[angle1];
   const int x2 = m_viewAngleToX[angle2];
@@ -350,7 +324,7 @@ void Renderer::RenderSeg(const seg_t *seg, const Player &player)
   const side_t *backSide = isBackSide ? ld.frontSide : ld.backSide;
 
   if (!frontSide) {
-    throw std::runtime_error("frontSidedefIndex == -1 -> The frontSidedef mustn't be empty.");
+    throw std::runtime_error("frontSidedefIndex == -1 -> The frontSidedef mustn't be empty/null.");
   }
 
   if (!backSide) {
@@ -468,12 +442,21 @@ void Renderer::RenderSegLoop(const seg_t *seg,
     }
 
     if (!seg->line->backSide) {
-      // one-sided line
-      DrawColumn(x, top, bottom, seg->line->frontSide->sector->color);
+      ImVec4 color = ImGui::ColorConvertU32ToFloat4(seg->line->frontSide->sector->color);
+      float index = (seg->line->frontSide - m_level->sidedefs.data()) / static_cast<float>(m_level->sidedefs.size());
+      color.x += index;
+      color.y += index;
+      color.z += index;
+
+      DrawColumn(x,
+                 yl,
+                 yh,
+                 MapColor(static_cast<uint8_t>(color.x * 255),
+                          static_cast<uint8_t>(color.y * 255),
+                          static_cast<uint8_t>(color.z * 255),
+                          255));
       m_ceilClip[x] = static_cast<int16_t>(m_canvasHeight);
       m_floorClip[x] = -1;
-    } else {
-      // TODO: portals
     }
 
     topFrac += topStep;
@@ -483,6 +466,8 @@ void Renderer::RenderSegLoop(const seg_t *seg,
 
 void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side, const Player &player)
 {
+  // production version, commented out for testing
+#if 1
   // calculate rw_distance for scale calculation
   m_rw_normalAngle = seg->angle + ANG90;
   angle_t offsetangle;
@@ -510,13 +495,12 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   if (range.end > range.start) {
     const fixed_t scale2 = ScaleFromGlobalAngle(player.angle + m_xToViewAngle[range.end], player);
     m_rw_scaleStep = (scale2 - m_rw_scale) / (range.end - range.start);
+  } else {
+    m_rw_scaleStep = 0;
   }
 
   fixed_t wordTop = side->sector->ceilingHeight - player.z;
   fixed_t wordBottom = side->sector->floorHeight - player.z;
-
-  wordTop >>= 4;
-  wordBottom >>= 4;
 
   fixed_t topStep = -FixedMul(m_rw_scaleStep, wordTop);
   fixed_t topFrac = (config::CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rw_scale, wordTop);
@@ -528,6 +512,52 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   m_floorPlane = CheckVisPlane(m_floorPlane, m_rwx, m_rwStopX - 1);
 
   RenderSegLoop(seg, topStep, topFrac, bottomStep, bottomFrac);
+
+#endif
+
+#if 0
+  // use the initial version
+  // project every coord with the standard 1/y
+  double wordTop = FixedToDouble(side->sector->ceilingHeight - player.z);
+  double wordBottom = FixedToDouble(side->sector->floorHeight - player.z);
+
+  // transform y coord
+  const double y1 = FixedToDouble(seg->start->y - player.y);
+  const double y2 = FixedToDouble(seg->end->y - player.y);
+
+  const double x1 = FixedToDouble(seg->start->x - player.x);
+  const double x2 = FixedToDouble(seg->end->x - player.x);
+
+  // rotate both coordinates by player.angle
+  double playerAngleSin = FixedToDouble(finesine[player.angle >> ANGLE_TO_FINE_SHIFT]);
+  double playerAngleCos = FixedToDouble(finesine[(player.angle + ANG90) >> ANGLE_TO_FINE_SHIFT]);
+  double rotatedX1 = x1 * playerAngleCos - y1 * playerAngleSin;
+  double rotatedY1 = x1 * playerAngleSin + y1 * playerAngleCos;
+
+  double rotatedX2 = x2 * playerAngleCos - y2 * playerAngleSin;
+  double rotatedY2 = x2 * playerAngleSin + y2 * playerAngleCos;
+
+  double invY1 = 1 / rotatedY1;
+  double invY2 = 1 / rotatedY2;
+
+  int x1Proj = ProjectX(rotatedX1, invY1);
+  int x2Proj = ProjectX(rotatedX2, invY2);
+
+  if (x2Proj < x1Proj) {
+    std::swap(x1Proj, x2Proj);
+    std::swap(invY1, invY2);
+  }
+
+  for (int x = std::max(0, x1Proj); x <= std::min(config::CANVAS_WIDTH - 1, x2Proj); x++) {
+    const double t = (x - x1Proj) / static_cast<double>(x2Proj - x1Proj);
+    const double invY = std::lerp(invY1, invY2, t);
+
+    const int yTop = ProjectZ(wordTop, invY);
+    const int yBottom = ProjectZ(wordBottom, invY);
+
+    DrawColumn(x, yTop, yBottom, seg->line->frontSide->sector->color);
+  }
+#endif
 }
 
 void Renderer::RenderSSector(const Player &player, const SubSector &subsector)
@@ -581,14 +611,14 @@ void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex
   RenderBSPNode(gameState, farNodeIndex);
 }
 
-int16_t Renderer::ProjectZ(const double_t z, const double_t inv_y) const
+int Renderer::ProjectZ(const double_t z, const double_t inv_y) const
 {
-  return static_cast<int16_t>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y);
+  return static_cast<int>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y);
 }
 
-int16_t Renderer::ProjectX(const double_t x, const double_t inv_y) const
+int Renderer::ProjectX(const double_t x, const double_t inv_y) const
 {
-  return static_cast<int16_t>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y);
+  return static_cast<int>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y);
 }
 
 // TODO: change color to texture implementation
@@ -606,4 +636,44 @@ Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, con
   memset(newPlane->top, 0xff, sizeof(newPlane->top));
 
   return newPlane;
+}
+
+void Renderer::Render(const GameState &gameState)
+{
+  ResetClippingArrays();
+  // production version, turned off to test other parts
+#if 0
+  if (m_level->nodes.empty()) {
+    // Entire level is a single subsector (no BSP splits were needed)
+    if (!m_level->subsectors.empty()) {
+      const SubSector &subsector = m_level->subsectors[0];
+
+      for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
+        RenderSeg(m_level->segments.data() + i, gameState.playerState);
+      }
+    }
+  } else {
+    RenderBSPNode(gameState, 0);
+  }
+#endif
+
+  // for testing just render every segment
+  for (line_t &line : m_level->linedefs) {
+    seg_t seg{
+      line.start, line.end, PointToAngle2(line.start->x, line.start->y, line.end->x, line.end->y), &line, 0, 0
+    };
+
+    RenderSeg(&seg, gameState.playerState);
+
+    if (line.backSide) {
+      seg_t backSeg{ line.start, line.end, PointToAngle2(line.start->x, line.start->y, line.end->x, line.end->y),
+                     &line,      1,        0 };
+
+      RenderSeg(&backSeg, gameState.playerState);
+    }
+  }
+
+  RenderVisPlanes();
+
+  m_fb.update();
 }
