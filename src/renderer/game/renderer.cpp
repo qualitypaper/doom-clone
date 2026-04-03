@@ -67,13 +67,13 @@ void Renderer::InitXToViewAngle()
 fixed_t Renderer::ScaleFromGlobalAngle(const angle_t angle, const Player &player) const
 {
   const angle_t anglea = ANG90 + (angle - player.angle);
-  const angle_t angleb = ANG90 + (angle - m_rw_normalAngle);
+  const angle_t angleb = ANG90 + (angle - m_rwNormalAngle);
 
   // both sines are allways positive
   const fixed_t sinea = finesine[anglea >> ANGLE_TO_FINE_SHIFT];
   const fixed_t sineb = finesine[angleb >> ANGLE_TO_FINE_SHIFT];
   const fixed_t num = FixedMul(config::CANVAS_CENTERX_FRAC, sineb);
-  const fixed_t den = FixedMul(m_rw_distance, sinea);
+  const fixed_t den = FixedMul(m_rwDistance, sinea);
 
   fixed_t scale;
 
@@ -169,9 +169,6 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
     clipStart++;
   }
 
-  StoreWallRange({ start, end }, seg, sidedef, player);
-  return;
-
   ClipRange *next;
   if (start < clipStart->start) {
     if (end < clipStart->start - 1) {
@@ -194,7 +191,7 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
     }
 
     // there is a fragment above *start
-    StoreWallRange({ start, static_cast<int16_t>(clipStart->start - 1) }, seg, sidedef, player);
+    StoreWallRange({ start, clipStart->start - 1 }, seg, sidedef, player);
     clipStart->start = start;
   }
 
@@ -207,8 +204,7 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
 
   while (next + 1 - m_solidSegs.data() < m_solidSegs.size() && end >= (next + 1)->start - 1) {
     // there is a fragment between two posts
-    StoreWallRange(
-      { static_cast<int16_t>(next->end + 1), static_cast<int16_t>((next + 1)->start - 1) }, seg, sidedef, player);
+    StoreWallRange({ next->end + 1, (next + 1)->start - 1 }, seg, sidedef, player);
     next++;
 
     if (end <= next->end) {
@@ -229,7 +225,7 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
   }
 
   // there is a fragment after next
-  StoreWallRange({ static_cast<int16_t>(next->end + 1), end }, seg, sidedef, player);
+  StoreWallRange({ next->end + 1, end }, seg, sidedef, player);
   next->end = end;
 }
 
@@ -261,10 +257,7 @@ void Renderer::ClipPassWall(int start, int end, const seg_t *seg, const side_t *
 
   while (end >= (clipStart + 1)->start - 1) {
     // There is a fragment between two posts.
-    StoreWallRange({ static_cast<int16_t>(clipStart->end + 1), static_cast<int16_t>((clipStart + 1)->start - 1) },
-                   seg,
-                   side,
-                   player);
+    StoreWallRange({ clipStart->end + 1, (clipStart + 1)->start - 1 }, seg, side, player);
     clipStart++;
 
     if (end <= clipStart->end) {
@@ -274,7 +267,7 @@ void Renderer::ClipPassWall(int start, int end, const seg_t *seg, const side_t *
   }
 
   // There is a fragment after *next.
-  StoreWallRange({ static_cast<int16_t>(clipStart->end + 1), end }, seg, side, player);
+  StoreWallRange({ clipStart->end + 1, end }, seg, side, player);
 }
 
 void Renderer::RenderSeg(const seg_t *seg, const Player &player)
@@ -290,7 +283,7 @@ void Renderer::RenderSeg(const seg_t *seg, const Player &player)
     return;
   }
 
-  m_rw_angle1 = angle1;
+  m_rwAngle1 = angle1;
   angle1 -= player.angle;
   angle2 -= player.angle;
 
@@ -396,11 +389,24 @@ Visplane *Renderer::CheckVisPlane(Visplane *visplane, const int start, const int
   visplane->maxX = end;
 
   memset(visplane->top, -1, sizeof(visplane->top));
+  memset(visplane->bottom, -1, sizeof(visplane->bottom));
 
   return visplane;
 }
 
-void Renderer::RenderVisPlanes() {}
+void Renderer::RenderVisPlanes(const Player &player)
+{
+  for (const Visplane &plane : m_visplanes) {
+    for (int x = plane.minX; x <= plane.maxX; x++) {
+      if (plane.bottom[x] == -1 || plane.top[x] == -1) continue;
+
+      int top = plane.top[x];
+      int bottom = plane.bottom[x];
+
+      DrawColumn(x, bottom, top, plane.color);
+    }
+  }
+}
 
 void Renderer::RenderSegLoop(const seg_t *seg,
                              const fixed_t topStep,
@@ -408,7 +414,7 @@ void Renderer::RenderSegLoop(const seg_t *seg,
                              const fixed_t bottomStep,
                              fixed_t bottomFrac)
 {
-  for (int x = m_rwx; x < std::min(m_rwStopX, (int)config::CANVAS_WIDTH); x++) {
+  for (int x = m_rwx; x < std::min(m_rwStopX, static_cast<int>(config::CANVAS_WIDTH)); x++) {
     int yl = (topFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
     if (yl < m_ceilClip[x] + 1) {
@@ -454,8 +460,6 @@ void Renderer::RenderSegLoop(const seg_t *seg,
       color.y += index;
       color.z += index;
 
-      std::cout << "Drew a line from: " << yl << " to " << yh << " at x = " << x << '\n';
-
       DrawColumn(x,
                  yl,
                  yh,
@@ -474,16 +478,14 @@ void Renderer::RenderSegLoop(const seg_t *seg,
 
 void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side, const Player &player)
 {
-  // production version, commented out for testing
-#if 1
   // calculate rw_distance for scale calculation
-  m_rw_normalAngle = seg->angle + ANG90;
+  m_rwNormalAngle = seg->angle + ANG90;
   angle_t offsetangle;
 
-  if (m_rw_normalAngle > m_rw_angle1) {
-    offsetangle = m_rw_normalAngle - m_rw_angle1;
+  if (m_rwNormalAngle > m_rwAngle1) {
+    offsetangle = m_rwNormalAngle - m_rwAngle1;
   } else {
-    offsetangle = m_rw_angle1 - m_rw_normalAngle;
+    offsetangle = m_rwAngle1 - m_rwNormalAngle;
   }
 
   if (offsetangle > ANG90) {
@@ -493,18 +495,18 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   const angle_t disAngle = ANG90 - offsetangle;
   const fixed_t hyp = PointToDist(seg->line->start->x, seg->line->start->y, player);
   const fixed_t sineval = finesine[disAngle >> ANGLE_TO_FINE_SHIFT];
-  m_rw_distance = FixedMul(hyp, sineval);
+  m_rwDistance = FixedMul(hyp, sineval);
 
   m_rwx = range.start;
   m_rwStopX = range.end + 1;
 
-  m_rw_scale = ScaleFromGlobalAngle(player.angle + m_xToViewAngle[range.start], player);
+  m_rwScale = ScaleFromGlobalAngle(player.angle + m_xToViewAngle[range.start], player);
 
   if (range.end > range.start) {
     const fixed_t scale2 = ScaleFromGlobalAngle(player.angle + m_xToViewAngle[range.end], player);
-    m_rw_scaleStep = (scale2 - m_rw_scale) / (range.end - range.start);
+    m_rwScaleStep = (scale2 - m_rwScale) / (range.end - range.start);
   } else {
-    m_rw_scaleStep = 0;
+    m_rwScaleStep = 0;
   }
 
   fixed_t wordTop = side->sector->ceilingHeight - player.z;
@@ -513,62 +515,16 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   wordTop >>= 4;
   wordBottom >>= 4;
 
-  fixed_t topStep = -FixedMul(m_rw_scaleStep, wordTop);
-  fixed_t topFrac = (config::CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rw_scale, wordTop);
+  fixed_t topStep = -FixedMul(m_rwScaleStep, wordTop);
+  fixed_t topFrac = (config::CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rwScale, wordTop);
 
-  fixed_t bottomStep = -FixedMul(m_rw_scaleStep, wordBottom);
-  fixed_t bottomFrac = (config::CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rw_scale, wordBottom);
+  fixed_t bottomStep = -FixedMul(m_rwScaleStep, wordBottom);
+  fixed_t bottomFrac = (config::CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rwScale, wordBottom);
 
   m_ceilPlane = CheckVisPlane(m_ceilPlane, m_rwx, m_rwStopX - 1);
   m_floorPlane = CheckVisPlane(m_floorPlane, m_rwx, m_rwStopX - 1);
 
   RenderSegLoop(seg, topStep, topFrac, bottomStep, bottomFrac);
-
-#endif
-
-#if 0
-  // use the initial version
-  // project every coord with the standard 1/y
-  double wordTop = FixedToDouble(side->sector->ceilingHeight - player.z);
-  double wordBottom = FixedToDouble(side->sector->floorHeight - player.z);
-
-  // transform y coord
-  const double y1 = FixedToDouble(seg->start->y - player.y);
-  const double y2 = FixedToDouble(seg->end->y - player.y);
-
-  const double x1 = FixedToDouble(seg->start->x - player.x);
-  const double x2 = FixedToDouble(seg->end->x - player.x);
-
-  // rotate both coordinates by player.angle
-  double playerAngleSin = FixedToDouble(finesine[player.angle >> ANGLE_TO_FINE_SHIFT]);
-  double playerAngleCos = FixedToDouble(finesine[(player.angle + ANG90) >> ANGLE_TO_FINE_SHIFT]);
-  double rotatedX1 = x1 * playerAngleCos - y1 * playerAngleSin;
-  double rotatedY1 = x1 * playerAngleSin + y1 * playerAngleCos;
-
-  double rotatedX2 = x2 * playerAngleCos - y2 * playerAngleSin;
-  double rotatedY2 = x2 * playerAngleSin + y2 * playerAngleCos;
-
-  double invY1 = 1 / rotatedY1;
-  double invY2 = 1 / rotatedY2;
-
-  int x1Proj = ProjectX(rotatedX1, invY1);
-  int x2Proj = ProjectX(rotatedX2, invY2);
-
-  if (x2Proj < x1Proj) {
-    std::swap(x1Proj, x2Proj);
-    std::swap(invY1, invY2);
-  }
-
-  for (int x = std::max(0, x1Proj); x <= std::min(config::CANVAS_WIDTH - 1, x2Proj); x++) {
-    const double t = (x - x1Proj) / static_cast<double>(x2Proj - x1Proj);
-    const double invY = std::lerp(invY1, invY2, t);
-
-    const int yTop = ProjectZ(wordTop, invY);
-    const int yBottom = ProjectZ(wordBottom, invY);
-
-    DrawColumn(x, yTop, yBottom, seg->line->frontSide->sector->color);
-  }
-#endif
 }
 
 void Renderer::RenderSSector(const Player &player, const SubSector &subsector)
@@ -622,16 +578,6 @@ void Renderer::RenderBSPNode(const GameState &gameState, const int16_t nodeIndex
   RenderBSPNode(gameState, farNodeIndex);
 }
 
-int Renderer::ProjectZ(const double_t z, const double_t inv_y) const
-{
-  return static_cast<int>(static_cast<double_t>(m_canvasHeight) / 2 - z * FOCAL_LENGTH * inv_y);
-}
-
-int Renderer::ProjectX(const double_t x, const double_t inv_y) const
-{
-  return static_cast<int>(static_cast<double>(m_canvasWidth) / 2 + x * FOCAL_LENGTH * inv_y);
-}
-
 // TODO: change color to texture implementation
 Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, const int16_t lightLevel)
 {
@@ -644,7 +590,7 @@ Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, con
   m_visplanes.emplace_back(height, color, lightLevel, config::CANVAS_WIDTH, -1);
   Visplane *newPlane = &m_visplanes.back();
 
-  memset(newPlane->top, 0xff, sizeof(newPlane->top));
+  memset(newPlane->top, -1, sizeof(newPlane->top));
 
   return newPlane;
 }
@@ -652,8 +598,7 @@ Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, con
 void Renderer::Render(const GameState &gameState)
 {
   ResetClippingArrays();
-  // production version, turned off to test other parts
-#if 1
+
   if (m_level->nodes.empty()) {
     // Entire level is a single subsector (no BSP splits were needed)
     if (!m_level->subsectors.empty()) {
@@ -666,27 +611,8 @@ void Renderer::Render(const GameState &gameState)
   } else {
     RenderBSPNode(gameState, 0);
   }
-#endif
 
-#if 0
-  // for testing just render every segment
-  for (line_t &line : m_level->linedefs) {
-    seg_t seg{
-      line.start, line.end, PointToAngle2(line.start->x, line.start->y, line.end->x, line.end->y), &line, 0, 0
-    };
-
-    RenderSeg(&seg, gameState.playerState);
-
-    if (line.backSide) {
-      seg_t backSeg{ line.start, line.end, PointToAngle2(line.start->x, line.start->y, line.end->x, line.end->y),
-                     &line,      1,        0 };
-
-      RenderSeg(&backSeg, gameState.playerState);
-    }
-  }
-#endif
-
-  RenderVisPlanes();
+  RenderVisPlanes(gameState.playerState);
 
   m_fb.update();
 }

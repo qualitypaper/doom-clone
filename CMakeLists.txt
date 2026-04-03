@@ -17,14 +17,6 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif ()
 
-# ---- Compiler warnings ----
-add_library(project_warnings INTERFACE)
-
-target_compile_options(project_warnings INTERFACE
-        $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -Wextra -Wpedantic>
-        $<$<CXX_COMPILER_ID:MSVC>:/W4>
-)
-
 # ---- Main executable ----
 file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "src/*.cpp")
 
@@ -42,10 +34,12 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
         PRIVATE
-        project_warnings
         SDL2::SDL2
         SDL2::SDL2main
 )
+
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}")
 
 # ---- Install rules ----
 install(TARGETS ${PROJECT_NAME}

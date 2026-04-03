@@ -4,6 +4,7 @@
 
 
 #include <cstdint>
+#include <string_view>
 
 namespace config {
 constexpr uint16_t WINDOW_WIDTH = 1200;
@@ -34,7 +35,7 @@ constexpr uint8_t DESIRED_FRAMERATE = 144;
 // made for fov of 90 degress, where tan(FOV/2) equals 1, if desired to change add (...)/tan(FOV/2)
 constexpr uint32_t PROJECTION_PLANE_DISTANCE = 1;
 
-constexpr double MOUSE_SENSITIVITY = 0.1;
+constexpr double MOUSE_SENSITIVITY = 1;
 
-constexpr const char *SAVED_LEVEL_PATH = "levels.wad";
+inline const std::string_view SAVED_LEVEL_PATH = PROJECT_ROOT_PATH "/levels.wad";
 }// namespace config

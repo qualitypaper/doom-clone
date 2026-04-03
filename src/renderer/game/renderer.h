@@ -34,9 +34,9 @@ private:
 
   Visplane *FindVisPlane(fixed_t height, uint32_t color, int16_t lightLevel);
   Visplane *CheckVisPlane(Visplane *visplane, int start, int end);
-  void RenderVisPlanes();
+  void RenderVisPlanes(const Player &player);
 
-  fixed_t ScaleFromGlobalAngle(angle_t angle, const Player &player) const;
+  [[nodiscard ]] fixed_t ScaleFromGlobalAngle(angle_t angle, const Player &player) const;
   void RenderSegLoop(const seg_t *seg, fixed_t topStep, fixed_t topFrac, fixed_t bottomStep, fixed_t bottomFrac);
   void StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side, const Player &player);
   void RenderSeg(const seg_t *seg, const Player &player);
@@ -59,14 +59,11 @@ private:
     return left < right;
   }
 
-  [[nodiscard]] int ProjectZ(double_t z, double_t inv_y) const;
-  [[nodiscard]] int ProjectX(double_t x, double_t inv_y) const;
-
 private:
   std::vector<int16_t> m_floorClip;
   std::vector<int16_t> m_ceilClip;
   // newEnd is one past the last clip range
-  ClipRange* m_newEnd;
+  ClipRange* m_newEnd{};
   std::vector<ClipRange> m_solidSegs;
   std::vector<Visplane> m_visplanes;
 
@@ -77,11 +74,11 @@ private:
 
   Visplane *m_ceilPlane = nullptr, *m_floorPlane = nullptr;
 
-  angle_t m_rw_normalAngle{};
-  angle_t m_rw_angle1{};
-  fixed_t m_rw_distance{};
-  fixed_t m_rw_scale{};
-  fixed_t m_rw_scaleStep{};
+  angle_t m_rwNormalAngle{};
+  angle_t m_rwAngle1{};
+  fixed_t m_rwDistance{};
+  fixed_t m_rwScale{};
+  fixed_t m_rwScaleStep{};
   int m_rwx{};
   int m_rwStopX{};
 

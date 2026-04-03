@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 
   gameState.playerState = Player{ .x = 0 << FRAC_BITS,
                                   .y = 0 << FRAC_BITS,
-                                  .z = 100 << FRAC_BITS,
+                                  .z = 10 << FRAC_BITS,
                                   .velocity = 15 << FRAC_BITS,
                                   .angle = ANG90,
                                   .health = 100,

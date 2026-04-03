@@ -9,14 +9,16 @@ namespace simulation {
 void update(GameState &gameState, const InputState &input, const double_t dt)
 {
   // mouse
-  const fixed_t mouseMovement = DoubleToFixed((double)input.mouse_dx * config::MOUSE_SENSITIVITY);
-  const angle_t angleDiff = (mouseMovement < 0 ? 1 : -ddd1) * tantoangle[SlopeDiv(std::abs(mouseMovement), FOCAL_LENGTH)];
-  gameState.playerState.angle = (gameState.playerState.angle + angleDiff);
+  const fixed_t mouseMovement = DoubleToFixed(static_cast<double>(input.mouse_dx) * config::MOUSE_SENSITIVITY);
+  const angle_t angleDiff = (mouseMovement < 0 ? 1 : -1) * tantoangle[SlopeDiv(std::abs(mouseMovement), FOCAL_LENGTH)];
+  gameState.playerState.angle += angleDiff;
 
   fixed_t &x = gameState.playerState.x, &y = gameState.playerState.y;
 
-  const fixed_t sin = finesine[gameState.playerState.angle >> ANGLE_TO_FINE_SHIFT];
-  const fixed_t cos = finesine[(gameState.playerState.angle + ANG90) >> ANGLE_TO_FINE_SHIFT];
+  // Movement should be based on the current facing angle, not per-frame mouse delta.
+  const angle_t viewAngle = gameState.playerState.angle;
+  const fixed_t sin = finesine[viewAngle >> ANGLE_TO_FINE_SHIFT];
+  const fixed_t cos = finesine[(viewAngle + ANG90) >> ANGLE_TO_FINE_SHIFT];
 
   fixed_t moveSide = 0, moveForward = 0;
 
@@ -33,8 +35,9 @@ void update(GameState &gameState, const InputState &input, const double_t dt)
 
   const fixed_t dis = FixedMul(DoubleToFixed(dt), velocity);
 
-  x += FixedMul(FixedMul(moveSide, cos) + FixedMul(moveForward, sin), dis);
-  y += FixedMul(FixedMul(moveSide, (-sin)) + FixedMul(moveForward, cos), dis);
+  // Forward = (cos, sin), right strafe = (sin, -cos) in this angle system.
+  x += FixedMul(FixedMul(moveForward, cos) + FixedMul(moveSide, sin), dis);
+  y += FixedMul(FixedMul(moveForward, sin) - FixedMul(moveSide, cos), dis);
 }
 
 }// namespace simulation
