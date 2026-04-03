@@ -169,6 +169,9 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
     clipStart++;
   }
 
+  StoreWallRange({ start, end }, seg, sidedef, player);
+  return;
+
   ClipRange *next;
   if (start < clipStart->start) {
     if (end < clipStart->start - 1) {
@@ -315,8 +318,11 @@ void Renderer::RenderSeg(const seg_t *seg, const Player &player)
   angle1 = (angle1 + FOV) >> ANGLE_TO_FINE_SHIFT;
   angle2 = (angle2 + FOV) >> ANGLE_TO_FINE_SHIFT;
 
-  const int x1 = m_viewAngleToX[angle1];
-  const int x2 = m_viewAngleToX[angle2];
+  int x1 = m_viewAngleToX[angle1];
+  int x2 = m_viewAngleToX[angle2];
+
+  if (x1 == x2)
+    return;
 
   const bool isBackSide = seg->side;
 
@@ -448,6 +454,8 @@ void Renderer::RenderSegLoop(const seg_t *seg,
       color.y += index;
       color.z += index;
 
+      std::cout << "Drew a line from: " << yl << " to " << yh << " at x = " << x << '\n';
+
       DrawColumn(x,
                  yl,
                  yh,
@@ -501,6 +509,9 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
 
   fixed_t wordTop = side->sector->ceilingHeight - player.z;
   fixed_t wordBottom = side->sector->floorHeight - player.z;
+
+  wordTop >>= 4;
+  wordBottom >>= 4;
 
   fixed_t topStep = -FixedMul(m_rw_scaleStep, wordTop);
   fixed_t topFrac = (config::CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rw_scale, wordTop);
@@ -642,7 +653,7 @@ void Renderer::Render(const GameState &gameState)
 {
   ResetClippingArrays();
   // production version, turned off to test other parts
-#if 0
+#if 1
   if (m_level->nodes.empty()) {
     // Entire level is a single subsector (no BSP splits were needed)
     if (!m_level->subsectors.empty()) {
@@ -657,6 +668,7 @@ void Renderer::Render(const GameState &gameState)
   }
 #endif
 
+#if 0
   // for testing just render every segment
   for (line_t &line : m_level->linedefs) {
     seg_t seg{
@@ -672,6 +684,7 @@ void Renderer::Render(const GameState &gameState)
       RenderSeg(&backSeg, gameState.playerState);
     }
   }
+#endif
 
   RenderVisPlanes();
 

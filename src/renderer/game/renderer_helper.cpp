@@ -66,7 +66,7 @@ angle_t PointToAngle(fixed_t x, fixed_t y, const fixed_t viewx, const fixed_t vi
 
 angle_t PointToAngle2(const fixed_t x1, const fixed_t y1, const fixed_t x2, const fixed_t y2)
 {
-  return PointToAngle(x1, y1, x2, y2);
+  return PointToAngle(x2, y2, x1, y1);
 }
 
 fixed_t PointToDist(const fixed_t x, const fixed_t y, const Player &player)
