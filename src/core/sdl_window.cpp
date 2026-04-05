@@ -4,19 +4,20 @@
 #include "sdl_window.h"
 
 void SdlWindow::updatePixels(const uint32_t *pixels) const
-{ SDL_UpdateTexture(texture, nullptr, pixels, width * sizeof(uint32_t)); }
+{
+  SDL_UpdateTexture(texture, nullptr, pixels, static_cast<int>(width * sizeof(uint32_t)));
+}
 
 void SdlWindow::updateScreen() const
 {
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, nullptr, nullptr);
   SDL_RenderPresent(renderer);
-  // Not needed when using renderer - SDL_RenderPresent handles this
 }
 
-SdlWindow::SdlWindow(const char* title, const uint16_t _width, const uint16_t _height, const uint32_t flags)
+SdlWindow::SdlWindow(const char *title, const uint16_t _width, const uint16_t _height, const uint32_t flags)
 {
-  if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+  if (SDL_Init(SDL_INIT_VIDEO) < 0) {
     throw std::runtime_error("SDL failed to initialize, Error: " + std::string(SDL_GetError()));
   }
 
@@ -33,7 +34,9 @@ SdlWindow::SdlWindow(const char* title, const uint16_t _width, const uint16_t _h
 
   window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
 
-  if (!window) { throw std::runtime_error("SDL failed to create a window, Error: " + std::string(SDL_GetError())); }
+  if (!window) {
+    throw std::runtime_error("SDL failed to create a window, Error: " + std::string(SDL_GetError()));
+  }
 
   renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
   if (!renderer) {
@@ -42,9 +45,11 @@ SdlWindow::SdlWindow(const char* title, const uint16_t _width, const uint16_t _h
   }
 
   texture = SDL_CreateTexture(
-    renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, config::WINDOW_WIDTH, config::WINDOW_HEIGHT);
+    renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT);
 
-  if (!texture) { throw std::runtime_error("SDL failed to create a texture, Error: " + std::string(SDL_GetError())); }
+  if (!texture) {
+    throw std::runtime_error("SDL failed to create a texture, Error: " + std::string(SDL_GetError()));
+  }
 }
 
 SdlWindow::~SdlWindow()

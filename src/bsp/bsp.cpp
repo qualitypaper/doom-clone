@@ -11,9 +11,9 @@ void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fi
 {
   for (const auto &seg : segs) {
     const Vertex start =
-      vertices[seg.startVertex].fromCenterCoords(config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+      vertices[seg.startVertex].fromCenterCoords(EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT);
     const Vertex end =
-      vertices[seg.endVertex].fromCenterCoords(config::EDITOR_WINDOW_WIDTH, config::EDITOR_WINDOW_HEIGHT);
+      vertices[seg.endVertex].fromCenterCoords(EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT);
 
     boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(start.y));
     boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(end.y));

@@ -20,7 +20,7 @@
 
 int main(int argc, char *argv[]);
 
-void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &window);
+void PollSdlEvents(GameState &gameState, InputState &input, const SdlWindow &window);
 
 bool running;
 
@@ -132,8 +132,8 @@ int main(int argc, char *argv[])
   // setup sdl window
   SdlWindow sdlWindow(
     "Doom Clone",
-    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_WIDTH : config::WINDOW_WIDTH,
-    gameState.currentMode == EngineMode::EDITOR_2D ? config::EDITOR_WINDOW_HEIGHT : config::WINDOW_HEIGHT,
+    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_WIDTH : WINDOW_WIDTH,
+    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_HEIGHT : WINDOW_HEIGHT,
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
@@ -141,11 +141,11 @@ int main(int argc, char *argv[])
 
   // setup the game renderer
   FrameBuffer fb(sdlWindow);
-  Renderer renderer(fb, level, config::CANVAS_WIDTH, config::CANVAS_HEIGHT);
+  Renderer renderer(fb, level, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   running = true;
   // game loop
-  constexpr double_t dt = 1 / static_cast<double>(config::DESIRED_FRAMERATE);
+  constexpr double_t dt = 1 / static_cast<double>(DESIRED_FRAMERATE);
   const double_t perfFreq = static_cast<double_t>(SDL_GetPerformanceFrequency());
   double_t acc = 0.0;
 
@@ -157,12 +157,11 @@ int main(int argc, char *argv[])
   while (running) {
     const uint64_t frameStart = SDL_GetPerformanceCounter();
     // reseting the states to defaults
-    renderer.ResetClippingArrays();
     input.mouse_dx = 0;
     input.mouse_dy = 0;
     fb.reset();
 
-    poll_sdl_events(gameState, input, sdlWindow);
+    PollSdlEvents(gameState, input, sdlWindow);
 
     if (gameState.currentMode == EngineMode::EDITOR_2D) {
       editorRenderer.render();
@@ -218,7 +217,7 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &window)
+void PollSdlEvents(GameState &gameState, InputState &input, const SdlWindow &window)
 {
   SDL_Event event;
 
@@ -240,8 +239,6 @@ void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &w
         if (gameState.currentMode != EngineMode::GAMEPLAY_3D) {
           SetEngineMode(gameState, input, EngineMode::GAMEPLAY_3D, window);
         }
-
-
         continue;
       } else if (event.key.keysym.sym == SDLK_F2) {
         if (gameState.currentMode != EngineMode::EDITOR_2D) {
@@ -267,6 +264,7 @@ void poll_sdl_events(GameState &gameState, InputState &input, const SdlWindow &w
     case SDL_MOUSEMOTION:
       HandleMouseMovement(event, input);
       break;
+    default:;
     }
   }
 }

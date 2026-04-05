@@ -120,7 +120,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   uint16_t &numberOfLevels,
   const std::unique_ptr<BspLevel> &bspLevel) const
 {
-  const bool fileExists = std::filesystem::exists(config::SAVED_LEVEL_PATH);
+  const bool fileExists = std::filesystem::exists(SAVED_LEVEL_PATH);
 
   std::vector<LevelData> allLevels;
   header _header{};
@@ -128,7 +128,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
 
   if (fileExists) {
     // extracting existing levels into memory
-    FileReader fr(config::SAVED_LEVEL_PATH);
+    FileReader fr(SAVED_LEVEL_PATH);
     fr.ReadRaw(_header);
 
     std::vector<directoryEntry> entries = ReadDirectory(fr, _header);
@@ -162,7 +162,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
     allLevels.push_back(std::move(newLevelData));
   }
 
-  FileWriter fw(config::SAVED_LEVEL_PATH, std::ios::binary | std::ios::trunc);
+  FileWriter fw(SAVED_LEVEL_PATH, std::ios::binary | std::ios::trunc);
 
   std::cout << "Saving level\n";
 
@@ -232,9 +232,9 @@ void EditorLevel::Save(const std::array<char8_t, 8> _name,
 
 void EditorLevel::Load(const uint16_t width, const uint16_t height)
 {
-  FileReader fr(config::SAVED_LEVEL_PATH);
+  FileReader fr(SAVED_LEVEL_PATH);
   if (!fr.IsStreamGood()) {
-    std::cerr << "Failed to open " << config::SAVED_LEVEL_PATH << " for loading. Using hardcoded level data." << '\n';
+    std::cerr << "Failed to open " << SAVED_LEVEL_PATH << " for loading. Using hardcoded level data." << '\n';
     return;
   }
 
@@ -302,7 +302,7 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
  */
 size_t EditorLevel::Load(std::unique_ptr<Level> &level)
 {
-  FileReader fr(config::SAVED_LEVEL_PATH);
+  FileReader fr(SAVED_LEVEL_PATH);
 
   header _header{};
   fr.ReadRaw(_header);

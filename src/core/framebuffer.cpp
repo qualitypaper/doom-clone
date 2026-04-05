@@ -1,8 +1,6 @@
 #include "framebuffer.h"
 #include "config.h"
 
-bool isOutOfBounds(uint16_t y) { return (y >= config::WINDOW_HEIGHT); }
-
 FrameBuffer::FrameBuffer(SdlWindow &sdlWindow) : sdlWindow(sdlWindow), width(sdlWindow.width), height(sdlWindow.height)
 {
   const uint32_t n = width * height;

@@ -363,7 +363,6 @@ void Editor::TransformVertices() const
 
   if (state->transformedVertices.size() != vertices.size()) {
     state->transformedVertices.resize(vertices.size());
-    std::printf("");
   }
 
   // editor vertex contains a vector, so copy is unacceptable

@@ -9,7 +9,7 @@ namespace simulation {
 void update(GameState &gameState, const InputState &input, const double_t dt)
 {
   // mouse
-  const fixed_t mouseMovement = DoubleToFixed(static_cast<double>(input.mouse_dx) * config::MOUSE_SENSITIVITY);
+  const fixed_t mouseMovement = DoubleToFixed(static_cast<double>(input.mouse_dx) * MOUSE_SENSITIVITY);
   const angle_t angleDiff = (mouseMovement < 0 ? 1 : -1) * tantoangle[SlopeDiv(std::abs(mouseMovement), FOCAL_LENGTH)];
   gameState.playerState.angle += angleDiff;
 

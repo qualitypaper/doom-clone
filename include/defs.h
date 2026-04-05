@@ -18,8 +18,8 @@ struct Visplane
   int minX = 0;
   int maxX = 0;
 
-  int16_t top[config::CANVAS_WIDTH]{};
-  int16_t bottom[config::CANVAS_WIDTH]{};
+  int16_t top[CANVAS_WIDTH]{};
+  int16_t bottom[CANVAS_WIDTH]{};
 };
 
 struct ClipRange

@@ -12,7 +12,18 @@ static constexpr uint16_t MAX_VISPLANES = 128;
 static constexpr uint16_t MAX_SEGMENTS = 64;
 
 static const fixed_t FOCAL_LENGTH =
-  FixedDiv(config::CANVAS_WIDTH << (FRAC_BITS - 1), finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
+  FixedDiv(CANVAS_WIDTH << (FRAC_BITS - 1), finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
+
+
+struct drawseg_t
+{
+  int y, x1, x2;
+  fixed_t xStep, yStep;
+  fixed_t xFrac, yFrac;
+
+  // TODO: change to texture implementation
+  uint32_t color;
+};
 
 // Forward declaration
 class FrameBuffer;
@@ -22,29 +33,36 @@ class Renderer
 public:
   Renderer(FrameBuffer &_fb, std::shared_ptr<Level> _level, uint16_t canvasWidth, uint16_t canvasHeight);
   void Render(const GameState &gameState);
-  void ResetClippingArrays();
-  void ResetSolidSegs();
+  void Reset();
 
   void DrawColumn(int x, int y0, int y1, uint32_t color) const;
 
 private:
+  void InitYSlope();
+  void InitDistScale();
   void InitViewAngleToX();
   void InitXToViewAngle();
 
+  // plane rendering
+  void MapPlane(const Visplane &plane, int y, int x1, int x2) const;
+  void MakeSpans(const Visplane &plane, int x, int t1, int b1, int t2, int b2) const;
+  void DrawSpan(const drawseg_t &ds) const;
 
+  void ResetSolidSegs();
+  void ResetPlanes();
   Visplane *FindVisPlane(fixed_t height, uint32_t color, int16_t lightLevel);
   Visplane *CheckVisPlane(Visplane *visplane, int start, int end);
-  void RenderVisPlanes(const Player &player);
+  void RenderVisPlanes();
 
-  [[nodiscard ]] fixed_t ScaleFromGlobalAngle(angle_t angle, const Player &player) const;
+  [[nodiscard ]] fixed_t ScaleFromGlobalAngle(angle_t angle) const;
   void RenderSegLoop(const seg_t *seg, fixed_t topStep, fixed_t topFrac, fixed_t bottomStep, fixed_t bottomFrac);
-  void StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side, const Player &player);
-  void RenderSeg(const seg_t *seg, const Player &player);
-  void RenderSSector(const Player &player, const SubSector &subsector);
-  void RenderBSPNode(const GameState &gameState, int16_t nodeIndex);
+  void StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side);
+  void RenderSeg(const seg_t *seg);
+  void RenderSSector(const SubSector &subsector);
+  void RenderBSPNode(int16_t nodeIndex);
 
-  void ClipSolidWall(int start, int end, const seg_t *seg, const side_t *sidedef, const Player &player);
-  void ClipPassWall(int start, int end, const seg_t *seg, const side_t *side, const Player &player);
+  void ClipSolidWall(int start, int end, const seg_t *seg, const side_t *sidedef);
+  void ClipPassWall(int start, int end, const seg_t *seg, const side_t *side);
 
   static bool PointOnSide(const Vertex v, const Node &node)
   {
@@ -62,15 +80,18 @@ private:
 private:
   std::vector<int16_t> m_floorClip;
   std::vector<int16_t> m_ceilClip;
-  // newEnd is one past the last clip range
-  ClipRange* m_newEnd{};
   std::vector<ClipRange> m_solidSegs;
   std::vector<Visplane> m_visplanes;
+
+  // distance to each row from the center (player view)
+  std::array<fixed_t, CANVAS_HEIGHT> m_ySlope{};
+  // essentially 1/cos(angle)
+  std::array<int, CANVAS_WIDTH> m_distScale{};
 
   // maps a fine angle onto screen x
   std::array<int, FINE_ANGLES / 2> m_viewAngleToX{};
   // maps a x into a fine angle
-  std::array<angle_t, config::CANVAS_WIDTH + 1> m_xToViewAngle{};
+  std::array<angle_t, CANVAS_WIDTH + 1> m_xToViewAngle{};
 
   Visplane *m_ceilPlane = nullptr, *m_floorPlane = nullptr;
 
@@ -83,6 +104,7 @@ private:
   int m_rwStopX{};
 
   FrameBuffer &m_fb;
+  const Player *m_player;
   std::shared_ptr<Level> m_level;
 
   uint16_t m_canvasWidth;
