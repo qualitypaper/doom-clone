@@ -2,10 +2,12 @@
 
 #include "sdl_window.h"
 
+#include <memory>
+
 class FrameBuffer
 {
 private:
-  SdlWindow &sdlWindow;
+  std::shared_ptr<SdlWindow> sdlWindow;
 
 public:
   uint16_t width;
@@ -13,7 +15,7 @@ public:
 
   uint32_t *pixels;
 
-  explicit FrameBuffer(SdlWindow &sdlWindow);
+  explicit FrameBuffer(std::shared_ptr<SdlWindow> sdlWindow);
   ~FrameBuffer();
 
   void update() const;

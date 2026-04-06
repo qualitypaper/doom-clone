@@ -1,6 +1,5 @@
 #include "bsp/bsp.h"
 #include "config.h"
-#include "core/framebuffer.h"
 #include "core/gameloop.h"
 #include "core/simulation.h"
 #include "renderer/editor/editor.h"
@@ -14,15 +13,10 @@
 #include <SDL_events.h>
 
 #include <cassert>
-#include <cstring>
 #include <fstream>
-#include <iostream>
-
-int main(int argc, char *argv[]);
-
-void PollSdlEvents(GameState &gameState, InputState &input, const SdlWindow &window);
 
 bool running;
+void PollSdlEvents(GameState &gameState, InputState &input, const std::shared_ptr<SdlWindow> &sdlWindow);
 
 // ==========================================
 // 1. VERTICES (World Coordinates)
@@ -98,31 +92,18 @@ static std::vector<LineDef> linedefs = {
 
 int main(int argc, char *argv[])
 {
-  // setup inputs and states
-  InputState input{};
-  GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
-
-  gameState.playerState = Player{ .x = 0 << FRAC_BITS,
-                                  .y = 0 << FRAC_BITS,
-                                  .z = 10 << FRAC_BITS,
-                                  .velocity = 15 << FRAC_BITS,
-                                  .angle = ANG90,
-                                  .health = 100,
-                                  .armor = 100,
-                                  .current_weapon = 0 };
-
   std::shared_ptr<Level> level;
   size_t numOfLevels;
 
   if (true) {
-    std::unique_ptr<Level> tempLevel = std::make_unique<Level>();
     std::array<char8_t, 8> levelName = MakeLevelName(1);
-    tempLevel->name = levelName;
+    auto tempLevel = std::make_unique<Level>(levelName);
     numOfLevels = EditorLevel::Load(tempLevel);
     level = std::move(tempLevel);
   } else {
     numOfLevels = 1;
-    level = std::make_shared<Level>();
+    std::array<char8_t, 8> levelName = MakeLevelName(1);
+    level = std::make_shared<Level>(levelName);
     level->vertices = std::move(vertices);
     level->sectors = std::move(sectors);
     Level::Init(*level, linedefs, sidedefs, std::vector<Seg>{});
@@ -130,20 +111,26 @@ int main(int argc, char *argv[])
   }
 
   // setup sdl window
-  SdlWindow sdlWindow(
-    "Doom Clone",
-    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_WIDTH : WINDOW_WIDTH,
-    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_HEIGHT : WINDOW_HEIGHT,
-    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_WIDTH : CANVAS_WIDTH,
-    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_HEIGHT : CANVAS_HEIGHT,
-    gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
+  auto sdlWindow = std::make_shared<SdlWindow>(
+    "Doom Clone", WINDOW_WIDTH, WINDOW_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
-  EditorRenderer editorRenderer(sdlWindow, *level, 1, numOfLevels);
+  auto editorRenderer = std::make_shared<EditorRenderer>(sdlWindow, *level, 1, numOfLevels);
 
   // setup the game renderer
-  FrameBuffer fb(sdlWindow);
-  Renderer renderer(fb, level);
+  auto renderer = std::make_shared<Renderer>(sdlWindow, level);
+
+  GameState gameState{ .player = { .x = 0 << FRAC_BITS,
+                                   .y = 0 << FRAC_BITS,
+                                   .z = 10 << FRAC_BITS,
+                                   .velocity = 15 << FRAC_BITS,
+                                   .angle = 0 },
+                       .currentMode = EngineMode::EDITOR_2D,
+                       .levelNum = 1,
+                       .sdlWindow = std::move(sdlWindow),
+                       .renderer = std::move(renderer),
+                       .editorRenderer = std::move(editorRenderer) };
+
 
   running = true;
   // game loop
@@ -157,55 +144,39 @@ int main(int argc, char *argv[])
   double_t fpsAccumulator = 0.0;
 
   while (running) {
-    const uint64_t frameStart = SDL_GetPerformanceCounter();
-    // reseting the states to defaults
-    input.mouse_dx = 0;
-    input.mouse_dy = 0;
-    fb.reset();
+    const size_t frameStart = SDL_GetPerformanceCounter();
+    gameState.Reset();
 
-    PollSdlEvents(gameState, input, sdlWindow);
+    PollSdlEvents(gameState, gameState.input, gameState.sdlWindow);
 
     if (gameState.currentMode == EngineMode::EDITOR_2D) {
-      editorRenderer.render();
-
-      const uint64_t frameEnd = SDL_GetPerformanceCounter();
-      const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
-      if (elapsed < dt) {
-        SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0));
-      }
-      continue;
+      gameState.editorRenderer->Render();
     } else if (gameState.currentMode == EngineMode::BSP_VIEWER) {
-      BSPBuilder::Visualize(sdlWindow, input, *level);
+      BSPBuilder::Visualize(*gameState.sdlWindow, gameState.input, *level);
+    } else {
+      // GAMEPLAY_3D
+      const uint64_t now = SDL_GetPerformanceCounter();
+      double_t frameTime = static_cast<double>(now - prev) / perfFreq;
+      prev = now;
+      if (frameTime > 0.25)
+        frameTime = 0.25;
+      acc += frameTime;
 
-      const uint64_t frameEnd = SDL_GetPerformanceCounter();
-      const double_t elapsed = static_cast<double_t>(frameEnd - frameStart) / perfFreq;
-      if (elapsed < dt) {
-        SDL_Delay(static_cast<Uint32>((dt - elapsed) * 1000.0));
+      while (acc >= dt) {
+        simulation::update(gameState, dt);
+        acc -= dt;
       }
-      continue;
-    }
 
-    uint64_t now = SDL_GetPerformanceCounter();
-    double_t frameTime = static_cast<double>(now - prev) / perfFreq;
-    prev = now;
-    if (frameTime > 0.25)
-      frameTime = 0.25;
-    acc += frameTime;
+      gameState.renderer->Render(gameState.player);
 
-    while (acc >= dt) {
-      simulation::update(gameState, input, dt);
-      acc -= dt;
-    }
-
-    renderer.Render(gameState);
-
-    // FPS tracking
-    frameCount++;
-    fpsAccumulator += frameTime;
-    if (fpsAccumulator >= 1.0) {
-      std::printf("FPS: %d\n", frameCount);
-      frameCount = 0;
-      fpsAccumulator = 0.0;
+      // FPS tracking
+      frameCount++;
+      fpsAccumulator += frameTime;
+      if (fpsAccumulator >= 1.0) {
+        std::printf("FPS: %d\n", frameCount);
+        frameCount = 0;
+        fpsAccumulator = 0.0;
+      }
     }
 
     const uint64_t frameEnd = SDL_GetPerformanceCounter();
@@ -219,7 +190,7 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-void PollSdlEvents(GameState &gameState, InputState &input, const SdlWindow &window)
+void PollSdlEvents(GameState &gameState, InputState &input, const std::shared_ptr<SdlWindow> &sdlWindow)
 {
   SDL_Event event;
 
@@ -227,7 +198,7 @@ void PollSdlEvents(GameState &gameState, InputState &input, const SdlWindow &win
     ImGui_ImplSDL2_ProcessEvent(&event);
 
     if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
-        && event.window.windowID == SDL_GetWindowID(window.getWindow())) {
+        && event.window.windowID == SDL_GetWindowID(sdlWindow->getWindow())) {
       running = false;
       continue;
     } else if (event.type == SDL_QUIT) {
@@ -239,16 +210,16 @@ void PollSdlEvents(GameState &gameState, InputState &input, const SdlWindow &win
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_F1) {
         if (gameState.currentMode != EngineMode::GAMEPLAY_3D) {
-          SetEngineMode(gameState, input, EngineMode::GAMEPLAY_3D, window);
+          SetEngineMode(gameState, EngineMode::GAMEPLAY_3D, sdlWindow);
         }
         continue;
       } else if (event.key.keysym.sym == SDLK_F2) {
         if (gameState.currentMode != EngineMode::EDITOR_2D) {
-          SetEngineMode(gameState, input, EngineMode::EDITOR_2D, window);
+          SetEngineMode(gameState, EngineMode::EDITOR_2D, sdlWindow);
         }
       } else if (event.key.keysym.sym == SDLK_F3) {
         if (gameState.currentMode != EngineMode::BSP_VIEWER) {
-          SetEngineMode(gameState, input, EngineMode::BSP_VIEWER, window);
+          SetEngineMode(gameState, EngineMode::BSP_VIEWER, sdlWindow);
         }
       }
     }

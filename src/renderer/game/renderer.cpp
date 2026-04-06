@@ -117,21 +117,20 @@ void Renderer::InitDistScale()
   }
 }
 
-Renderer::Renderer(FrameBuffer &_fb, std::shared_ptr<Level> _level)
-  : m_fb(_fb), m_player(nullptr), m_level(std::move(_level))
+Renderer::Renderer(std::shared_ptr<SdlWindow> sdlWindow, std::shared_ptr<Level> _level)
+  : m_fb(sdlWindow), m_player(nullptr), m_level(std::move(_level))
 {
   m_centerXFrac = static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1);
   m_centerYFrac = static_cast<fixed_t>(m_fb.height) << (FRAC_BITS - 1);
-  m_focalLength = FixedDiv(
-    static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1),
-    finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
+  m_focalLength = FixedDiv(static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1),
+                           finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
 
-  m_ceilClip.resize(_fb.width);
-  m_floorClip.resize(_fb.width);
-  m_ySlope.resize(_fb.height);
-  m_distScale.resize(_fb.width);
-  m_xToViewAngle.resize(_fb.width + 1);
-  m_spanStart.resize(_fb.height);
+  m_ceilClip.resize(m_fb.width);
+  m_floorClip.resize(m_fb.width);
+  m_ySlope.resize(m_fb.height);
+  m_distScale.resize(m_fb.width);
+  m_xToViewAngle.resize(m_fb.width + 1);
+  m_spanStart.resize(m_fb.height);
 
   m_visplanes.reserve(MAX_VISPLANES);
   m_solidSegs.resize(MAX_SEGMENTS);
@@ -148,6 +147,7 @@ void Renderer::Reset()
   ResetPlanes();
   ResetSolidSegs();
 }
+void Renderer::SetLevel(std::shared_ptr<Level> _level) { this->m_level = std::move(_level); }
 
 void Renderer::ResetSolidSegs()
 {
@@ -348,27 +348,21 @@ void Renderer::RenderSeg(const seg_t *seg)
   if (!backSide) {
     ClipSolidWall(x1, x2, seg, frontSide);
   } else {
-    ClipPassWall(x1, x2, seg, backSide);
+    ClipPassWall(x1, x2, seg, frontSide);
   }
 }
 
-void Renderer::RenderSegLoop(const seg_t *seg,
-                             const fixed_t topStep,
-                             fixed_t topFrac,
-                             const fixed_t bottomStep,
-                             fixed_t bottomFrac,
-                             const bool markCeiling,
-                             const bool markFloor)
+void Renderer::RenderSegLoop(drawseg_t &ds)
 {
   for (int x = m_rwx; x < std::min(m_rwStopX, static_cast<int>(m_fb.width)); x++) {
-    int yl = (topFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
+    int yl = (ds.topFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
     if (yl < m_ceilClip[x] + 1) {
       yl = m_ceilClip[x] + 1;
     }
 
     // mark ceiling
-    if (markCeiling) {
+    if (ds.markCeiling) {
       int top = m_ceilClip[x];
       int bottom = yl - 1;
 
@@ -383,14 +377,14 @@ void Renderer::RenderSegLoop(const seg_t *seg,
     }
 
 
-    int yh = (bottomFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
+    int yh = (ds.botFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
     if (yh >= m_floorClip[x]) {
       yh = m_floorClip[x] - 1;
     }
 
     // mark floor
-    if (markFloor) {
+    if (ds.markFloor) {
       int top = yh + 1;
       int bottom = m_floorClip[x] - 1;
 
@@ -404,40 +398,68 @@ void Renderer::RenderSegLoop(const seg_t *seg,
       }
     }
 
+    const uint32_t color = ds.frontSide->sector->color;
 
-    if (!seg->line->backSide) {
+    if (!ds.backSide) {
       // test version, in order to understand which wall is which
-      ImVec4 color = ImGui::ColorConvertU32ToFloat4(seg->line->frontSide->sector->color);
-      float index = (seg->line->frontSide - m_level->sidedefs.data()) / static_cast<float>(m_level->sidedefs.size());
-      color.x += index;
-      color.y += index;
-      color.z += index;
+      ImVec4 _color = ImGui::ColorConvertU32ToFloat4(color);
+      float index = (ds.frontSide - m_level->sidedefs.data()) / static_cast<float>(m_level->sidedefs.size());
+      _color.x += index;
+      _color.y += index;
+      _color.z += index;
 
       DrawColumn(x,
                  yl,
                  yh,
-                 MapColor(static_cast<uint8_t>(color.x * 255),
-                          static_cast<uint8_t>(color.y * 255),
-                          static_cast<uint8_t>(color.z * 255),
+                 MapColor(static_cast<uint8_t>(_color.x * 255),
+                          static_cast<uint8_t>(_color.y * 255),
+                          static_cast<uint8_t>(_color.z * 255),
                           255));
+
       m_ceilClip[x] = static_cast<int16_t>(m_fb.height);
       m_floorClip[x] = -1;
     } else {
-      if (seg->line->type == LineDefType::REGULAR) {
+      if (ds.seg->line->type == LineDefType::REGULAR) {
         // portal
-        if (yl > m_ceilClip[x])
-          m_ceilClip[x] = static_cast<int16_t>(yl);
-        if (yh < m_floorClip[x])
-          m_floorClip[x] = static_cast<int16_t>(yh);
-        // TODO: fix ceil/floorPlanes updates
 
-      } else if (seg->line->type == LineDefType::DOOR) {
+        // top wall
+        int mid = ds.pixHigh >> HEIGHT_BITS;
+        ds.pixHigh += ds.pixHighStep;
+
+        if (mid >= m_floorClip[x]) {
+          mid = m_floorClip[x] - 1;
+        }
+
+        if (mid >= yl) {
+          DrawColumn(x, mid, yl, MapColor(0, 255, 0, 255));
+          m_ceilClip[x] = mid;
+        } else {
+          m_ceilClip[x] = yl - 1;
+        }
+
+        // bottom wall
+        mid = (ds.pixLow + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
+        ds.pixLow += ds.pixLowStep;
+
+        if (mid <= m_ceilClip[x]) {
+          mid = m_ceilClip[x] + 1;
+        }
+
+        if (mid <= yh) {
+          DrawColumn(x, mid, yh, MapColor(0, 255, 0, 255));
+          m_floorClip[x] = mid;
+        } else {
+          m_floorClip[x] = yh + 1;
+        }
+
+      } else if (ds.seg->line->type == LineDefType::DOOR) {
         // TODO: make a door renderer
       }
     }
 
-    topFrac += topStep;
-    bottomFrac += bottomStep;
+    m_rwScale += m_rwScaleStep;
+    ds.topFrac += ds.topStep;
+    ds.botFrac += ds.botStep;
   }
 }
 
@@ -478,22 +500,46 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
     m_rwScaleStep = 0;
   }
 
-  fixed_t wordTop = side->sector->ceilingHeight - m_player->z;
-  fixed_t wordBottom = side->sector->floorHeight - m_player->z;
+  fixed_t worldTop = side->sector->ceilingHeight - m_player->z;
+  fixed_t worldBottom = side->sector->floorHeight - m_player->z;
 
-  wordTop >>= 4;
-  wordBottom >>= 4;
+  drawseg_t ds{ .seg = seg,
+                .frontSide = side,
+                .backSide = !seg->side ? seg->line->backSide : seg->line->frontSide };
 
-  fixed_t topStep = -FixedMul(m_rwScaleStep, wordTop);
-  fixed_t topFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, wordTop);
+  worldTop >>= 4;
+  worldBottom >>= 4;
 
-  fixed_t bottomStep = -FixedMul(m_rwScaleStep, wordBottom);
-  fixed_t bottomFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, wordBottom);
+  ds.topStep = -FixedMul(m_rwScaleStep, worldTop);
+  ds.topFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldTop);
+
+  ds.botStep = -FixedMul(m_rwScaleStep, worldBottom);
+  ds.botFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldBottom);
+
+  fixed_t worldHigh;
+  fixed_t worldLow;
+
+  if (ds.backSide) {
+    worldHigh = ds.backSide->sector->ceilingHeight - m_player->z;
+    worldLow = ds.backSide->sector->floorHeight - m_player->z;
+
+    worldHigh >>= 4;
+    worldLow >>= 4;
+
+    ds.pixHighStep = -FixedMul(m_rwScaleStep, worldHigh);
+    ds.pixLowStep = -FixedMul(m_rwScaleStep, worldLow);
+  } else {
+    worldHigh = 0;
+    worldLow = 0;
+  }
+
+  ds.pixHigh = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldHigh);
+  ds.pixLow = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldLow);
 
   bool markCeiling = true;
   bool markFloor = true;
 
-  if (!seg->line->backSide) {
+  if (!ds.backSide) {
     markCeiling = markFloor = true;
   } else {
     if (side->sector->floorHeight >= m_player->z) {
@@ -505,13 +551,17 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
     }
   }
 
+  ds.markFloor = markFloor;
+  ds.markCeiling = markCeiling;
+
   if (markCeiling)
     m_ceilPlane = CheckVisPlane(m_ceilPlane, m_rwx, m_rwStopX - 1);
 
   if (markFloor)
     m_floorPlane = CheckVisPlane(m_floorPlane, m_rwx, m_rwStopX - 1);
 
-  RenderSegLoop(seg, topStep, topFrac, bottomStep, bottomFrac, markCeiling, markFloor);
+
+  RenderSegLoop(ds);
 }
 
 void Renderer::RenderSSector(const SubSector &subsector)
@@ -565,9 +615,9 @@ void Renderer::RenderBSPNode(const int16_t nodeIndex)
   RenderBSPNode(farNodeIndex);
 }
 
-void Renderer::Render(const GameState &gameState)
+void Renderer::Render(const Player &player)
 {
-  this->m_player = &gameState.playerState;
+  this->m_player = &player;
   Reset();
 
   if (m_level->nodes.empty()) {

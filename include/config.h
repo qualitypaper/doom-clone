@@ -9,9 +9,6 @@
 constexpr uint16_t WINDOW_WIDTH = 1200;
 constexpr uint16_t WINDOW_HEIGHT = 800;
 
-constexpr uint16_t EDITOR_WINDOW_WIDTH = 1500;
-constexpr uint16_t EDITOR_WINDOW_HEIGHT = 1200;
-
 constexpr uint16_t CANVAS_WIDTH = 800;
 constexpr uint16_t CANVAS_HEIGHT = 600;
 

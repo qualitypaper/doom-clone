@@ -1,18 +1,24 @@
 #pragma once
 
-#include "../../../include/math_utils.h"
-#include "../../../include/tables.h"
-#include "../../bsp/bsp.h"
-#include "../../core/gameloop.h"
+#include "defs.h"
+#include "tables.h"
+#include "core/framebuffer.h"
 
+#include <array>
+#include <memory>
 #include <vector>
+
+class SdlWindow;
+struct GameState;
+struct Level;
+struct Player;
 
 static constexpr uint16_t NF_SUBSECTOR = 0x8000;
 static constexpr uint16_t MAX_VISPLANES = 128;
 static constexpr uint16_t MAX_SEGMENTS = 64;
 
 
-struct drawseg_t
+struct drawspan_t
 {
   int y, x1, x2;
   fixed_t xStep, yStep;
@@ -22,15 +28,35 @@ struct drawseg_t
   uint32_t color;
 };
 
-// Forward declaration
-class FrameBuffer;
+struct drawseg_t
+{
+  const seg_t *seg;
+  const side_t *frontSide;
+  const side_t *backSide;
+
+  fixed_t topFrac;
+  fixed_t topStep;
+  fixed_t botFrac;
+  fixed_t botStep;
+
+  bool markCeiling;
+  bool markFloor;
+
+  fixed_t pixHigh;
+  fixed_t pixHighStep;
+
+  fixed_t pixLow;
+  fixed_t pixLowStep;
+};
 
 class Renderer
 {
 public:
-  Renderer(FrameBuffer &_fb, std::shared_ptr<Level> _level);
-  void Render(const GameState &gameState);
+  Renderer(std::shared_ptr<SdlWindow> sdlWindow, std::shared_ptr<Level> _level);
+  void Render(const Player &player);
   void Reset();
+
+  void SetLevel(std::shared_ptr<Level> _level);
 
   void DrawColumn(int x, int y0, int y1, uint32_t color) const;
 
@@ -43,7 +69,7 @@ private:
   // plane rendering
   void MapPlane(const Visplane &plane, int y, int x1, int x2) const;
   void MakeSpans(const Visplane &plane, int x, int t1, int b1, int t2, int b2);
-  void DrawSpan(drawseg_t &ds) const;
+  void DrawSpan(drawspan_t &ds) const;
 
   void ResetSolidSegs();
   void ResetPlanes();
@@ -51,14 +77,8 @@ private:
   Visplane *CheckVisPlane(Visplane *visplane, int start, int end);
   void RenderVisPlanes();
 
-  [[nodiscard ]] fixed_t ScaleFromGlobalAngle(angle_t angle) const;
-  void RenderSegLoop(const seg_t *seg,
-                     fixed_t topStep,
-                     fixed_t topFrac,
-                     fixed_t bottomStep,
-                     fixed_t bottomFrac,
-                     bool markCeiling,
-                     bool markFloor);
+  [[nodiscard]] fixed_t ScaleFromGlobalAngle(angle_t angle) const;
+  void RenderSegLoop(drawseg_t &ds);
   void StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side);
   void RenderSeg(const seg_t *seg);
   void RenderSSector(const SubSector &subsector);
@@ -111,7 +131,7 @@ private:
   int m_rwx{};
   int m_rwStopX{};
 
-  FrameBuffer &m_fb;
+  FrameBuffer m_fb;
   const Player *m_player;
   std::shared_ptr<Level> m_level;
 };

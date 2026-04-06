@@ -1,13 +1,19 @@
 #include "gameloop.h"
 #include "../bsp/bsp.h"
-#include "config.h"
+#include "renderer/editor/editor_renderer.h"
+#include "renderer/game/renderer.h"
 #include "sdl_window.h"
 
 #include <SDL_mouse.h>
 #include <SDL_stdinc.h>
 #include <SDL_video.h>
 
-struct InputState;
+void GameState::Reset()
+{
+  // reset transient input state each frame
+  input.mouse_dx = 0;
+  input.mouse_dy = 0;
+}
 
 void HandleMouseMovement(const SDL_Event &event, InputState &input)
 {
@@ -22,7 +28,9 @@ void HandleKeyInput(const SDL_Event &event, InputState &input)
   input.keys[scancode] = pressed;
 }
 
-void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode, const SdlWindow &sdlWindow)
+void SetEngineMode(GameState &state,
+                   const EngineMode newMode,
+                   const std::shared_ptr<SdlWindow> &sdlWindow)
 {
   // nothing to change
   if (state.currentMode == newMode)
@@ -32,34 +40,29 @@ void SetEngineMode(GameState &state, InputState &input, const EngineMode newMode
 
   if (newMode == EngineMode::GAMEPLAY_3D) {
     // disable absolute mouse
-    // SDL_SetRelativeMouseMode(SDL_TRUE);
-    SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_FALSE);
-    SDL_SetWindowPosition(sdlWindow.getWindow(), SDL_WINDOWPOS_CENTERED_DISPLAY(1), SDL_WINDOWPOS_CENTERED_DISPLAY(1));
-    SDL_SetWindowSize(sdlWindow.getWindow(), WINDOW_WIDTH, WINDOW_HEIGHT);
-  } else if (newMode == EngineMode::BSP_VIEWER) {
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetWindowFullscreen(sdlWindow->getWindow(), SDL_FALSE);
+
+    auto newLevel = std::make_unique<Level>(state.editorRenderer->GetLevelName());
+    EditorLevel::Load(newLevel);
+    state.renderer->SetLevel(std::move(newLevel));
+
+    return;
+  } else if (newMode == EngineMode::EDITOR_2D) {
     // in order to use mouse cursor
     SDL_SetRelativeMouseMode(SDL_FALSE);
-    SDL_SetWindowSize(sdlWindow.getWindow(), EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT);
     // SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
-
-    // wiping clean the state, in order to prevent unexpected key and mouse inputs
-    memset(input.keys, false, sizeof(input.keys));
-    memset(input.mouse_buttons, false, sizeof(input.mouse_buttons));
-
-    input.mouse_dx = 0;
-    input.mouse_dy = 0;
   } else {
     // in order to use mouse cursor
     SDL_SetRelativeMouseMode(SDL_FALSE);
-    SDL_SetWindowSize(sdlWindow.getWindow(), EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT);
     // SDL_SetWindowFullscreen(sdlWindow.getWindow(), SDL_TRUE);
-
-    // wiping clean the state, in order to prevent unexpected key and mouse inputs
-    memset(input.keys, false, sizeof(input.keys));
-    memset(input.mouse_buttons, false, sizeof(input.mouse_buttons));
-    input.mouse_dx = 0;
-    input.mouse_dy = 0;
   }
+  // wiping clean the state, in order to prevent unexpected key and mouse inputs
+  state.input.keys.fill(false);
+  state.input.mouse_buttons.fill(false);
+
+  state.input.mouse_dx = 0;
+  state.input.mouse_dy = 0;
 }
 
 void Level::Load(FileReader &fr)

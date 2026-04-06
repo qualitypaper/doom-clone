@@ -77,11 +77,6 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
   state.level->linedefs.pop_back();
 }
 
-ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
-{
-  return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight());
-}
-
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
 {
   auto &vertex = state.findVertex(vertexId);
@@ -399,8 +394,10 @@ void Editor::changeLevel(const uint16_t newLevelNum) const
   const size_t copyLen = std::min(nameStr.size(), size_t{ 8 });
   std::memcpy(levelName.data(), nameStr.data(), copyLen);
 
-  state->level = std::make_unique<EditorLevel>(newLevelNum, levelName);
-  state->level->Load(state->width, state->height);
+  auto newLevel = std::make_unique<Level>(levelName);
+
+  EditorLevel::Load(newLevel);
+  state->level = std::make_unique<EditorLevel>(*newLevel, newLevelNum, this->state->width, this->state->height);
 }
 
 

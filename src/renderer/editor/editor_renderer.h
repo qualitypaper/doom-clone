@@ -16,14 +16,14 @@ struct ImVec2;
 class EditorRenderer
 {
 public:
-  EditorRenderer(SdlWindow &sdlWindow, Level &level, uint16_t _levelNum, uint16_t _numOfLevels);
+  EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow, Level &level, uint16_t _levelNum, uint16_t _numOfLevels);
   ~EditorRenderer();
 
-  void render() const;
-
+  void Render() const;
+  std::array<char8_t, 8> GetLevelName() const;
 
 private:
-  SdlWindow &m_sdlWindow;
+  std::shared_ptr<SdlWindow> m_sdlWindow;
   std::unique_ptr<Editor> m_editor;
 
   static void startFrame();

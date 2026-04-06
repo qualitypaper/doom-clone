@@ -209,7 +209,6 @@ struct EditorVertex : public EditorObject
   [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
   [[nodiscard]] ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
   [[nodiscard]] double length() const { return std::sqrt(x * x + y * y); }
-  [[nodiscard]] ImVec2 fromCenterCoords(const SdlWindow &sdlWindow) const;
 
   void normalize()
   {

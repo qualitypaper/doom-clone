@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <vector>
 
+
+
 struct Visplane
 {
   fixed_t height = 0;

@@ -38,8 +38,8 @@ void WriteLevelData(FileWriter &fw, LevelData &levelData)
 
 void EditorLineDef::serialize(FileWriter &fw) const
 {
-  fw.WriteRaw(static_cast<int16_t>(getObjectIndex(start)));
-  fw.WriteRaw(static_cast<int16_t>(getObjectIndex(end)));
+  fw.WriteRaw(static_cast<int32_t>(getObjectIndex(start)));
+  fw.WriteRaw(static_cast<int32_t>(getObjectIndex(end)));
   const int8_t intType = static_cast<int8_t>(type);
   fw.WriteRaw(intType);
 
@@ -49,7 +49,7 @@ void EditorLineDef::serialize(FileWriter &fw) const
 
 void EditorLineDef::deserialize(FileReader &fr)
 {
-  int16_t _start, _end;
+  int32_t _start, _end;
   fr.ReadRaw(_start);
   start = makeObjectId(EditorObjectType::VERTEX, _start);
   fr.ReadRaw(_end);
@@ -117,8 +117,8 @@ void EditorLevel::SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLev
 }
 
 void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
-  uint16_t &numberOfLevels,
-  const std::unique_ptr<BspLevel> &bspLevel) const
+                                  uint16_t &numberOfLevels,
+                                  const std::unique_ptr<BspLevel> &bspLevel) const
 {
   const bool fileExists = std::filesystem::exists(SAVED_LEVEL_PATH);
 
@@ -164,8 +164,6 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
 
   FileWriter fw(SAVED_LEVEL_PATH, std::ios::binary | std::ios::trunc);
 
-  std::cout << "Saving level\n";
-
   if (!fw.IsStreamGood()) {
     throw std::runtime_error("Failed to open file for saving.\n");
   }
@@ -195,13 +193,13 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   fw.WriteRaw(_header);
 
   numberOfLevels = static_cast<uint16_t>(allLevels.size());
-  std::cout << "saved level" << std::endl;
+  std::cout << "Saved Level: " << (char *)_name.data() << '\n';
 }
 
 void EditorLevel::Save(const std::array<char8_t, 8> _name,
-  uint16_t &numberOfLevels,
-  const uint16_t width,
-  const uint16_t height)
+                       uint16_t &numberOfLevels,
+                       const uint16_t width,
+                       const uint16_t height)
 {
   if (levelNum <= 0) {
     throw std::runtime_error("Level number must be greater than zero.");
@@ -213,14 +211,16 @@ void EditorLevel::Save(const std::array<char8_t, 8> _name,
 
   // run bsp algorithm before saving
   auto nativeVertices = vertices | std::views::transform([width, height](const auto &ev) {
-    const Vertex v{ DoubleToFixed(ev.x), DoubleToFixed(ev.y) };
+                          const Vertex v{ DoubleToFixed(ev.x), DoubleToFixed(ev.y) };
 
-    return v.toCenterCoords(width, height);
-  }) | std::ranges::to<std::vector<Vertex>>();
+                          return v.toCenterCoords(width, height);
+                        })
+    | std::ranges::to<std::vector<Vertex>>();
 
   auto nativeLinedefs = linedefs | std::views::transform([](const auto &ld) {
-    return LineDef(ld.start, ld.end, ld.type, ld.frontSideDef, ld.backSideDef);
-  }) | std::ranges::to<std::vector<LineDef>>();
+                          return LineDef(ld.start, ld.end, ld.type, ld.frontSideDef, ld.backSideDef);
+                        })
+    | std::ranges::to<std::vector<LineDef>>();
 
   BSPBuilder bspBuilder(std::move(nativeVertices), std::move(nativeLinedefs));
   bspBuilder.BuildBSPTree();
@@ -257,10 +257,7 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
   fr.SetPos(offset);
 
   fr.ReadVector(linedefs);
-  std::cout << "Read linedefs\n";
-
   fr.ReadVector(sidedefs);
-  std::cout << "Read sidedefs\n";
 
   std::vector<Vertex> _vertices;
   fr.ReadVector(_vertices);
@@ -271,7 +268,6 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
     vertices[i] = EditorVertex(temp.x, temp.y);
   }
 
-  std::cout << "Read vertices\n";
 
   // skip segments
   size_t segSize = 0;
@@ -290,7 +286,6 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
 
   // read sectors
   fr.ReadVector(sectors);
-  std::cout << "Read sectors\n";
 
   std::cout << "Finished loading level from file.\n";
 }

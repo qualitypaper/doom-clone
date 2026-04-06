@@ -1,11 +1,14 @@
 #pragma once
 #include "defs.h"
-#include "core/gameloop.h"
 #include "core/serialization.h"
 
 #include <array>
 #include <fstream>
 #include <memory>
+
+class SdlWindow;
+struct InputState;
+struct Level;
 
 enum class SegmentPosition { FRONT, BACK, SPANNING };
 

@@ -4,5 +4,5 @@
 
 namespace simulation {
 
-    void update(GameState &gameState, const InputState &input, double_t dt);
+    void update(GameState &gameState, double_t dt);
 }

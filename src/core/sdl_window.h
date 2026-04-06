@@ -1,12 +1,13 @@
 #pragma once
 
 #include <SDL.h>
+#include <array>
 #include <stdexcept>
 
 struct InputState
 {
-  bool keys[SDL_NUM_SCANCODES];
-  bool mouse_buttons[8];
+  std::array<bool, SDL_NUM_SCANCODES> keys;
+  std::array<bool, 8> mouse_buttons;
   int mouse_dx;
   int mouse_dy;
 };
@@ -15,7 +16,7 @@ class SdlWindow
 {
 public:
   SdlWindow(const char *title,
-            uint16_t windowWidth, // size of the actual window
+            uint16_t windowWidth,// size of the actual window
             uint16_t windowHeight,
             uint16_t renderWidth,// internal render resolution
             uint16_t renderHeight,

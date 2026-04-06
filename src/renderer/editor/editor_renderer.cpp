@@ -22,10 +22,10 @@ static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 static float g_defaultVertexRadius = 4.0f;
 static float g_defaultLinedefThickness = 2.0f;
 
-EditorRenderer::EditorRenderer(SdlWindow &sdlWindow,
-  Level &level,
-  const uint16_t _levelNum,
-  const uint16_t _numOfLevels)
+EditorRenderer::EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow,
+                               Level &level,
+                               const uint16_t _levelNum,
+                               const uint16_t _numOfLevels)
   : m_sdlWindow(sdlWindow)
 {
   const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
@@ -46,10 +46,11 @@ EditorRenderer::EditorRenderer(SdlWindow &sdlWindow,
   style.FontScaleDpi = mainScale;// Set initial font scale.
 
   // Setup Platform/Renderer backends
-  ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
-  ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
+  ImGui_ImplSDL2_InitForSDLRenderer(m_sdlWindow->getWindow(), m_sdlWindow->getRenderer());
+  ImGui_ImplSDLRenderer2_Init(m_sdlWindow->getRenderer());
 
-  this->m_editor = std::make_unique<Editor>(level, _levelNum, _numOfLevels, sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight());
+  this->m_editor = std::make_unique<Editor>(
+    level, _levelNum, _numOfLevels, m_sdlWindow->getRenderWidth(), m_sdlWindow->getRenderHeight());
 }
 
 EditorRenderer::~EditorRenderer()
@@ -71,12 +72,15 @@ void EditorRenderer::endFrame() const
   ImGui::Render();
   const ImGuiIO &currentIo = ImGui::GetIO();
   SDL_RenderSetScale(
-    m_sdlWindow.getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
+    m_sdlWindow->getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
 
-  SDL_RenderClear(m_sdlWindow.getRenderer());
-  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_sdlWindow.getRenderer());
-  SDL_RenderPresent(m_sdlWindow.getRenderer());
+  SDL_RenderClear(m_sdlWindow->getRenderer());
+  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_sdlWindow->getRenderer());
+  SDL_RenderPresent(m_sdlWindow->getRenderer());
 }
+
+
+std::array<char8_t, 8> EditorRenderer::GetLevelName() const { return m_editor->state->level->name; }
 
 void EditorRenderer::drawLinePreview(const float_t thickness) const
 {
@@ -131,9 +135,9 @@ void EditorRenderer::drawPopupsForSelectedObjects() const
   }
 }
 
-void EditorRenderer::render() const
+void EditorRenderer::Render() const
 {
-  SDL_SetRenderDrawColor(m_sdlWindow.getRenderer(), 0, 0, 0, 255);
+  SDL_SetRenderDrawColor(m_sdlWindow->getRenderer(), 0, 0, 0, 255);
 
   // Start the Dear ImGui frame
   startFrame();
@@ -200,8 +204,8 @@ void EditorRenderer::drawLevelSelection() const
   ImGui::SetNextWindowSize(ImVec2(150, 0));
 
   ImGui::Begin("LevelSelection",
-    nullptr,
-    ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+               nullptr,
+               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
   // TODO: rewrite createSelect to use a index based for loop instead of storing indices in a seperate array
   std::vector<std::uint16_t> levelOptions;
@@ -235,7 +239,7 @@ void EditorRenderer::drawBlockSelection() const
   const auto drawList = ImGui::GetWindowDrawList();
   const ImVec2 blockSelectionStart = m_editor->state->blockSelectionStart;
   const ImVec2 blockSelectionEnd = { blockSelectionStart.x + m_editor->state->blockSelectionOffset.x,
-    blockSelectionStart.y + m_editor->state->blockSelectionOffset.y };
+                                     blockSelectionStart.y + m_editor->state->blockSelectionOffset.y };
 
   const float minX = std::min(blockSelectionStart.x, blockSelectionEnd.x);
   const float maxX = std::max(blockSelectionStart.x, blockSelectionEnd.x);
@@ -398,8 +402,8 @@ void EditorRenderer::drawSectorsWindow() const
         ImGui::SetNextItemWidth(200);
 
         float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
-          ImGui::ColorConvertU32ToFloat4(sector.color).y,
-          ImGui::ColorConvertU32ToFloat4(sector.color).z };
+                           ImGui::ColorConvertU32ToFloat4(sector.color).y,
+                           ImGui::ColorConvertU32ToFloat4(sector.color).z };
 
         if (ImGui::ColorPicker3("Sector color", color)) {
           // update sector color
@@ -442,9 +446,9 @@ void EditorRenderer::drawVertices(const float_t vertexRadius) const
 }
 
 void EditorRenderer::drawArrowForLinedef(const float_t thickness,
-  const uint32_t startVertexId,
-  const uint32_t endVertexId,
-  const ImU32 color) const
+                                         const uint32_t startVertexId,
+                                         const uint32_t endVertexId,
+                                         const ImU32 color) const
 {
   static double s_arrowLength = 15;
   static double s_arrowAngle = -45;
@@ -463,9 +467,9 @@ void EditorRenderer::drawArrowForLinedef(const float_t thickness,
   const float zoom = std::max(0.1f, m_editor->state->canvasZoom);
 
   const ImVec2 leftArrowEnd{ static_cast<float>(endVec.x + leftArrowDir.x * s_arrowLength * zoom),
-    static_cast<float>(endVec.y + leftArrowDir.y * s_arrowLength * zoom) };
+                             static_cast<float>(endVec.y + leftArrowDir.y * s_arrowLength * zoom) };
   const ImVec2 rightArrowEnd{ static_cast<float>(endVec.x + rightArrowDir.x * s_arrowLength * zoom),
-    static_cast<float>(endVec.y + rightArrowDir.y * s_arrowLength * zoom) };
+                              static_cast<float>(endVec.y + rightArrowDir.y * s_arrowLength * zoom) };
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 
@@ -495,9 +499,11 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
   const ImVec2 &startVec = m_editor->state->transformedVertices[getObjectIndex(ld.start)];
   const ImVec2 &endVec = m_editor->state->transformedVertices[getObjectIndex(ld.end)];
 
-  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow.getRenderWidth() <= startVec.x || m_sdlWindow.getRenderHeight() <= startVec.y)
+  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow->getRenderWidth() <= startVec.x
+      || m_sdlWindow->getRenderHeight() <= startVec.y)
     return;
-  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow.getRenderWidth() <= endVec.x || m_sdlWindow.getRenderHeight() <= endVec.y)
+  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow->getRenderWidth() <= endVec.x
+      || m_sdlWindow->getRenderHeight() <= endVec.y)
     return;
 
   drawList->AddLine(startVec, endVec, color, thickness);
@@ -522,8 +528,8 @@ void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t t
 
 void EditorRenderer::drawCoordinatesCenter(const float vertexRadius) const
 {
-  const EditorVertex center =
-    math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow.getRenderWidth(), m_sdlWindow.getRenderHeight());
+  const EditorVertex center = math_utils::fromCenterCoordinates(
+    EditorVertex(0, 0), m_sdlWindow->getRenderWidth(), m_sdlWindow->getRenderHeight());
   const ImVec2 centerTransformed = m_editor->TransformVertex(center);
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
@@ -641,9 +647,9 @@ bool EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
 }
 
 void EditorRenderer::createSidedefSelect(const char *label,
-  const std::vector<EditorSidedef> &sidedefs,
-  int16_t &currentItem,
-  const bool hasReset)
+                                         const std::vector<EditorSidedef> &sidedefs,
+                                         int16_t &currentItem,
+                                         const bool hasReset)
 {
   if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
     // handling -1 option separately
@@ -674,10 +680,10 @@ void EditorRenderer::createSidedefSelect(const char *label,
 }
 
 void EditorRenderer::createSelect(const char *label,
-  const std::vector<std::uint16_t> &options,
-  std::uint16_t currentItem,
-  const std::function<void(uint16_t)> &setCurrElem,
-  const std::function<void()> &addNewElem)
+                                  const std::vector<std::uint16_t> &options,
+                                  std::uint16_t currentItem,
+                                  const std::function<void(uint16_t)> &setCurrElem,
+                                  const std::function<void()> &addNewElem)
 {
   if (ImGui::BeginCombo(label, std::format("Level: {}", currentItem).c_str())) {
     for (const std::uint16_t &option : options) {
@@ -702,7 +708,7 @@ void EditorRenderer::createSelect(const char *label,
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
 {
   const auto &v = m_editor->state->findVertex(vertexId);
-  if (v.x < 0 || v.y < 0 || m_sdlWindow.getRenderWidth() <= v.x || m_sdlWindow.getRenderHeight() <= v.y)
+  if (v.x < 0 || v.y < 0 || m_sdlWindow->getRenderWidth() <= v.x || m_sdlWindow->getRenderHeight() <= v.y)
     return;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();

@@ -1,4 +1,5 @@
 #include "core/framebuffer.h"
+#include "core/gameloop.h"
 #include "renderer.h"
 
 #include <algorithm>
@@ -34,7 +35,7 @@ void Renderer::MakeSpans(const Visplane &plane, const int x, int t1, int b1, int
   }
 }
 
-void Renderer::DrawSpan(drawseg_t &ds) const
+void Renderer::DrawSpan(drawspan_t &ds) const
 {
   // scale the point to the window size
   ds.y = std::clamp(ds.y, 0, m_fb.height - 1);
@@ -67,7 +68,7 @@ void Renderer::MapPlane(const Visplane &plane, const int y, const int x1, const 
   const fixed_t xFrac = m_centerXFrac + FixedMul(finesine[(angle + ANG90) >> ANGLE_TO_FINE_SHIFT], length);
   const fixed_t yFrac = -m_centerYFrac - FixedMul(finesine[angle >> ANGLE_TO_FINE_SHIFT], length);
 
-  drawseg_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.color };
+  drawspan_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.color };
   DrawSpan(ds);
 }
 

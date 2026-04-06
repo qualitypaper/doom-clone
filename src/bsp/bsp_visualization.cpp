@@ -275,6 +275,7 @@ void BSPBuilder::PrintTree() const
   const std::vector<std::vector<std::string>> rows = BuildRows();
   const std::vector<std::string> formattedRows = FormatRows(rows);
 
+  std::cout << "BSP Tree: \n";
   for (const auto &row : formattedRows) {
     std::cout << ' ' << row << '\n';
   }

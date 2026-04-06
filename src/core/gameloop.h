@@ -1,12 +1,18 @@
 #pragma once
 
-#include "../../include/defs.h"
-#include "sdl_window.h"
+#include "core/sdl_window.h"
+#include "defs.h"
 
+#include <algorithm>
 #include <array>
-#include <cmath>
+#include <format>
+#include <memory>
+#include <string>
 #include <vector>
 
+
+class EditorRenderer;
+class Renderer;
 /*
  X, Y - horizontal planes, X - east-west, Y - north-south
  Z - vertical plane,
@@ -20,54 +26,45 @@ struct Player
   fixed_t z{};
   fixed_t velocity{};
   angle_t angle{};
-  uint8_t health{ 100 };
-  uint8_t armor{};
-  uint8_t current_weapon{};
-};
-
-enum class EntityType { Imp, Projectile, Pickup };
-
-struct EntityState
-{
-  EntityType type;
-  Vertex position;
-  float z;
-  Vertex velocity;
-  int health;
-};
-
-struct GameState
-{
-  Player playerState{};
-  std::vector<EntityState> entityState{};
-  uint32_t rng_seed{};
-  time_t gameTime{};
-  EngineMode currentMode;
-  uint16_t levelNum{};
 };
 
 struct Level
 {
-  std::vector<Vertex> vertices;
-  std::vector<line_t> linedefs;
-  std::vector<side_t> sidedefs;
-  std::vector<Sector> sectors;
-  std::vector<Node> nodes;
-  std::vector<SubSector> subsectors;
-  std::vector<seg_t> segments;
-  std::array<char8_t, 8> name{};
+  explicit Level(const std::array<char8_t, 8> _name) : name(_name) {}
+
+  std::vector<Vertex> vertices{};
+  std::vector<line_t> linedefs{};
+  std::vector<side_t> sidedefs{};
+  std::vector<Sector> sectors{};
+  std::vector<Node> nodes{};
+  std::vector<SubSector> subsectors{};
+  std::vector<seg_t> segments{};
+  std::array<char8_t, 8> name;
 
   void Load(FileReader &fr);
 
   static void Init(Level &level,
-    const std::vector<LineDef> &_lines,
-    const std::vector<SideDef> &_sides,
-    const std::vector<Seg> &_segs);
+                   const std::vector<LineDef> &_lines,
+                   const std::vector<SideDef> &_sides,
+                   const std::vector<Seg> &_segs);
+};
+
+struct GameState
+{
+  Player player{};
+  EngineMode currentMode;
+  uint16_t levelNum{};
+  std::shared_ptr<SdlWindow> sdlWindow;
+  std::shared_ptr<Renderer> renderer;
+  std::shared_ptr<EditorRenderer> editorRenderer;
+  InputState input;
+
+  void Reset();
 };
 
 void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);
-void SetEngineMode(GameState &gameState, InputState &input, EngineMode newMode, const SdlWindow &sdlWindow);
+void SetEngineMode(GameState &gameState, EngineMode newMode, const std::shared_ptr<SdlWindow> &sdlWindow);
 
 inline std::array<char8_t, 8> MakeLevelName(uint16_t number)
 {

@@ -10,10 +10,8 @@
 void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fixed_t, 4> &boundingBox) const
 {
   for (const auto &seg : segs) {
-    const Vertex start =
-      vertices[seg.startVertex].fromCenterCoords(EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT);
-    const Vertex end =
-      vertices[seg.endVertex].fromCenterCoords(EDITOR_WINDOW_WIDTH, EDITOR_WINDOW_HEIGHT);
+    const Vertex start = vertices[seg.startVertex].fromCenterCoords(WINDOW_WIDTH, WINDOW_HEIGHT);
+    const Vertex end = vertices[seg.endVertex].fromCenterCoords(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(start.y));
     boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(end.y));
@@ -29,9 +27,7 @@ void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fi
   }
 }
 
-Node::Node(const fixed_t _x, const fixed_t _y, const fixed_t _dx, const fixed_t _dy)
-  : x(_x), y(_y), dx(_dx), dy(_dy)
-{}
+Node::Node(const fixed_t _x, const fixed_t _y, const fixed_t _dx, const fixed_t _dy) : x(_x), y(_y), dx(_dx), dy(_dy) {}
 
 BSPBuilder::BSPBuilder(std::vector<Vertex> _vertices, std::vector<LineDef> _linedefs)
   : vertices(std::move(_vertices)), linedefs(std::move(_linedefs))
