@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 {
   // setup inputs and states
   InputState input{};
-  GameState gameState{ .currentMode = EngineMode::GAMEPLAY_3D };
+  GameState gameState{ .currentMode = EngineMode::EDITOR_2D };
 
   gameState.playerState = Player{ .x = 0 << FRAC_BITS,
                                   .y = 0 << FRAC_BITS,
@@ -134,6 +134,8 @@ int main(int argc, char *argv[])
     "Doom Clone",
     gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_WIDTH : WINDOW_WIDTH,
     gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_HEIGHT : WINDOW_HEIGHT,
+    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_WIDTH : CANVAS_WIDTH,
+    gameState.currentMode == EngineMode::EDITOR_2D ? EDITOR_WINDOW_HEIGHT : CANVAS_HEIGHT,
     gameState.currentMode == EngineMode::EDITOR_2D ? SDL_WINDOW_SHOWN : SDL_WINDOW_SHOWN);
 
   // setup Dear ImGui
@@ -141,7 +143,7 @@ int main(int argc, char *argv[])
 
   // setup the game renderer
   FrameBuffer fb(sdlWindow);
-  Renderer renderer(fb, level, CANVAS_WIDTH, CANVAS_HEIGHT);
+  Renderer renderer(fb, level);
 
   running = true;
   // game loop

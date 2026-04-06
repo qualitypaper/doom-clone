@@ -49,7 +49,7 @@ EditorRenderer::EditorRenderer(SdlWindow &sdlWindow,
   ImGui_ImplSDL2_InitForSDLRenderer(sdlWindow.getWindow(), sdlWindow.getRenderer());
   ImGui_ImplSDLRenderer2_Init(sdlWindow.getRenderer());
 
-  this->m_editor = std::make_unique<Editor>(level, _levelNum, _numOfLevels, sdlWindow.width, sdlWindow.height);
+  this->m_editor = std::make_unique<Editor>(level, _levelNum, _numOfLevels, sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight());
 }
 
 EditorRenderer::~EditorRenderer()
@@ -495,9 +495,9 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
   const ImVec2 &startVec = m_editor->state->transformedVertices[getObjectIndex(ld.start)];
   const ImVec2 &endVec = m_editor->state->transformedVertices[getObjectIndex(ld.end)];
 
-  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow.width <= startVec.x || m_sdlWindow.height <= startVec.y)
+  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow.getRenderWidth() <= startVec.x || m_sdlWindow.getRenderHeight() <= startVec.y)
     return;
-  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow.width <= endVec.x || m_sdlWindow.height <= endVec.y)
+  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow.getRenderWidth() <= endVec.x || m_sdlWindow.getRenderHeight() <= endVec.y)
     return;
 
   drawList->AddLine(startVec, endVec, color, thickness);
@@ -523,7 +523,7 @@ void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t t
 void EditorRenderer::drawCoordinatesCenter(const float vertexRadius) const
 {
   const EditorVertex center =
-    math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow.width, m_sdlWindow.height);
+    math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow.getRenderWidth(), m_sdlWindow.getRenderHeight());
   const ImVec2 centerTransformed = m_editor->TransformVertex(center);
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
@@ -702,7 +702,7 @@ void EditorRenderer::createSelect(const char *label,
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
 {
   const auto &v = m_editor->state->findVertex(vertexId);
-  if (v.x < 0 || v.y < 0 || m_sdlWindow.width <= v.x || m_sdlWindow.height <= v.y)
+  if (v.x < 0 || v.y < 0 || m_sdlWindow.getRenderWidth() <= v.x || m_sdlWindow.getRenderHeight() <= v.y)
     return;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();

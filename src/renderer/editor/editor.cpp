@@ -79,7 +79,7 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
 
 ImVec2 EditorVertex::fromCenterCoords(const SdlWindow &sdlWindow) const
 {
-  return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.width, sdlWindow.height);
+  return math_utils::fromCenterCoordinates(this->toImVec2(), sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight());
 }
 
 void EditorVertex::remove(EditorState &state, const uint32_t vertexId)

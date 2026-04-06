@@ -87,43 +87,47 @@ void Level::Load(FileReader &fr)
     const seg_t *segment = &segments[ssector.firstSegIndex];
 
     if (segment->side) {
-      ssector.sector = segment->line->backSide->sector;
+      if (segment->line->backSide) {
+        ssector.sector = segment->line->backSide->sector;
+      }
     } else {
-      ssector.sector = segment->line->frontSide->sector;
+      if (segment->line->frontSide) {
+        ssector.sector = segment->line->frontSide->sector;
+      }
     }
   }
 }
 void Level::Init(Level &level,
-  const std::vector<LineDef> &_lines,
-  const std::vector<SideDef> &_sides,
-  const std::vector<Seg> &_segs)
+                 const std::vector<LineDef> &_lines,
+                 const std::vector<SideDef> &_sides,
+                 const std::vector<Seg> &_segs)
 {
   level.linedefs.reserve(_lines.size());
   level.sidedefs.reserve(_sides.size());
 
   for (const SideDef &side : _sides) {
     level.sidedefs.emplace_back(side.sectorId < 0 ? nullptr : &level.sectors[side.sectorId],
-      side.xOffset,
-      side.yOffset,
-      side.upperWallTexture,
-      side.middleWallTexture,
-      side.bottomWallTexture);
+                                side.xOffset,
+                                side.yOffset,
+                                side.upperWallTexture,
+                                side.middleWallTexture,
+                                side.bottomWallTexture);
   }
 
   for (const LineDef &line : _lines) {
     level.linedefs.emplace_back(&level.vertices[line.start],
-      &level.vertices[line.end],
-      line.type,
-      line.frontSidedef == -1 ? nullptr : &level.sidedefs[line.frontSidedef],
-      line.backSidedef == -1 ? nullptr : &level.sidedefs[line.backSidedef]);
+                                &level.vertices[line.end],
+                                line.type,
+                                line.frontSidedef == -1 ? nullptr : &level.sidedefs[line.frontSidedef],
+                                line.backSidedef == -1 ? nullptr : &level.sidedefs[line.backSidedef]);
   }
 
   for (const Seg &seg : _segs) {
     level.segments.emplace_back(&level.vertices[seg.startVertex],
-      &level.vertices[seg.endVertex],
-      seg.angle,
-      &level.linedefs[seg.linedefIndex],
-      seg.side,
-      seg.offset);
+                                &level.vertices[seg.endVertex],
+                                seg.angle,
+                                &level.linedefs[seg.linedefIndex],
+                                seg.side,
+                                seg.offset);
   }
 }

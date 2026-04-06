@@ -11,9 +11,6 @@ static constexpr uint16_t NF_SUBSECTOR = 0x8000;
 static constexpr uint16_t MAX_VISPLANES = 128;
 static constexpr uint16_t MAX_SEGMENTS = 64;
 
-static const fixed_t FOCAL_LENGTH =
-  FixedDiv(CANVAS_WIDTH << (FRAC_BITS - 1), finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
-
 
 struct drawseg_t
 {
@@ -31,7 +28,7 @@ class FrameBuffer;
 class Renderer
 {
 public:
-  Renderer(FrameBuffer &_fb, std::shared_ptr<Level> _level, uint16_t canvasWidth, uint16_t canvasHeight);
+  Renderer(FrameBuffer &_fb, std::shared_ptr<Level> _level);
   void Render(const GameState &gameState);
   void Reset();
 
@@ -45,8 +42,8 @@ private:
 
   // plane rendering
   void MapPlane(const Visplane &plane, int y, int x1, int x2) const;
-  void MakeSpans(const Visplane &plane, int x, int t1, int b1, int t2, int b2) const;
-  void DrawSpan(const drawseg_t &ds) const;
+  void MakeSpans(const Visplane &plane, int x, int t1, int b1, int t2, int b2);
+  void DrawSpan(drawseg_t &ds) const;
 
   void ResetSolidSegs();
   void ResetPlanes();
@@ -55,7 +52,13 @@ private:
   void RenderVisPlanes();
 
   [[nodiscard ]] fixed_t ScaleFromGlobalAngle(angle_t angle) const;
-  void RenderSegLoop(const seg_t *seg, fixed_t topStep, fixed_t topFrac, fixed_t bottomStep, fixed_t bottomFrac);
+  void RenderSegLoop(const seg_t *seg,
+                     fixed_t topStep,
+                     fixed_t topFrac,
+                     fixed_t bottomStep,
+                     fixed_t bottomFrac,
+                     bool markCeiling,
+                     bool markFloor);
   void StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side);
   void RenderSeg(const seg_t *seg);
   void RenderSSector(const SubSector &subsector);
@@ -84,14 +87,19 @@ private:
   std::vector<Visplane> m_visplanes;
 
   // distance to each row from the center (player view)
-  std::array<fixed_t, CANVAS_HEIGHT> m_ySlope{};
+  std::vector<fixed_t> m_ySlope;
   // essentially 1/cos(angle)
-  std::array<int, CANVAS_WIDTH> m_distScale{};
+  std::vector<int> m_distScale;
 
   // maps a fine angle onto screen x
   std::array<int, FINE_ANGLES / 2> m_viewAngleToX{};
   // maps a x into a fine angle
-  std::array<angle_t, CANVAS_WIDTH + 1> m_xToViewAngle{};
+  std::vector<angle_t> m_xToViewAngle;
+  std::vector<int> m_spanStart;
+
+  fixed_t m_focalLength{};
+  fixed_t m_centerXFrac{};
+  fixed_t m_centerYFrac{};
 
   Visplane *m_ceilPlane = nullptr, *m_floorPlane = nullptr;
 
@@ -106,7 +114,4 @@ private:
   FrameBuffer &m_fb;
   const Player *m_player;
   std::shared_ptr<Level> m_level;
-
-  uint16_t m_canvasWidth;
-  uint16_t m_canvasHeight;
 };

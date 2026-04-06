@@ -1,94 +1,88 @@
 #include "core/framebuffer.h"
 #include "renderer.h"
 
+#include <algorithm>
+
 namespace {
-
-
 fixed_t s_baseXScale;
 fixed_t s_baseYScale;
 }// namespace
 
 
-void Renderer::MakeSpans(const Visplane &plane, const int x, int t1, int b1, int t2, int b2) const
+void Renderer::MakeSpans(const Visplane &plane, const int x, int t1, int b1, int t2, int b2)
 {
-  static std::array<int, CANVAS_HEIGHT> s_spanStart;
+  const int maxY = static_cast<int>(m_fb.height);
 
-  while (t1 > 0 && t1 < t2 && t1 <= b1) {
-    MapPlane(plane, t1, s_spanStart[t1], x - 1);
+  while (t1 >= 0 && t1 < maxY && t1 < t2 && t1 <= b1) {
+    MapPlane(plane, t1, m_spanStart[t1], x - 1);
     t1++;
   }
 
-  while (b1 < CANVAS_HEIGHT && b1 > b2 && b1 >= t1) {
-    MapPlane(plane, b1, s_spanStart[b1], x - 1);
+  while (b1 < maxY && b1 > b2 && b1 >= t1) {
+    MapPlane(plane, b1, m_spanStart[b1], x - 1);
     b1--;
   }
 
-  while (t2 > 0 && t2 < t1 && t2 <= b2) {
-    s_spanStart[t2] = x;
+  while (t2 >= 0 && t2 < maxY && t2 < t1 && t2 <= b2) {
+    m_spanStart[t2] = x;
     t2++;
   }
 
-  while (b2 < CANVAS_HEIGHT && b2 > b1 && b2 >= t2) {
-    s_spanStart[b2] = x;
+  while (b2 < maxY && b2 >= 0 && b2 > b1 && b2 >= t2) {
+    m_spanStart[b2] = x;
     b2--;
   }
 }
 
-void Renderer::DrawSpan(const drawseg_t &ds) const
+void Renderer::DrawSpan(drawseg_t &ds) const
 {
   // scale the point to the window size
-  int scaledY = static_cast<int>(SCALE_X * ds.y);
-  int transformedX1 = static_cast<int>(SCALE_Y * ds.x1);
-  int transformedX2 = static_cast<int>(SCALE_Y * ds.x2);
+  ds.y = std::clamp(ds.y, 0, m_fb.height - 1);
+  ds.x1 = std::clamp(ds.x1, 0, m_fb.width - 1);
+  ds.x2 = std::clamp(ds.x2, 0, m_fb.width - 1);
 
-  scaledY = std::clamp(scaledY, 0, WINDOW_HEIGHT - 1);
-  transformedX1 = std::clamp(transformedX1, 0, WINDOW_WIDTH - 1);
-  transformedX2 = std::clamp(transformedX2, 0, WINDOW_WIDTH - 1);
-
-  if (transformedX1 > transformedX2)
-    std::swap(transformedX1, transformedX2);
+  if (ds.x1 > ds.x2)
+    std::swap(ds.x1, ds.x2);
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
   const uint32_t pitch = this->m_fb.width;
 
-  for (uint32_t i = 0; i <= SCALE_X + 1; i++) {
-    uint32_t *ptr = this->m_fb.pixels + scaledY * pitch + (transformedX1 + i);
+  uint32_t *ptr = this->m_fb.pixels + ds.y * pitch + ds.x1;
 
-    for (uint32_t *curr = ptr; curr <= ptr + transformedX2; curr++) {
-      *(uint32_t *)curr = ds.color;
-    }
+  for (uint32_t *curr = ptr; curr <= ptr + (ds.x2 - ds.x1); curr++) {
+    *(uint32_t *)curr = ds.color;
   }
 }
 
 void Renderer::MapPlane(const Visplane &plane, const int y, const int x1, const int x2) const
 {
-  const fixed_t distance = FixedMul(plane.height - m_player->z, m_ySlope[y]);
+  const fixed_t distance = FixedMul(std::abs(plane.height - m_player->z), m_ySlope[y]);
   const fixed_t xStep = FixedMul(s_baseXScale, distance);
   const fixed_t yStep = FixedMul(s_baseYScale, distance);
 
   const fixed_t length = FixedMul(distance, m_distScale[x1]);
   const angle_t angle = m_player->angle + m_xToViewAngle[x1];
 
-  const fixed_t xFrac = CANVAS_CENTERX_FRAC + FixedMul(finesine[(angle + ANG90) >> ANGLE_TO_FINE_SHIFT], length);
-  const fixed_t yFrac = -CANVAS_CENTERY_FRAC - FixedMul(finesine[angle >> ANGLE_TO_FINE_SHIFT], length);
+  const fixed_t xFrac = m_centerXFrac + FixedMul(finesine[(angle + ANG90) >> ANGLE_TO_FINE_SHIFT], length);
+  const fixed_t yFrac = -m_centerYFrac - FixedMul(finesine[angle >> ANGLE_TO_FINE_SHIFT], length);
 
-  const drawseg_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.color };
+  drawseg_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.color };
   DrawSpan(ds);
 }
 
 void Renderer::ResetPlanes()
 {
   std::ranges::fill(m_ceilClip, 0);
-  std::ranges::fill(m_floorClip, m_canvasHeight - 1);
+  std::ranges::fill(m_floorClip, m_fb.height - 1);
   m_visplanes.clear();
 
   // left to right mapping
   const angle_t angle = (m_player->angle - ANG90) >> ANGLE_TO_FINE_SHIFT;
 
   // use cos for x
-  s_baseXScale = FixedDiv(finesine[m_player->angle >> ANGLE_TO_FINE_SHIFT], FOCAL_LENGTH);
-  s_baseYScale = -FixedDiv(finesine[angle], FOCAL_LENGTH);
+  s_baseXScale = FixedDiv(finesine[m_player->angle >> ANGLE_TO_FINE_SHIFT], m_focalLength);
+  s_baseYScale = -FixedDiv(finesine[angle], m_focalLength);
 }
 
 // TODO: change color to texture implementation
@@ -100,10 +94,11 @@ Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, con
     }
   }
 
-  m_visplanes.emplace_back(height, color, lightLevel, CANVAS_WIDTH, -1);
+  m_visplanes.emplace_back(height, color, lightLevel, static_cast<int>(m_fb.width), -1, m_fb.width);
   Visplane *newPlane = &m_visplanes.back();
 
-  memset(newPlane->top, -1, sizeof(newPlane->top));
+  std::ranges::fill(newPlane->top, -1);
+  std::ranges::fill(newPlane->bottom, -1);
 
   return newPlane;
 }
@@ -154,17 +149,14 @@ Visplane *Renderer::CheckVisPlane(Visplane *visplane, const int start, const int
   }
 
   // make a new visplane
-  Visplane &lastVisplane = m_visplanes.back();
-  lastVisplane.height = visplane->height;
-  lastVisplane.lightLevel = visplane->lightLevel;
-  lastVisplane.color = visplane->color;
+  const fixed_t sourceHeight = visplane->height;
+  const int sourceLightLevel = visplane->lightLevel;
+  const uint32_t sourceColor = visplane->color;
 
+  visplane = &m_visplanes.emplace_back(sourceHeight, sourceColor, sourceLightLevel, start, end, m_fb.width);
 
-  visplane = &m_visplanes.emplace_back();
-  visplane->minX = start;
-  visplane->maxX = end;
-
-  memset(visplane->top, -1, sizeof(visplane->top));
+  std::ranges::fill(visplane->top, -1);
+  std::ranges::fill(visplane->bottom, -1);
 
   return visplane;
 }
@@ -175,11 +167,22 @@ void Renderer::RenderVisPlanes()
     if (vp.minX > vp.maxX)
       continue;
 
-    vp.top[vp.minX - 1] = -1;
-    vp.top[vp.maxX + 1] = -1;
+    int prevTop = -1;
+    int prevBottom = -1;
 
-    for (int x = vp.minX; x <= vp.maxX; x++) {
-      MakeSpans(vp, x, vp.top[x - 1], vp.bottom[x - 1], vp.top[x], vp.bottom[x]);
+    // Iterate one column past maxX to flush pending spans.
+    for (int x = vp.minX; x <= vp.maxX + 1; x++) {
+      int curTop = -1;
+      int curBottom = -1;
+
+      if (x <= vp.maxX) {
+        curTop = vp.top[x];
+        curBottom = vp.bottom[x];
+      }
+
+      MakeSpans(vp, x, prevTop, prevBottom, curTop, curBottom);
+      prevTop = curTop;
+      prevBottom = curBottom;
     }
   }
 }

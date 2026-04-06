@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 struct Visplane
 {
@@ -18,8 +19,18 @@ struct Visplane
   int minX = 0;
   int maxX = 0;
 
-  int16_t top[CANVAS_WIDTH]{};
-  int16_t bottom[CANVAS_WIDTH]{};
+  std::vector<int16_t> top;
+  std::vector<int16_t> bottom;
+
+  Visplane() = default;
+  Visplane(const fixed_t _height,
+           const uint32_t _color,
+           const int _lightLevel,
+           const int _minX,
+           const int _maxX,
+           const std::size_t width)
+    : height(_height), color(_color), lightLevel(_lightLevel), minX(_minX), maxX(_maxX), top(width, -1), bottom(width, -1)
+  {}
 };
 
 struct ClipRange

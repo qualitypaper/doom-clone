@@ -38,8 +38,10 @@ void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
       const auto &seg = level.segments[i];
 
-      const ImVec2 mappedStart = seg.start->fromCenterCoords(sdlWindow.width, sdlWindow.height).toImVec();
-      const ImVec2 mappedEnd = seg.end->fromCenterCoords(sdlWindow.width, sdlWindow.height).toImVec();
+      const ImVec2 mappedStart =
+        seg.start->fromCenterCoords(sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight()).toImVec();
+      const ImVec2 mappedEnd =
+        seg.end->fromCenterCoords(sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight()).toImVec();
 
       SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
     }
@@ -57,12 +59,12 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const Node &root)
 
   const ImVec2 lineStart = math_utils::fromCenterCoordinates(
     ImVec2{ static_cast<float>(rootX - dirX * lineLen), static_cast<float>(rootY - dirY * lineLen) },
-    sdlWindow.width,
-    sdlWindow.height);
+    sdlWindow.getRenderWidth(),
+    sdlWindow.getRenderHeight());
   const ImVec2 lineEnd = math_utils::fromCenterCoordinates(
     ImVec2{ static_cast<float>(rootX + dirX * lineLen), static_cast<float>(rootY + dirY * lineLen) },
-    sdlWindow.width,
-    sdlWindow.height);
+    sdlWindow.getRenderWidth(),
+    sdlWindow.getRenderHeight());
 
   SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 255, 0, 255);
   SDL_RenderDrawLine(sdlWindow.getRenderer(),

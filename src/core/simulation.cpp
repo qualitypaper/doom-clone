@@ -1,6 +1,5 @@
 #include "simulation.h"
 #include "config.h"
-#include "renderer/game/renderer.h"
 #include "renderer/game/renderer_helper.h"
 
 namespace simulation {
@@ -8,9 +7,14 @@ namespace simulation {
 // updates the game state with a constant rate of @param dt
 void update(GameState &gameState, const InputState &input, const double_t dt)
 {
+  // Keep input angular scaling independent from Renderer internals.
+  static const fixed_t focalLength = FixedDiv(
+    static_cast<fixed_t>(CANVAS_WIDTH) << (FRAC_BITS - 1),
+    finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
+
   // mouse
   const fixed_t mouseMovement = DoubleToFixed(static_cast<double>(input.mouse_dx) * MOUSE_SENSITIVITY);
-  const angle_t angleDiff = (mouseMovement < 0 ? 1 : -1) * tantoangle[SlopeDiv(std::abs(mouseMovement), FOCAL_LENGTH)];
+  const angle_t angleDiff = (mouseMovement < 0 ? 1 : -1) * tantoangle[SlopeDiv(std::abs(mouseMovement), focalLength)];
   gameState.playerState.angle += angleDiff;
 
   fixed_t &x = gameState.playerState.x, &y = gameState.playerState.y;

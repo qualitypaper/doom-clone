@@ -1,7 +1,8 @@
 #include "framebuffer.h"
 #include "config.h"
 
-FrameBuffer::FrameBuffer(SdlWindow &sdlWindow) : sdlWindow(sdlWindow), width(sdlWindow.width), height(sdlWindow.height)
+FrameBuffer::FrameBuffer(SdlWindow &sdlWindow)
+  : sdlWindow(sdlWindow), width(sdlWindow.getRenderWidth()), height(sdlWindow.getRenderHeight())
 {
   const uint32_t n = width * height;
   this->pixels = new uint32_t[n];

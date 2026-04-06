@@ -19,6 +19,8 @@ static constexpr int16_t HEIGHT_UNIT = 1 << HEIGHT_BITS;
 
 void Renderer::InitViewAngleToX()
 {
+  const int screenWidth = static_cast<int>(m_fb.width);
+
   for (size_t i = 0; i < m_viewAngleToX.size(); i++) {
     int t;
 
@@ -27,17 +29,17 @@ void Renderer::InitViewAngleToX()
       t = 0;
     } else if (finetangent[i] < -FRAC_UNIT * 2) {
       // cover asymptotes
-      t = CANVAS_WIDTH;
+      t = screenWidth;
     } else {
       // normal case
-      t = FixedMul(FOCAL_LENGTH, finetangent[i]);
+      t = FixedMul(m_focalLength, finetangent[i]);
       // rounding up to the nearest
-      t = (CANVAS_CENTERX_FRAC - t + FRAC_UNIT - 1) >> FRAC_BITS;
+      t = (m_centerXFrac - t + FRAC_UNIT - 1) >> FRAC_BITS;
 
       if (t < -1) {
         t = -1;
-      } else if (t > CANVAS_WIDTH + 1) {
-        t = CANVAS_WIDTH;
+      } else if (t > screenWidth + 1) {
+        t = screenWidth;
       }
     }
 
@@ -51,7 +53,7 @@ void Renderer::InitXToViewAngle()
     angle_t i = 0;
 
     // find by brute-forcing the angle mapping to this x
-    while (m_viewAngleToX[i] > x) {
+    while (i + 1 < m_viewAngleToX.size() && m_viewAngleToX[i] > x) {
       i++;
     }
 
@@ -71,7 +73,7 @@ fixed_t Renderer::ScaleFromGlobalAngle(const angle_t angle) const
   // both sines are allways positive
   const fixed_t sinea = finesine[anglea >> ANGLE_TO_FINE_SHIFT];
   const fixed_t sineb = finesine[angleb >> ANGLE_TO_FINE_SHIFT];
-  const fixed_t num = FixedMul(FOCAL_LENGTH, sineb);
+  const fixed_t num = FixedMul(m_focalLength, sineb);
   const fixed_t den = FixedMul(m_rwDistance, sinea);
 
   fixed_t scale;
@@ -101,8 +103,8 @@ void Renderer::InitYSlope()
 {
   // calc yslope
   for (int i = 0; i < m_ySlope.size(); i++) {
-    const fixed_t dy = std::abs(((i - CANVAS_HEIGHT / 2) << FRAC_BITS) + FRAC_UNIT / 2);
-    m_ySlope[i] = FixedDiv(FOCAL_LENGTH, dy);
+    const fixed_t dy = std::abs(((i - static_cast<int>(m_fb.height) / 2) << FRAC_BITS) + FRAC_UNIT / 2);
+    m_ySlope[i] = FixedDiv(m_focalLength, dy);
   }
 }
 
@@ -115,14 +117,22 @@ void Renderer::InitDistScale()
   }
 }
 
-Renderer::Renderer(FrameBuffer &_fb,
-                   std::shared_ptr<Level> _level,
-                   const uint16_t canvasWidth,
-                   const uint16_t canvasHeight)
-  : m_fb(_fb), m_player(nullptr), m_level(std::move(_level)), m_canvasWidth(canvasWidth), m_canvasHeight(canvasHeight)
+Renderer::Renderer(FrameBuffer &_fb, std::shared_ptr<Level> _level)
+  : m_fb(_fb), m_player(nullptr), m_level(std::move(_level))
 {
-  m_ceilClip.resize(canvasWidth);
-  m_floorClip.resize(canvasWidth);
+  m_centerXFrac = static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1);
+  m_centerYFrac = static_cast<fixed_t>(m_fb.height) << (FRAC_BITS - 1);
+  m_focalLength = FixedDiv(
+    static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1),
+    finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
+
+  m_ceilClip.resize(_fb.width);
+  m_floorClip.resize(_fb.width);
+  m_ySlope.resize(_fb.height);
+  m_distScale.resize(_fb.width);
+  m_xToViewAngle.resize(_fb.width + 1);
+  m_spanStart.resize(_fb.height);
+
   m_visplanes.reserve(MAX_VISPLANES);
   m_solidSegs.resize(MAX_SEGMENTS);
   ResetSolidSegs();
@@ -143,35 +153,29 @@ void Renderer::ResetSolidSegs()
 {
   m_solidSegs[0].start = -0x7fffffff;
   m_solidSegs[0].end = -1;
-  m_solidSegs[1].start = m_canvasWidth;
+  m_solidSegs[1].start = m_fb.width;
   m_solidSegs[1].end = 0x7fffffff;
 }
 
-void Renderer::DrawColumn(const int x, const int y0, const int y1, const uint32_t color) const
+void Renderer::DrawColumn(int x, int y0, int y1, const uint32_t color) const
 {
   // scale the point to the window size
-  int scaledX = static_cast<int>(SCALE_X * x);
-  int transformedY0 = static_cast<int>(SCALE_Y * y0);
-  int transformedY1 = static_cast<int>(SCALE_Y * y1);
+  x = std::clamp(x, 0, m_fb.width - 1);
+  y0 = std::clamp(y0, 0, m_fb.height - 1);
+  y1 = std::clamp(y1, 0, m_fb.height - 1);
 
-  scaledX = std::clamp(scaledX, 0, WINDOW_WIDTH - 1);
-  transformedY0 = std::clamp(transformedY0, 0, WINDOW_HEIGHT - 1);
-  transformedY1 = std::clamp(transformedY1, 0, WINDOW_HEIGHT - 1);
-
-  if (transformedY0 > transformedY1)
-    std::swap(transformedY0, transformedY1);
+  if (y0 > y1)
+    std::swap(y0, y1);
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
-  const uint32_t pitch = this->m_fb.width;
+  const uint32_t pitch = m_fb.width;
 
-  for (uint32_t i = 0; i < SCALE_X + 1; i++) {
-    uint32_t *ptr = this->m_fb.pixels + transformedY0 * pitch + (scaledX + i);
+  uint32_t *ptr = m_fb.pixels + y0 * pitch + x;
 
-    for (int32_t y = transformedY0; y <= transformedY1; y++) {
-      *(uint32_t *)ptr = color;
-      ptr += pitch;
-    }
+  for (int32_t y = y0; y <= y1; y++) {
+    *(uint32_t *)ptr = color;
+    ptr += pitch;
   }
 }
 
@@ -352,9 +356,11 @@ void Renderer::RenderSegLoop(const seg_t *seg,
                              const fixed_t topStep,
                              fixed_t topFrac,
                              const fixed_t bottomStep,
-                             fixed_t bottomFrac)
+                             fixed_t bottomFrac,
+                             const bool markCeiling,
+                             const bool markFloor)
 {
-  for (int x = m_rwx; x < std::min(m_rwStopX, static_cast<int>(CANVAS_WIDTH)); x++) {
+  for (int x = m_rwx; x < std::min(m_rwStopX, static_cast<int>(m_fb.width)); x++) {
     int yl = (topFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
     if (yl < m_ceilClip[x] + 1) {
@@ -362,17 +368,20 @@ void Renderer::RenderSegLoop(const seg_t *seg,
     }
 
     // mark ceiling
-    int top = m_ceilClip[x] + 1;
-    int bottom = yl - 1;
+    if (markCeiling) {
+      int top = m_ceilClip[x];
+      int bottom = yl - 1;
 
-    if (bottom >= m_floorClip[x]) {
-      bottom = m_floorClip[x] - 1;
+      if (bottom >= m_floorClip[x]) {
+        bottom = m_floorClip[x] - 1;
+      }
+
+      if (top <= bottom && m_ceilPlane) {
+        m_ceilPlane->top[x] = top;
+        m_ceilPlane->bottom[x] = bottom;
+      }
     }
 
-    if (top <= bottom && m_ceilPlane) {
-      m_ceilPlane->top[x] = top;
-      m_ceilPlane->bottom[x] = bottom;
-    }
 
     int yh = (bottomFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
@@ -381,20 +390,23 @@ void Renderer::RenderSegLoop(const seg_t *seg,
     }
 
     // mark floor
-    top = yh + 1;
-    bottom = m_floorClip[x] - 1;
+    if (markFloor) {
+      int top = yh + 1;
+      int bottom = m_floorClip[x] - 1;
 
-    if (top <= m_ceilClip[x]) {
-      top = m_ceilClip[x] + 1;
+      if (top <= m_ceilClip[x]) {
+        top = m_ceilClip[x] + 1;
+      }
+
+      if (top <= bottom && m_floorPlane) {
+        m_floorPlane->top[x] = top;
+        m_floorPlane->bottom[x] = bottom;
+      }
     }
 
-    if (top <= bottom && m_floorPlane) {
-      m_floorPlane->top[x] = top;
-      m_floorPlane->bottom[x] = bottom;
-    }
 
     if (!seg->line->backSide) {
-      // test version, in order to understand which wall is whichdddddddd
+      // test version, in order to understand which wall is which
       ImVec4 color = ImGui::ColorConvertU32ToFloat4(seg->line->frontSide->sector->color);
       float index = (seg->line->frontSide - m_level->sidedefs.data()) / static_cast<float>(m_level->sidedefs.size());
       color.x += index;
@@ -408,7 +420,7 @@ void Renderer::RenderSegLoop(const seg_t *seg,
                           static_cast<uint8_t>(color.y * 255),
                           static_cast<uint8_t>(color.z * 255),
                           255));
-      m_ceilClip[x] = static_cast<int16_t>(m_canvasHeight);
+      m_ceilClip[x] = static_cast<int16_t>(m_fb.height);
       m_floorClip[x] = -1;
     } else {
       if (seg->line->type == LineDefType::REGULAR) {
@@ -417,6 +429,7 @@ void Renderer::RenderSegLoop(const seg_t *seg,
           m_ceilClip[x] = static_cast<int16_t>(yl);
         if (yh < m_floorClip[x])
           m_floorClip[x] = static_cast<int16_t>(yh);
+        // TODO: fix ceil/floorPlanes updates
 
       } else if (seg->line->type == LineDefType::DOOR) {
         // TODO: make a door renderer
@@ -430,29 +443,37 @@ void Renderer::RenderSegLoop(const seg_t *seg,
 
 void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const side_t *side)
 {
+  const int maxX = static_cast<int>(m_fb.width) - 1;
+  const int clampedStart = std::clamp(range.start, 0, maxX);
+  const int clampedEnd = std::clamp(range.end, 0, maxX);
+
+  if (clampedStart > clampedEnd) {
+    return;
+  }
+
   // calculate rw_distance for scale calculation
   m_rwNormalAngle = seg->angle + ANG90;
 
   angle_t offsetAngle = std::abs(static_cast<long long>(m_rwNormalAngle) - static_cast<long long>(m_rwAngle1));
 
   // TODO: figure out why Doom used this
-  // if (offsetAngle > ANG90) {
-  //   offsetAngle = ANG90;
-  // }
+  if (offsetAngle > ANG90) {
+    offsetAngle = ANG90;
+  }
 
   const angle_t disAngle = ANG90 - offsetAngle;
   const fixed_t hyp = PointToDist(seg->line->start->x, seg->line->start->y, *m_player);
   const fixed_t sineval = finesine[disAngle >> ANGLE_TO_FINE_SHIFT];
   m_rwDistance = FixedMul(hyp, sineval);
 
-  m_rwx = range.start;
-  m_rwStopX = range.end + 1;
+  m_rwx = clampedStart;
+  m_rwStopX = clampedEnd + 1;
 
-  m_rwScale = ScaleFromGlobalAngle(m_player->angle + m_xToViewAngle[range.start]);
+  m_rwScale = ScaleFromGlobalAngle(m_player->angle + m_xToViewAngle[clampedStart]);
 
-  if (range.end > range.start) {
-    const fixed_t scale2 = ScaleFromGlobalAngle(m_player->angle + m_xToViewAngle[range.end]);
-    m_rwScaleStep = (scale2 - m_rwScale) / (range.end - range.start);
+  if (clampedEnd > clampedStart) {
+    const fixed_t scale2 = ScaleFromGlobalAngle(m_player->angle + m_xToViewAngle[clampedEnd]);
+    m_rwScaleStep = (scale2 - m_rwScale) / (clampedEnd - clampedStart);
   } else {
     m_rwScaleStep = 0;
   }
@@ -464,10 +485,10 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   wordBottom >>= 4;
 
   fixed_t topStep = -FixedMul(m_rwScaleStep, wordTop);
-  fixed_t topFrac = (CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rwScale, wordTop);
+  fixed_t topFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, wordTop);
 
   fixed_t bottomStep = -FixedMul(m_rwScaleStep, wordBottom);
-  fixed_t bottomFrac = (CANVAS_CENTERY_FRAC >> 4) - FixedMul(m_rwScale, wordBottom);
+  fixed_t bottomFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, wordBottom);
 
   bool markCeiling = true;
   bool markFloor = true;
@@ -490,7 +511,7 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   if (markFloor)
     m_floorPlane = CheckVisPlane(m_floorPlane, m_rwx, m_rwStopX - 1);
 
-  RenderSegLoop(seg, topStep, topFrac, bottomStep, bottomFrac);
+  RenderSegLoop(seg, topStep, topFrac, bottomStep, bottomFrac, markCeiling, markFloor);
 }
 
 void Renderer::RenderSSector(const SubSector &subsector)
@@ -554,15 +575,13 @@ void Renderer::Render(const GameState &gameState)
     if (!m_level->subsectors.empty()) {
       const SubSector &subsector = m_level->subsectors[0];
 
-      for (int16_t i = subsector.firstSegIndex; i < subsector.firstSegIndex + subsector.segCount; i++) {
-        RenderSeg(m_level->segments.data() + i);
-      }
+      RenderSSector(subsector);
     }
   } else {
     RenderBSPNode(0);
   }
 
-#if 0
+#if 1
   RenderVisPlanes();
 #endif
 
