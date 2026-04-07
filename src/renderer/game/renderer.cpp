@@ -1,7 +1,5 @@
 #include "renderer.h"
 
-#include "config.h"
-#include "math_utils.h"
 #include "renderer_helper.h"
 #include "tables.h"
 
@@ -146,6 +144,7 @@ void Renderer::Reset()
 {
   ResetPlanes();
   ResetSolidSegs();
+  m_fb.reset();
 }
 void Renderer::SetLevel(std::shared_ptr<Level> _level) { this->m_level = std::move(_level); }
 
@@ -363,7 +362,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
 
     // mark ceiling
     if (ds.markCeiling) {
-      int top = m_ceilClip[x];
+      int top = m_ceilClip[x] + 1;
       int bottom = yl - 1;
 
       if (bottom >= m_floorClip[x]) {
@@ -408,6 +407,12 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
       _color.y += index;
       _color.z += index;
 
+      // std::cout << "Drawing a column x: " << x << ", tofrom: " << yl << ", to" << yh << '\n';
+
+      if (yl == 300 && yh == 300) {
+        std::printf("");
+      }
+
       DrawColumn(x,
                  yl,
                  yh,
@@ -420,36 +425,39 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
       m_floorClip[x] = -1;
     } else {
       if (ds.seg->line->type == LineDefType::REGULAR) {
-        // portal
+        // render a portal
 
         // top wall
-        int mid = ds.pixHigh >> HEIGHT_BITS;
-        ds.pixHigh += ds.pixHighStep;
+        if (ds.pixHigh != INT32_MIN) {
+          int mid = ds.pixHigh >> HEIGHT_BITS;
+          ds.pixHigh += ds.pixHighStep;
 
-        if (mid >= m_floorClip[x]) {
-          mid = m_floorClip[x] - 1;
+          if (mid >= m_floorClip[x]) {
+            mid = m_floorClip[x] - 1;
+          }
+
+          if (mid >= yl) {
+            DrawColumn(x, mid, yl, MapColor(0, 255, 0, 255));
+            m_ceilClip[x] = mid;
+          } else {
+            m_ceilClip[x] = yl - 1;
+          }
         }
-
-        if (mid >= yl) {
-          DrawColumn(x, mid, yl, MapColor(0, 255, 0, 255));
-          m_ceilClip[x] = mid;
-        } else {
-          m_ceilClip[x] = yl - 1;
-        }
-
         // bottom wall
-        mid = (ds.pixLow + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
-        ds.pixLow += ds.pixLowStep;
+        if (ds.pixLow != INT32_MIN) {
+          int mid = (ds.pixLow + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
+          ds.pixLow += ds.pixLowStep;
 
-        if (mid <= m_ceilClip[x]) {
-          mid = m_ceilClip[x] + 1;
-        }
+          if (mid <= m_ceilClip[x]) {
+            mid = m_ceilClip[x] + 1;
+          }
 
-        if (mid <= yh) {
-          DrawColumn(x, mid, yh, MapColor(0, 255, 0, 255));
-          m_floorClip[x] = mid;
-        } else {
-          m_floorClip[x] = yh + 1;
+          if (mid <= yh) {
+            DrawColumn(x, mid, yh, MapColor(0, 255, 0, 255));
+            m_floorClip[x] = mid;
+          } else {
+            m_floorClip[x] = yh + 1;
+          }
         }
 
       } else if (ds.seg->line->type == LineDefType::DOOR) {
@@ -505,7 +513,7 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
 
   drawseg_t ds{ .seg = seg,
                 .frontSide = side,
-                .backSide = !seg->side ? seg->line->backSide : seg->line->frontSide };
+                .backSide = side == seg->line->frontSide ? seg->line->backSide : seg->line->frontSide };
 
   worldTop >>= 4;
   worldBottom >>= 4;
@@ -516,25 +524,30 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   ds.botStep = -FixedMul(m_rwScaleStep, worldBottom);
   ds.botFrac = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldBottom);
 
-  fixed_t worldHigh;
-  fixed_t worldLow;
-
   if (ds.backSide) {
-    worldHigh = ds.backSide->sector->ceilingHeight - m_player->z;
-    worldLow = ds.backSide->sector->floorHeight - m_player->z;
+    fixed_t worldHigh = ds.backSide->sector->ceilingHeight - m_player->z;
+    fixed_t worldLow = ds.backSide->sector->floorHeight - m_player->z;
 
     worldHigh >>= 4;
     worldLow >>= 4;
 
-    ds.pixHighStep = -FixedMul(m_rwScaleStep, worldHigh);
-    ds.pixLowStep = -FixedMul(m_rwScaleStep, worldLow);
-  } else {
-    worldHigh = 0;
-    worldLow = 0;
-  }
+    if (worldHigh < worldTop) {
+      ds.pixHigh = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldHigh);
+      ds.pixHighStep = -FixedMul(m_rwScaleStep, worldHigh);
+    } else {
+      ds.pixHigh = ds.pixHighStep = INT32_MIN;
+    }
 
-  ds.pixHigh = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldHigh);
-  ds.pixLow = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldLow);
+    if (worldLow > worldBottom) {
+      ds.pixLow = (m_centerYFrac >> 4) - FixedMul(m_rwScale, worldLow);
+      ds.pixLowStep = -FixedMul(m_rwScaleStep, worldLow);
+    } else {
+      ds.pixLow = ds.pixLowStep = INT32_MIN;
+    }
+  } else {
+    ds.pixLow = ds.pixHigh = INT32_MIN;
+    ds.pixLowStep = ds.pixHighStep = INT32_MIN;
+  }
 
   bool markCeiling = true;
   bool markFloor = true;
@@ -631,7 +644,7 @@ void Renderer::Render(const Player &player)
     RenderBSPNode(0);
   }
 
-#if 1
+#if 0
   RenderVisPlanes();
 #endif
 

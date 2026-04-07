@@ -1,8 +1,8 @@
 #pragma once
 
+#include "core/framebuffer.h"
 #include "defs.h"
 #include "tables.h"
-#include "core/framebuffer.h"
 
 #include <array>
 #include <memory>

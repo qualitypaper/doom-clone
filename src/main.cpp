@@ -120,11 +120,11 @@ int main(int argc, char *argv[])
   // setup the game renderer
   auto renderer = std::make_shared<Renderer>(sdlWindow, level);
 
-  GameState gameState{ .player = { .x = 0 << FRAC_BITS,
+  GameState gameState{ .player = { .x = 100 << FRAC_BITS,
                                    .y = 0 << FRAC_BITS,
                                    .z = 10 << FRAC_BITS,
                                    .velocity = 15 << FRAC_BITS,
-                                   .angle = 0 },
+                                   .angle = ANG180 },
                        .currentMode = EngineMode::EDITOR_2D,
                        .levelNum = 1,
                        .sdlWindow = std::move(sdlWindow),

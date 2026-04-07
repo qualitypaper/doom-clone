@@ -40,7 +40,7 @@ void SetEngineMode(GameState &state,
 
   if (newMode == EngineMode::GAMEPLAY_3D) {
     // disable absolute mouse
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    // SDL_SetRelativeMouseMode(SDL_TRUE);
     SDL_SetWindowFullscreen(sdlWindow->getWindow(), SDL_FALSE);
 
     auto newLevel = std::make_unique<Level>(state.editorRenderer->GetLevelName());
