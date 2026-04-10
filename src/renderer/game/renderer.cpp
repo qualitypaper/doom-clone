@@ -481,10 +481,8 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
     return;
   }
 
-  // Derive orientation from the actual seg endpoints.
-  // Prebuilt seg angles can be stale for reversed/split segs.
-  const angle_t segAngle = PointToAngle2(seg->start->x, seg->start->y, seg->end->x, seg->end->y);
-  m_rwNormalAngle = segAngle + ANG90;
+  // derive normal angle
+  m_rwNormalAngle = seg->angle + ANG90;
 
   angle_t offsetAngle = std::abs(static_cast<long long>(m_rwNormalAngle) - static_cast<long long>(m_rwAngle1));
 

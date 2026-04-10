@@ -47,7 +47,8 @@ void BSPBuilder::BuildBSPTree()
 
     _segments.emplace_back(ld.start, ld.end, angle, static_cast<int16_t>(i), 0, 0);
     if (ld.backSidedef != -1) {
-      _segments.emplace_back(ld.end, ld.start, angle, static_cast<int16_t>(i), 1, 0);
+      // reverting the angle for the reverted side
+      _segments.emplace_back(ld.end, ld.start, ANG270 - angle + ANG90, static_cast<int16_t>(i), 1, 0);
     }
   }
 
