@@ -193,7 +193,6 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
     if (end < clipStart->start - 1) {
       // no solid segs in the way, render the whole seg
       StoreWallRange({ start, end }, seg, sidedef);
-
       next = m_solidSegs.end().base();
 
       // moves everything to the right by one
@@ -356,9 +355,9 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
   for (int x = m_rwx; x < std::min(m_rwStopX, static_cast<int>(m_fb.width)); x++) {
     int yl = (ds.topFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
-    if (yl < m_ceilClip[x] + 1) {
-      yl = m_ceilClip[x] + 1;
-    }
+    // if (yl < m_ceilClip[x] + 1) {
+    //   yl = m_ceilClip[x] + 1;
+    // }
 
     // mark ceiling
     if (ds.markCeiling) {
@@ -378,9 +377,9 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
 
     int yh = (ds.botFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
-    if (yh >= m_floorClip[x]) {
-      yh = m_floorClip[x] - 1;
-    }
+    // if (yh >= m_floorClip[x]) {
+    //   yh = m_floorClip[x] - 1;
+    // }
 
     // mark floor
     if (ds.markFloor) {
@@ -442,7 +441,11 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           } else {
             m_ceilClip[x] = yl - 1;
           }
+        } else {
+          // No upper wall slice in this column: preserve the open portal clip.
+          m_ceilClip[x] = yl - 1;
         }
+
         // bottom wall
         if (ds.pixLow != INT32_MIN) {
           int mid = (ds.pixLow + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
@@ -458,6 +461,9 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           } else {
             m_floorClip[x] = yh + 1;
           }
+        } else {
+          // No lower wall slice in this column: preserve the open portal clip.
+          m_floorClip[x] = yh + 1;
         }
 
       } else if (ds.seg->line->type == LineDefType::DOOR) {
@@ -552,9 +558,11 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   bool markCeiling = true;
   bool markFloor = true;
 
-  if (!ds.backSide) {
-    markCeiling = markFloor = true;
-  } else {
+  if (ds.backSide) {
+    // Only mark planes where this two-sided wall can actually reveal a gap.
+    markCeiling = ds.backSide->sector->ceilingHeight < side->sector->ceilingHeight;
+    markFloor = ds.backSide->sector->floorHeight > side->sector->floorHeight;
+
     if (side->sector->floorHeight >= m_player->z) {
       markFloor = false;
     }

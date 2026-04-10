@@ -94,8 +94,8 @@ SplitResult BSPBuilder::SplitBySplitter(std::vector<Seg> &segs, const Seg &split
       linedefs.emplace_back(startLd);
       linedefs.emplace_back(endLd);
 
-      Seg newSeg{ seg.startVertex, newVertexId, 0, static_cast<int16_t>(linedefs.size() - 2), seg.side, 0 };
-      Seg newOtherSeg{ newVertexId, seg.endVertex, 0, static_cast<int16_t>(linedefs.size() - 1), seg.side, 0 };
+      Seg newSeg{ seg.startVertex, newVertexId, seg.angle, static_cast<int16_t>(linedefs.size() - 2), seg.side, 0 };
+      Seg newOtherSeg{ newVertexId, seg.endVertex, seg.angle, static_cast<int16_t>(linedefs.size() - 1), !seg.side, 0 };
 
       const SegmentPosition newSegPos = DetermineSegmentPosition(splitter, newSeg);
 

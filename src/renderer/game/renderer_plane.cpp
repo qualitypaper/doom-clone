@@ -156,9 +156,6 @@ Visplane *Renderer::CheckVisPlane(Visplane *visplane, const int start, const int
 
   visplane = &m_visplanes.emplace_back(sourceHeight, sourceColor, sourceLightLevel, start, end, m_fb.width);
 
-  std::ranges::fill(visplane->top, -1);
-  std::ranges::fill(visplane->bottom, -1);
-
   return visplane;
 }
 
