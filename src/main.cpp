@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
   GameState gameState{ .player = { .x = 100 << FRAC_BITS,
                                    .y = 0 << FRAC_BITS,
                                    .z = 10 << FRAC_BITS,
-                                   .velocity = 15 << FRAC_BITS,
+                                   .velocity = 30 << FRAC_BITS,
                                    .angle = ANG180 },
                        .currentMode = EngineMode::EDITOR_2D,
                        .levelNum = 1,

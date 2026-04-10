@@ -82,8 +82,8 @@ fixed_t Renderer::ScaleFromGlobalAngle(const angle_t angle) const
     if (scale > 64 * FRAC_UNIT) {
       scale = 64 * FRAC_UNIT;
 
-    } else if (scale < 256) {
-      scale = 256;
+    } else if (scale <= FRAC_UNIT >> 4) {
+      scale = FRAC_UNIT >> 4;
     }
   } else {
     scale = 64 * FRAC_UNIT;
@@ -190,7 +190,7 @@ void Renderer::ClipSolidWall(int start, int end, const seg_t *seg, const side_t 
 
   ClipRange *next;
   if (start < clipStart->start) {
-    if (end < clipStart->start - 1) {
+    if (end < clipStart->start) {
       // no solid segs in the way, render the whole seg
       StoreWallRange({ start, end }, seg, sidedef);
       next = m_solidSegs.end().base();
@@ -355,9 +355,9 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
   for (int x = m_rwx; x < std::min(m_rwStopX, static_cast<int>(m_fb.width)); x++) {
     int yl = (ds.topFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
-    // if (yl < m_ceilClip[x] + 1) {
-    //   yl = m_ceilClip[x] + 1;
-    // }
+    if (yl < m_ceilClip[x] + 1) {
+      yl = m_ceilClip[x] + 1;
+    }
 
     // mark ceiling
     if (ds.markCeiling) {
@@ -377,9 +377,9 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
 
     int yh = (ds.botFrac + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
 
-    // if (yh >= m_floorClip[x]) {
-    //   yh = m_floorClip[x] - 1;
-    // }
+    if (yh >= m_floorClip[x]) {
+      yh = m_floorClip[x] - 1;
+    }
 
     // mark floor
     if (ds.markFloor) {
@@ -406,12 +406,6 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
       _color.y += index;
       _color.z += index;
 
-      // std::cout << "Drawing a column x: " << x << ", tofrom: " << yl << ", to" << yh << '\n';
-
-      if (yl == 300 && yh == 300) {
-        std::printf("");
-      }
-
       DrawColumn(x,
                  yl,
                  yh,
@@ -428,7 +422,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
 
         // top wall
         if (ds.pixHigh != INT32_MIN) {
-          int mid = ds.pixHigh >> HEIGHT_BITS;
+          int mid = (ds.pixHigh + HEIGHT_UNIT - 1) >> HEIGHT_BITS;
           ds.pixHigh += ds.pixHighStep;
 
           if (mid >= m_floorClip[x]) {
@@ -436,7 +430,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           }
 
           if (mid >= yl) {
-            DrawColumn(x, mid, yl, MapColor(0, 255, 0, 255));
+            DrawColumn(x, mid, yl, MapColor(255, 0, 255, 255));
             m_ceilClip[x] = mid;
           } else {
             m_ceilClip[x] = yl - 1;
@@ -487,8 +481,10 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
     return;
   }
 
-  // calculate rw_distance for scale calculation
-  m_rwNormalAngle = seg->angle + ANG90;
+  // Derive orientation from the actual seg endpoints.
+  // Prebuilt seg angles can be stale for reversed/split segs.
+  const angle_t segAngle = PointToAngle2(seg->start->x, seg->start->y, seg->end->x, seg->end->y);
+  m_rwNormalAngle = segAngle + ANG90;
 
   angle_t offsetAngle = std::abs(static_cast<long long>(m_rwNormalAngle) - static_cast<long long>(m_rwAngle1));
 
@@ -498,7 +494,8 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   }
 
   const angle_t disAngle = ANG90 - offsetAngle;
-  const fixed_t hyp = PointToDist(seg->line->start->x, seg->line->start->y, *m_player);
+  // Distance must use the current seg start, not linedef start.
+  const fixed_t hyp = PointToDist(seg->start->x, seg->start->y, *m_player);
   const fixed_t sineval = finesine[disAngle >> ANGLE_TO_FINE_SHIFT];
   m_rwDistance = FixedMul(hyp, sineval);
 
@@ -519,7 +516,7 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
 
   drawseg_t ds{ .seg = seg,
                 .frontSide = side,
-                .backSide = side == seg->line->frontSide ? seg->line->backSide : seg->line->frontSide };
+                .backSide = seg->side ? seg->line->frontSide : seg->line->backSide };
 
   worldTop >>= 4;
   worldBottom >>= 4;
