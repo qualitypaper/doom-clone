@@ -163,8 +163,8 @@ void Renderer::DrawColumn(int x, int y0, int y1, const uint32_t color) const
   y0 = std::clamp(y0, 0, m_fb.height - 1);
   y1 = std::clamp(y1, 0, m_fb.height - 1);
 
-  if (y0 > y1)
-    std::swap(y0, y1);
+  // if (y0 > y1)
+  //   std::swap(y0, y1);
 
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
@@ -430,7 +430,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           }
 
           if (mid >= yl) {
-            DrawColumn(x, mid, yl, MapColor(255, 0, 255, 255));
+            DrawColumn(x, yl, mid, MapColor(255, 0, 255, 255));
             m_ceilClip[x] = mid;
           } else {
             m_ceilClip[x] = yl - 1;
@@ -554,10 +554,6 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   bool markFloor = true;
 
   if (ds.backSide) {
-    // Only mark planes where this two-sided wall can actually reveal a gap.
-    markCeiling = ds.backSide->sector->ceilingHeight < side->sector->ceilingHeight;
-    markFloor = ds.backSide->sector->floorHeight > side->sector->floorHeight;
-
     if (side->sector->floorHeight >= m_player->z) {
       markFloor = false;
     }
@@ -647,7 +643,7 @@ void Renderer::Render(const Player &player)
     RenderBSPNode(0);
   }
 
-#if 0
+#if 1
   RenderVisPlanes();
 #endif
 

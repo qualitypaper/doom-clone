@@ -42,9 +42,6 @@ void Renderer::DrawSpan(drawspan_t &ds) const
   ds.x1 = std::clamp(ds.x1, 0, m_fb.width - 1);
   ds.x2 = std::clamp(ds.x2, 0, m_fb.width - 1);
 
-  if (ds.x1 > ds.x2)
-    std::swap(ds.x1, ds.x2);
-
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
   const uint32_t pitch = this->m_fb.width;
@@ -96,12 +93,8 @@ Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, con
   }
 
   m_visplanes.emplace_back(height, color, lightLevel, static_cast<int>(m_fb.width), -1, m_fb.width);
-  Visplane *newPlane = &m_visplanes.back();
 
-  std::ranges::fill(newPlane->top, -1);
-  std::ranges::fill(newPlane->bottom, -1);
-
-  return newPlane;
+  return &m_visplanes.back();
 }
 
 
@@ -182,5 +175,7 @@ void Renderer::RenderVisPlanes()
       prevTop = curTop;
       prevBottom = curBottom;
     }
+
+    // m_fb.update();
   }
 }
