@@ -1,6 +1,6 @@
 #pragma once
+#include "../core/serialization/serialization.h"
 #include "defs.h"
-#include "core/serialization.h"
 
 #include <array>
 #include <fstream>

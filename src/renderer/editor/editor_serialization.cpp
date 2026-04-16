@@ -1,40 +1,13 @@
-#include "math_utils.h"
+#include "../../core/math_utils.h"
 
+#include "../../core/serialization/serialization.h"
+#include "../../core/serialization/wad_serializer.h"
 #include "bsp/bsp.h"
 #include "config.h"
-#include "core/serialization.h"
 #include "editor.h"
 
 #include "ranges"
 #include <cstring>
-
-struct LevelData
-{
-  std::vector<uint8_t> rawData;
-  directoryEntry entry{};
-};
-
-LevelData ReadLevelData(FileReader &fr, const directoryEntry &entry)
-{
-  LevelData levelData;
-  levelData.entry = entry;
-
-  fr.SetPos(entry.offset);
-
-  levelData.rawData.resize(entry.size);
-  fr.ReadData(reinterpret_cast<char *>(levelData.rawData.data()), entry.size);
-
-  return levelData;
-}
-
-void WriteLevelData(FileWriter &fw, LevelData &levelData)
-{
-  levelData.entry.offset = static_cast<uint32_t>(fw.Cursor());
-  levelData.entry.size = static_cast<uint32_t>(levelData.rawData.size());
-
-  fw.WriteRaw(levelData.entry.size);
-  fw.WriteData(reinterpret_cast<const char *>(levelData.rawData.data()), levelData.rawData.size());
-}
 
 void EditorLineDef::serialize(FileWriter &fw) const
 {
@@ -76,33 +49,6 @@ void EditorVertex::deserialize(FileReader &fr)
 }
 
 
-std::vector<directoryEntry> ReadDirectory(FileReader &fr, const header &hdr)
-{
-  std::vector<directoryEntry> entries;
-  entries.reserve(hdr.numDirectories);
-
-  fr.SetPos(sizeof(header) + hdr.directoryOffset);
-
-  for (uint32_t i = 0; i < hdr.numDirectories && fr.IsStreamGood(); ++i) {
-    directoryEntry entry{};
-    fr.ReadRaw(entry);
-    entries.push_back(entry);
-  }
-
-  return entries;
-}
-
-size_t WriteDirectoryAndGetOffset(FileWriter &fw, const std::vector<directoryEntry> &entries)
-{
-  const size_t dirOffset = fw.Cursor();
-
-  for (const auto &entry : entries) {
-    fw.WriteRaw(entry);
-  }
-
-  return dirOffset;
-}
-
 void EditorLevel::SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const
 {
   VectorWriter writer(buffer);
@@ -122,7 +68,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
 {
   const bool fileExists = std::filesystem::exists(SAVED_LEVEL_PATH);
 
-  std::vector<LevelData> allLevels;
+  std::vector<LumpData> allLumps;
   header _header{};
   int32_t targetLevelIndex = -1;
 
@@ -132,10 +78,11 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
     fr.ReadRaw(_header);
 
     std::vector<directoryEntry> entries = ReadDirectory(fr, _header);
+    allLumps.reserve(entries.size());
 
     for (size_t i = 0; i < entries.size(); ++i) {
-      LevelData levelData = ReadLevelData(fr, entries[i]);
-      allLevels.push_back(levelData);
+      LumpData lumpData = ReadLumpData(fr, entries[i]);
+      allLumps.push_back(lumpData);
 
       if (entries[i].name == _name) {
         targetLevelIndex = static_cast<int32_t>(i);
@@ -149,7 +96,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   // serializing current level
   SerializeLevelToBuffer(bspLevel, newLevelBuffer);
 
-  LevelData newLevelData;
+  LumpData newLevelData;
   newLevelData.rawData = std::move(newLevelBuffer);
   directoryEntry newEntry{};
   std::memcpy(newEntry.name.data(), _name.data(), sizeof(newEntry.name.size()));
@@ -157,42 +104,14 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   newLevelData.entry = newEntry;
 
   if (targetLevelIndex >= 0) {
-    allLevels[targetLevelIndex] = std::move(newLevelData);
+    allLumps[targetLevelIndex] = std::move(newLevelData);
   } else {
-    allLevels.push_back(std::move(newLevelData));
+    allLumps.push_back(std::move(newLevelData));
   }
 
-  FileWriter fw(SAVED_LEVEL_PATH, std::ios::binary | std::ios::trunc);
+  numberOfLevels = allLumps.size();
+  WriteLumps(std::move(allLumps), _header);
 
-  if (!fw.IsStreamGood()) {
-    throw std::runtime_error("Failed to open file for saving.\n");
-  }
-
-  fw.WriteRaw(_header);
-
-  std::vector<directoryEntry> finalEntries;
-  for (auto &levelData : allLevels) {
-    levelData.entry.offset = static_cast<uint32_t>(fw.Cursor());
-    levelData.entry.size = static_cast<uint32_t>(levelData.rawData.size());
-
-    fw.WriteData(reinterpret_cast<const char *>(levelData.rawData.data()), levelData.rawData.size());
-
-    finalEntries.push_back(levelData.entry);
-  }
-
-  const size_t directoryOffset = fw.Cursor() - sizeof(header);
-  for (const auto &entry : finalEntries) {
-    fw.WriteRaw(entry);
-  }
-
-  // update header inf
-  _header.numDirectories = static_cast<uint32_t>(finalEntries.size());
-  _header.directoryOffset = static_cast<uint32_t>(directoryOffset);
-
-  fw.SetPos(0);
-  fw.WriteRaw(_header);
-
-  numberOfLevels = static_cast<uint16_t>(allLevels.size());
   std::cout << "Saved Level: " << (char *)_name.data() << '\n';
 }
 

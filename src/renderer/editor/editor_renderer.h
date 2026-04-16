@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../../include/math_utils.h"
 #include "../../core/gameloop.h"
+#include "../../core/math_utils.h"
 #include "../../core/sdl_window.h"
 #include "editor.h"
 #include "editor_input_handler.h"

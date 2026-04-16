@@ -66,14 +66,4 @@ void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);
 void SetEngineMode(GameState &gameState, EngineMode newMode, const std::shared_ptr<SdlWindow> &sdlWindow);
 
-inline std::array<char8_t, 8> MakeLevelName(uint16_t number)
-{
-  const std::string s = std::format("Map{}", number);
-  std::array<char8_t, 8> arr{};
-
-  const size_t len = std::min(s.size(), size_t{ 8 });
-  for (size_t i = 0; i < len; ++i) {
-    arr[i] = static_cast<char8_t>(s[i]);
-  }
-  return arr;
-}
+std::array<char8_t, 8> MakeLevelName(uint16_t number);

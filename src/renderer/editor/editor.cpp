@@ -1,10 +1,10 @@
 #include "editor.h"
 
+#include "../../core/math_utils.h"
 #include "commands.h"
 #include "core/gameloop.h"
 #include "editor_input_handler.h"
 #include "editor_renderer.h"
-#include "math_utils.h"
 
 #include <algorithm>
 #include <cstring>
@@ -370,11 +370,7 @@ void Editor::addEmptyLevel() const
 {
   state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
   state->numOfLevels++;
-  auto levelName = std::array<char8_t, 8>{};
-  const std::string nameStr = std::format("Map{}", state->numOfLevels);
-
-  const size_t copyLen = std::min(nameStr.size(), size_t{ 8 });
-  std::memcpy(levelName.data(), nameStr.data(), copyLen);
+  const std::array<char8_t, 8> levelName = MakeLevelName(state->numOfLevels);
 
   state->level = std::make_unique<EditorLevel>(state->numOfLevels, levelName);
 }

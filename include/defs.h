@@ -1,8 +1,8 @@
 #ifndef DOOMCLONE_DEFS_H
 #define DOOMCLONE_DEFS_H
+#include "../src/core/serialization/serialization.h"
 #include "config.h"
 #include "core/fixed_math.h"
-#include "core/serialization.h"
 #include "imgui/imgui.h"
 #include "tables.h"
 

@@ -328,8 +328,8 @@ void Renderer::RenderSeg(const seg_t *seg)
   angle1 = (angle1 + FOV) >> ANGLE_TO_FINE_SHIFT;
   angle2 = (angle2 + FOV) >> ANGLE_TO_FINE_SHIFT;
 
-  int x1 = m_viewAngleToX[angle1];
-  int x2 = m_viewAngleToX[angle2];
+  const int x1 = m_viewAngleToX[angle1];
+  const int x2 = m_viewAngleToX[angle2];
 
   if (x1 == x2)
     return;
@@ -486,10 +486,10 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
 
   angle_t offsetAngle = std::abs(static_cast<long long>(m_rwNormalAngle) - static_cast<long long>(m_rwAngle1));
 
-  // TODO: figure out why Doom used this
-  if (offsetAngle > ANG90) {
-    offsetAngle = ANG90;
-  }
+  // TODO: figure out why Doom used this, currently causes a bug in wall rendering
+  // if (offsetAngle > ANG90) {
+  //   offsetAngle = ANG90;
+  // }
 
   const angle_t disAngle = ANG90 - offsetAngle;
   // Distance must use the current seg start, not linedef start.
@@ -512,9 +512,7 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   fixed_t worldTop = side->sector->ceilingHeight - m_player->z;
   fixed_t worldBottom = side->sector->floorHeight - m_player->z;
 
-  drawseg_t ds{ .seg = seg,
-                .frontSide = side,
-                .backSide = seg->side ? seg->line->frontSide : seg->line->backSide };
+  drawseg_t ds{ .seg = seg, .frontSide = side, .backSide = seg->side ? seg->line->frontSide : seg->line->backSide };
 
   worldTop >>= 4;
   worldBottom >>= 4;

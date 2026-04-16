@@ -1,5 +1,5 @@
 #include "gameloop.h"
-#include "../bsp/bsp.h"
+#include "bsp/bsp.h"
 #include "renderer/editor/editor_renderer.h"
 #include "renderer/game/renderer.h"
 #include "sdl_window.h"
@@ -28,9 +28,7 @@ void HandleKeyInput(const SDL_Event &event, InputState &input)
   input.keys[scancode] = pressed;
 }
 
-void SetEngineMode(GameState &state,
-                   const EngineMode newMode,
-                   const std::shared_ptr<SdlWindow> &sdlWindow)
+void SetEngineMode(GameState &state, const EngineMode newMode, const std::shared_ptr<SdlWindow> &sdlWindow)
 {
   // nothing to change
   if (state.currentMode == newMode)
@@ -85,7 +83,7 @@ void Level::Load(FileReader &fr)
 
   Level::Init(*this, _linedefs, _sidedefs, segs);
 
-  // adding sector into each subsector, for easier access during rendering
+  // adding sector into each subsector for easier access during rendering
   for (auto &ssector : subsectors) {
     const seg_t *segment = &segments[ssector.firstSegIndex];
 

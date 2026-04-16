@@ -3,8 +3,8 @@
 
 #define _USE_MATH_DEFINES
 
+#include "../../include/defs.h"
 #include "core/fixed_math.h"
-#include "defs.h"
 
 #include <algorithm>
 #include <cmath>

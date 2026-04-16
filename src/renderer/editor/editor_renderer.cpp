@@ -1,8 +1,8 @@
 #include "editor_renderer.h"
 
+#include "../../core/math_utils.h"
 #include "commands.h"
 #include "editor.h"
-#include "math_utils.h"
 
 #include "imgui/backends/imgui_impl_sdl2.h"
 #include "imgui/backends/imgui_impl_sdlrenderer2.h"

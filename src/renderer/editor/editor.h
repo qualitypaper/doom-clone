@@ -1,11 +1,12 @@
 #pragma once
 
+#include "../../core/math_utils.h"
+#include "../../core/serialization/serialization.h"
+#include "../../core/serialization/wad_serializer.h"
 #include "bsp/bsp.h"
 #include "core/gameloop.h"
-#include "core/serialization.h"
 #include "defs.h"
 #include "imgui/imgui.h"
-#include "math_utils.h"
 
 #include <fstream>
 #include <iostream>
@@ -36,52 +37,6 @@ struct AABB
   }
 };
 
-struct header
-{
-  std::array<char8_t, 4> magicNumber;
-  uint32_t numDirectories;
-  uint32_t directoryOffset;
-
-  template<typename Writer>
-  void serialize(Writer &w) const
-  {
-    serialization::serialize(w, magicNumber);
-    serialization::serialize(w, numDirectories);
-    serialization::serialize(w, directoryOffset);
-  }
-
-  template<typename Reader>
-  void deserialize(Reader &r)
-  {
-    serialization::deserialize(r, magicNumber);
-    serialization::deserialize(r, numDirectories);
-    serialization::deserialize(r, directoryOffset);
-  }
-};
-
-
-struct directoryEntry
-{
-  uint32_t offset;
-  uint32_t size;
-  std::array<char8_t, 8> name;
-
-  template<typename Writer>
-  void serialize(Writer &w) const
-  {
-    serialization::serialize(w, offset);
-    serialization::serialize(w, size);
-    serialization::serialize(w, name);
-  }
-
-  template<typename Reader>
-  void deserialize(Reader &r)
-  {
-    serialization::deserialize(r, offset);
-    serialization::deserialize(r, size);
-    serialization::deserialize(r, name);
-  }
-};
 
 enum class EditorObjectType { LINEDEF, VERTEX, SECTOR, SIDEDEF };
 

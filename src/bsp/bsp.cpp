@@ -1,7 +1,7 @@
 #include "bsp.h"
 
+#include "../core/math_utils.h"
 #include "config.h"
-#include "math_utils.h"
 #include "renderer/game/renderer_helper.h"
 
 #include <iostream>

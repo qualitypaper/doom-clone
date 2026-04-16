@@ -1,6 +1,6 @@
+#include "../core/math_utils.h"
 #include "bsp.h"
 #include "imgui/imgui.h"
-#include "math_utils.h"
 #include "renderer/editor/editor_renderer.h"
 
 void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow,
