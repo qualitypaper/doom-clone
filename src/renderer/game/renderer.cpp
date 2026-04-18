@@ -430,7 +430,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           }
 
           if (mid >= yl) {
-            DrawColumn(x, yl, mid, MapColor(255, 0, 255, 255));
+            DrawColumn(x, yl, mid, MapColor(200, 100, 0, 255));
             m_ceilClip[x] = mid;
           } else {
             m_ceilClip[x] = yl - 1;
@@ -486,7 +486,8 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
 
   angle_t offsetAngle = std::abs(static_cast<long long>(m_rwNormalAngle) - static_cast<long long>(m_rwAngle1));
 
-  // TODO: figure out why Doom used this, currently causes a bug in wall rendering
+  // TODO: figure out why Doom used this
+  // currently causes a bug in wall rendering (infinite falls are being rendered when crossing the walls start vertex)
   // if (offsetAngle > ANG90) {
   //   offsetAngle = ANG90;
   // }

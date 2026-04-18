@@ -1,6 +1,8 @@
 #include "bsp/bsp.h"
 #include "config.h"
 #include "core/gameloop.h"
+#include "core/serialization/colors_serializer.h"
+#include "core/serialization/wad_serializer.h"
 #include "core/simulation.h"
 #include "renderer/editor/editor.h"
 #include "renderer/editor/editor_renderer.h"
@@ -96,18 +98,18 @@ int main(int argc, char *argv[])
   size_t numOfLevels;
 
   if (true) {
-    std::array<char8_t, 8> levelName = MakeLevelName(1);
+    std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(1);
     auto tempLevel = std::make_unique<Level>(levelName);
     numOfLevels = EditorLevel::Load(tempLevel);
     level = std::move(tempLevel);
   } else {
     numOfLevels = 1;
-    std::array<char8_t, 8> levelName = MakeLevelName(1);
+    std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(1);
     level = std::make_shared<Level>(levelName);
     level->vertices = std::move(vertices);
     level->sectors = std::move(sectors);
     Level::Init(*level, linedefs, sidedefs, std::vector<Seg>{});
-    level->name = MakeLevelName(1);
+    level->name = WadSerializer::MakeLevelName(1);
   }
 
   // setup sdl window
@@ -131,6 +133,11 @@ int main(int argc, char *argv[])
                        .renderer = std::move(renderer),
                        .editorRenderer = std::move(editorRenderer) };
 
+  // initialize palette
+  {
+    FileReader fr(PROJECT_ROOT_PATH"/PLAYPAL.pal");
+    auto paletteManager = std::make_unique<PaletteManager>(fr);
+  }
 
   running = true;
   // game loop

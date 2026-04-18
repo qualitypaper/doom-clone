@@ -65,5 +65,3 @@ struct GameState
 void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);
 void SetEngineMode(GameState &gameState, EngineMode newMode, const std::shared_ptr<SdlWindow> &sdlWindow);
-
-std::array<char8_t, 8> MakeLevelName(uint16_t number);

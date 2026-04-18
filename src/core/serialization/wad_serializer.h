@@ -5,6 +5,10 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string_view>
+#include <vector>
 
 struct header
 {
@@ -59,15 +63,49 @@ struct LumpData
   directoryEntry entry{};
 };
 
+class WadSerializer
+{
+public:
+  WadSerializer() = default;
+  explicit WadSerializer(std::filesystem::path filePath);
 
-directoryEntry FindDirectory(FileReader &fr, const header &hdr, const std::array<char8_t, 8> &name);
-std::vector<directoryEntry> ReadDirectory(FileReader &fr, const header &hdr);
-void WriteLumpData(FileWriter &fw, LumpData &lumpData);
-LumpData ReadLumpData(FileReader &fr, const directoryEntry &entry);
-void WriteLumps(std::vector<LumpData> allLumps, header &_header);
+  void SetFilePath(const std::filesystem::path &filePath);
+  [[nodiscard]] const std::filesystem::path &GetFilePath() const;
 
+  bool Load(bool readLumps = false);
+  bool LoadHeader(FileReader &fr);
+  bool LoadDirectory(FileReader &fr);
 
-std::array<char8_t, 8> MakeLevelName(uint16_t number);
-std::array<char8_t, 8> MakeLumpName(std::string_view name);
+  static LumpData ReadLump(FileReader &fr, const directoryEntry &entry);
+  static std::vector<LumpData> ReadLumps(FileReader &fr, const std::vector<directoryEntry> &entries);
+  void LoadAllLumps(FileReader &fr);
+
+  [[nodiscard]] const header &GetHeader() const;
+  [[nodiscard]] const std::vector<directoryEntry> &GetDirectory() const;
+  [[nodiscard]] const std::vector<LumpData> &GetLoadedLumps() const;
+
+  [[nodiscard]] std::optional<directoryEntry> FindDirectoryEntry(const std::array<char8_t, 8> &name) const;
+  [[nodiscard]] const LumpData *FindLoadedLump(const std::array<char8_t, 8> &name) const;
+
+  void SetHeader(const header &hdr);
+  void SetLumps(std::vector<LumpData> lumps);
+  void Write(const std::filesystem::path &filePath, header *hdrOverride = nullptr);
+  void Write(header *hdrOverride = nullptr);
+
+  static std::array<char8_t, 8> MakeLevelName(uint16_t number);
+  static std::array<char8_t, 8> MakeLumpName(std::string_view name);
+
+private:
+  static std::vector<directoryEntry> ReadDirectory(FileReader &fr, const header &hdr);
+  static void WriteLump(FileWriter &fw, LumpData &lumpData);
+  static void WriteLumpsToPath(std::vector<LumpData> &allLumps, header &hdr, const std::filesystem::path &filePath);
+
+private:
+  std::filesystem::path m_filePath;
+  header m_header{};
+  std::vector<directoryEntry> m_directory;
+  std::vector<LumpData> m_loadedLumps;
+};
+
 
 #endif// DOOMCLONE_WAD_PARSER_H

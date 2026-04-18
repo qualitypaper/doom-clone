@@ -73,20 +73,18 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   int32_t targetLevelIndex = -1;
 
   if (fileExists) {
-    // extracting existing levels into memory
-    FileReader fr(SAVED_LEVEL_PATH);
-    fr.ReadRaw(_header);
+    WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+    if (wadSerializer.Load(true)) {
+      _header = wadSerializer.GetHeader();
+      allLumps = wadSerializer.GetLoadedLumps();
 
-    std::vector<directoryEntry> entries = ReadDirectory(fr, _header);
-    allLumps.reserve(entries.size());
-
-    for (size_t i = 0; i < entries.size(); ++i) {
-      LumpData lumpData = ReadLumpData(fr, entries[i]);
-      allLumps.push_back(lumpData);
-
-      if (entries[i].name == _name) {
-        targetLevelIndex = static_cast<int32_t>(i);
+      for (size_t i = 0; i < allLumps.size(); ++i) {
+        if (allLumps[i].entry.name == _name) {
+          targetLevelIndex = static_cast<int32_t>(i);
+        }
       }
+    } else {
+      _header = { { 'P', 'W', 'A', 'D' }, 1, 0 };
     }
   } else {
     _header = { { 'P', 'W', 'A', 'D' }, 1, 0 };
@@ -99,8 +97,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   LumpData newLevelData;
   newLevelData.rawData = std::move(newLevelBuffer);
   directoryEntry newEntry{};
-  std::memcpy(newEntry.name.data(), _name.data(), sizeof(newEntry.name.size()));
-
+  std::memcpy(newEntry.name.data(), _name.data(), newEntry.name.size());
   newLevelData.entry = newEntry;
 
   if (targetLevelIndex >= 0) {
@@ -109,9 +106,12 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
     allLumps.push_back(std::move(newLevelData));
   }
 
-  numberOfLevels = allLumps.size();
-  WriteLumps(std::move(allLumps), _header);
+  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  wadSerializer.SetHeader(_header);
+  wadSerializer.SetLumps(std::move(allLumps));
+  wadSerializer.Write();
 
+  numberOfLevels = static_cast<uint16_t>(wadSerializer.GetDirectory().size());
   std::cout << "Saved Level: " << (char *)_name.data() << '\n';
 }
 
@@ -157,23 +157,17 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
     return;
   }
 
-  header _header{};
-  fr.ReadRaw(_header);
-
-  std::vector<directoryEntry> directory = ReadDirectory(fr, _header);
-  uint32_t offset = UINT32_MAX;
-
-  for (auto &entry : directory) {
-    if (entry.name == name) {
-      offset = entry.offset;
-    }
+  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  if (!wadSerializer.Load(false)) {
+    throw std::runtime_error("Failed to read WAD file.");
   }
 
-  if (offset == UINT32_MAX) {
+  const auto entry = wadSerializer.FindDirectoryEntry(name);
+  if (!entry.has_value()) {
     throw std::runtime_error("Level couldn't be found.");
   }
 
-  fr.SetPos(offset);
+  fr.SetPos(entry->offset);
 
   fr.ReadVector(linedefs);
   fr.ReadVector(sidedefs);
@@ -218,23 +212,19 @@ size_t EditorLevel::Load(std::unique_ptr<Level> &level)
 {
   FileReader fr(SAVED_LEVEL_PATH);
 
-  header _header{};
-  fr.ReadRaw(_header);
-  std::vector<directoryEntry> directory = ReadDirectory(fr, _header);
-  uint32_t offset = UINT32_MAX;
-
-  for (const auto &entry : directory) {
-    if (entry.name == level->name) {
-      offset = entry.offset;
-    }
+  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  if (!wadSerializer.Load(false)) {
+    throw std::runtime_error("Failed to read WAD file.");
   }
-  if (offset == UINT32_MAX) {
+
+  const auto entry = wadSerializer.FindDirectoryEntry(level->name);
+  if (!entry.has_value()) {
     throw std::runtime_error("Level couldn't be found.");
   }
 
-  fr.SetPos(offset);
+  fr.SetPos(entry->offset);
 
   level->Load(fr);
 
-  return _header.numDirectories;
+  return wadSerializer.GetHeader().numDirectories;
 }

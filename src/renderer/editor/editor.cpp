@@ -1,6 +1,7 @@
 #include "editor.h"
 
-#include "../../core/math_utils.h"
+#include "core/math_utils.h"
+#include "core/serialization/wad_serializer.h"
 #include "commands.h"
 #include "core/gameloop.h"
 #include "editor_input_handler.h"
@@ -370,7 +371,7 @@ void Editor::addEmptyLevel() const
 {
   state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
   state->numOfLevels++;
-  const std::array<char8_t, 8> levelName = MakeLevelName(state->numOfLevels);
+  const std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(state->numOfLevels);
 
   state->level = std::make_unique<EditorLevel>(state->numOfLevels, levelName);
 }

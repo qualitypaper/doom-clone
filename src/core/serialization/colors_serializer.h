@@ -1,9 +1,10 @@
-//
-// Created by qualitypaper on 4/16/26.
-//
+// TODO: add colormap
 
 #ifndef DOOMCLONE_COLORS_SERIALIZER_H
 #define DOOMCLONE_COLORS_SERIALIZER_H
+
+#include "serialization.h"
+
 
 #include <array>
 #include <cstdint>
@@ -18,16 +19,31 @@ constexpr uint8_t NUMBER_OF_PALETTES = 14;
 struct RGB
 {
   uint8_t r, g, b;
+
+  template<typename Writer>
+  void serialize(Writer &w)
+  {
+    serialization::serialize(w, r);
+    serialization::serialize(w, g);
+    serialization::serialize(w, b);
+  }
 };
 
 
 class PaletteManager
 {
 public:
-  constexpr PaletteManager(FileReader &fr, const header &hdr);
+  PaletteManager(FileReader &fr, const header &hdr);
+  explicit PaletteManager(FileReader &fr);
 
   void SetCurrentPalette(uint8_t index);
   [[nodiscard]] const RGB &GetColor(uint8_t index) const;
+
+  template<class Writer>
+  void Serialize(Writer &w);
+
+private:
+  void ReadPalette(FileReader &fr);
 
 private:
   std::array<RGB, PALETTE_SIZE * NUMBER_OF_PALETTES> m_playpal{};

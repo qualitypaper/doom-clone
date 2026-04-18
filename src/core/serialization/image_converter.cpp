@@ -6,17 +6,21 @@
 
 #include <iostream>
 
+namespace image {
+
 // helper: find the closest Doom palette color to a given RGB pixel
-uint8_t FindClosestPaletteColor(const uint8_t r, const uint8_t g, const uint8_t b, const std::array<RGB, 256> &playpal)
+uint8_t FindClosestPaletteColor(const uint8_t r, const uint8_t g, const uint8_t b, const PaletteManager &palManager)
 {
   int bestIndex = 0;
   int minDistance = std::numeric_limits<int>::max();
 
   // Loop through all 256 colors in the Doom palette
   for (int i = 0; i < 256; ++i) {
-    const int dr = r - playpal[i].r;
-    const int dg = g - playpal[i].g;
-    const int db = b - playpal[i].b;
+    const RGB color = palManager.GetColor(i);
+
+    const int dr = r - color.r;
+    const int dg = g - color.g;
+    const int db = b - color.b;
 
     const int distanceSq = (dr * dr) + (dg * dg) + (db * db);
 
@@ -28,7 +32,7 @@ uint8_t FindClosestPaletteColor(const uint8_t r, const uint8_t g, const uint8_t 
   return static_cast<uint8_t>(bestIndex);
 }
 
-RawImage ParseImageToDoomRaw(const std::string &filepath, const std::array<RGB, 256> &playpal)
+RawImage LoadRawImage(const std::filesystem::path &filepath, const PaletteManager &palManager)
 {
   RawImage result;
   result.width = 0;
@@ -66,8 +70,7 @@ RawImage ParseImageToDoomRaw(const std::string &filepath, const std::array<RGB, 
       if (a < 128) {
         result.pixels[pixelIndex] = -1;
       } else {
-
-        result.pixels[pixelIndex] = FindClosestPaletteColor(r, g, b, playpal);
+        result.pixels[pixelIndex] = FindClosestPaletteColor(r, g, b, palManager);
       }
     }
   }
@@ -78,12 +81,28 @@ RawImage ParseImageToDoomRaw(const std::string &filepath, const std::array<RGB, 
   return result;
 }
 
-std::vector<uint8_t> ConvertFromRawToWad(const RawImage &img)
+std::vector<uint8_t> ConvertRawToFlat(const RawImage &img)
 {
+  std::vector<uint8_t> res;
+  res.reserve(img.width * img.height);
+
+  // just writing the colors row-wise
+  for (const int16_t pixel : img.pixels) {
+    if (pixel < 0)
+      throw std::runtime_error("Unexpected negative value when convert into a flat texture.");
+
+    res.push_back(static_cast<uint8_t>(pixel));
+  }
+
+  return std::move(res);
+}
+
+std::vector<uint8_t> ConvertRawToWall(const RawImage &img)
+{
+  // TODO: reserve required space for the res vector
   std::vector<uint8_t> res;
 
   // write header (width, height, left/top offsets)
-
   res.push_back(img.width & 0xFF);
   res.push_back((img.width >> 8) & 0xFF);
 
@@ -116,7 +135,11 @@ std::vector<uint8_t> ConvertFromRawToWad(const RawImage &img)
 
     int y = 0;
     int index = (img.width * y) + x;
+    std::vector<uint8_t> runPixels;
+    runPixels.reserve(128);
+
     while (y < img.height) {
+      runPixels.clear();
       // find solid part
       while (y < img.height && img.pixels[index] == -1) {
         y++;
@@ -127,10 +150,9 @@ std::vector<uint8_t> ConvertFromRawToWad(const RawImage &img)
         break;
 
       const int runStart = y;
-      std::vector<uint8_t> runPixels;
 
       // 128 is the maximum size of the post
-      while (y < img.height && img.pixels[index] != -1 && runPixels.size() < 128) {
+      while (y < img.height && img.pixels[index] != -1 && runPixels.size() <= 128) {
         runPixels.push_back(static_cast<uint8_t>(img.pixels[index]));
         y++;
         index += img.width;
@@ -164,3 +186,4 @@ std::vector<uint8_t> ConvertFromRawToWad(const RawImage &img)
 
   return std::move(res);
 }
+}// namespace image

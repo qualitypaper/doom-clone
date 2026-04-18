@@ -14,20 +14,11 @@ struct RawImage
   std::vector<int16_t> pixels;
 };
 
-class Image
-{
-public:
-  Image(const std::filesystem::path &path, const PaletteManager &palManager);
-
-private:
-  int width, height;
-  std::vector<uint8_t> m_pixels;
-
-private:
-  void ConvertRawToWad(const RawImage &img);
-  [[nodiscard]] static uint8_t FindClosestPaletteColor(uint8_t r, uint8_t g, uint8_t b, const PaletteManager &palManager);
-  [[nodiscard]] static RawImage LoadRawImage(const std::filesystem::path &path, const PaletteManager &palManager);
-};
+namespace image {
+[[nodiscard]] std::vector<uint8_t> ConvertRawToWall(const RawImage &img);
+[[nodiscard]] uint8_t FindClosestPaletteColor(uint8_t r, uint8_t g, uint8_t b, const PaletteManager &palManager);
+[[nodiscard]] RawImage LoadRawImage(const std::filesystem::path &filepath, const PaletteManager &palManager);
+}// namespace image
 
 
 #endif// DOOMCLONE_IMAGE_CONVERTER_H
