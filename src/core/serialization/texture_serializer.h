@@ -1,39 +1,45 @@
 #ifndef DOOMCLONE_TEXTURE_SERIALIZER_H
 #define DOOMCLONE_TEXTURE_SERIALIZER_H
 
-#include "config.h"
+#include "defs.h"
 #include "wad_serializer.h"
-
 
 #include <algorithm>
 #include <cstdint>
 #include <vector>
 
-inline void WriteFlat(std::vector<uint8_t> img, const std::array<char8_t, 8> &name)
+struct Texture
 {
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
-  if (!wadSerializer.Load(true)) {
-    return;
-  }
+  explicit Texture(const lumpName &_name) : name(_name) {}
 
-  std::vector<LumpData> lumps = wadSerializer.GetLoadedLumps();
-  const auto it =
-    std::find_if(lumps.begin(), lumps.end(), [&](const LumpData &lump) { return lump.entry.name == name; });
+  virtual ~Texture() = default;
 
-  LumpData flatLump{};
-  flatLump.entry.name = name;
-  flatLump.rawData = std::move(img);
+  virtual void Write() {}
+  virtual void Read() {}
 
-  if (it == lumps.end()) {
-    lumps.push_back(std::move(flatLump));
-  } else {
-    *it = std::move(flatLump);
-  }
+  lumpName name;
+  std::vector<uint8_t> data;
+};
 
-  header hdr = wadSerializer.GetHeader();
-  wadSerializer.SetHeader(hdr);
-  wadSerializer.SetLumps(std::move(lumps));
-  wadSerializer.Write();
-}
+class FlatTexture : public Texture
+{
+public:
+  explicit FlatTexture(const lumpName &_name) : Texture(_name) {}
+
+  void Write() override;
+  void Read() override;
+
+  static std::vector<FlatTexture> ReadAll();
+};
+
+class WallTexture : public Texture
+{
+public:
+  explicit WallTexture(const lumpName &_name) : Texture(_name) {}
+
+  void Write() override;
+  void Read() override;
+};
+
 
 #endif// DOOMCLONE_TEXTURE_SERIALIZER_H

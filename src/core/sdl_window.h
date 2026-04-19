@@ -2,14 +2,15 @@
 
 #include <SDL.h>
 #include <array>
+#include <memory>
 #include <stdexcept>
 
 struct InputState
 {
   std::array<bool, SDL_NUM_SCANCODES> keys;
-  std::array<bool, 8> mouse_buttons;
-  int mouse_dx;
-  int mouse_dy;
+  std::array<bool, 8> mouseButtons;
+  int mousedx;
+  int mousedy;
 };
 
 class SdlWindow
@@ -24,18 +25,23 @@ public:
 
   ~SdlWindow();
 
-  // Update the streaming texture with your rendered pixels (RGBA8888)
-  void updatePixels(const uint32_t *pixels) const;
+  void UpdatePixels(const uint32_t *pixels) const;
 
   // Render the texture to screen
-  void updateScreen() const;
+  void UpdateScreen() const;
+  void PollEvents(InputState &input, bool &running);
 
-  [[nodiscard]] SDL_Window *getWindow() const { return window; }
-  [[nodiscard]] SDL_Renderer *getRenderer() const { return renderer; }
-  [[nodiscard]] SDL_Texture *getTexture() const { return texture; }
+  [[nodiscard]] SDL_Window *GetWindow() const { return window; }
+  [[nodiscard]] SDL_Renderer *GetRenderer() const { return renderer; }
+  [[nodiscard]] SDL_Texture *GetTexture() const { return texture; }
 
-  [[nodiscard]] uint16_t getRenderWidth() const { return renderWidth; }
-  [[nodiscard]] uint16_t getRenderHeight() const { return renderHeight; }
+  [[nodiscard]] uint16_t GetRenderWidth() const { return renderWidth; }
+  [[nodiscard]] uint16_t GetRenderHeight() const { return renderHeight; }
+
+  [[nodiscard]] uint16_t GetWidth() const { return height; }
+  [[nodiscard]] uint16_t GetHeight() const { return width; }
+
+
 
 private:
   SDL_Window *window = nullptr;

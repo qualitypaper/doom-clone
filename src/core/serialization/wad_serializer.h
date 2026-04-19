@@ -1,6 +1,7 @@
 #ifndef DOOMCLONE_WAD_PARSER_H
 #define DOOMCLONE_WAD_PARSER_H
 
+#include "defs.h"
 #include "serialization.h"
 
 #include <array>
@@ -82,18 +83,20 @@ public:
 
   [[nodiscard]] const header &GetHeader() const;
   [[nodiscard]] const std::vector<directoryEntry> &GetDirectory() const;
+  [[nodiscard]] std::vector<directoryEntry> &GetDirectory();
   [[nodiscard]] const std::vector<LumpData> &GetLoadedLumps() const;
+  [[nodiscard]] std::vector<LumpData> &GetLoadedLumps();
 
-  [[nodiscard]] std::optional<directoryEntry> FindDirectoryEntry(const std::array<char8_t, 8> &name) const;
-  [[nodiscard]] const LumpData *FindLoadedLump(const std::array<char8_t, 8> &name) const;
+  [[nodiscard]] std::optional<directoryEntry*> FindDirectoryEntry(const lumpName &name);
+  [[nodiscard]] const LumpData *FindLoadedLump(const lumpName &name) const;
 
   void SetHeader(const header &hdr);
   void SetLumps(std::vector<LumpData> lumps);
   void Write(const std::filesystem::path &filePath, header *hdrOverride = nullptr);
   void Write(header *hdrOverride = nullptr);
 
-  static std::array<char8_t, 8> MakeLevelName(uint16_t number);
-  static std::array<char8_t, 8> MakeLumpName(std::string_view name);
+  static lumpName MakeLevelName(uint16_t number);
+  static lumpName MakeLumpName(std::string_view name);
 
 private:
   static std::vector<directoryEntry> ReadDirectory(FileReader &fr, const header &hdr);

@@ -2,10 +2,10 @@
 #include "config.h"
 #include "core/gameloop.h"
 #include "core/serialization/colors_serializer.h"
+#include "core/serialization/texture_serializer.h"
 #include "core/serialization/wad_serializer.h"
 #include "core/simulation.h"
 #include "renderer/editor/editor.h"
-#include "renderer/editor/editor_renderer.h"
 #include "renderer/game/renderer.h"
 
 #include "imgui/backends/imgui_impl_sdl2.h"
@@ -92,6 +92,23 @@ static std::vector<LineDef> linedefs = {
   LineDef(4, 1, LineDefType::REGULAR, 7, -1),
 };
 
+void HandleModeChange(GameState &gameState, const std::shared_ptr<SdlWindow> &sdlWindow)
+{
+  if (gameState.input.keys[SDL_SCANCODE_F1]) {
+    if (gameState.currentMode != EngineMode::GAMEPLAY_3D) {
+      SetEngineMode(gameState, EngineMode::GAMEPLAY_3D, sdlWindow);
+    }
+  } else if (gameState.input.keys[SDL_SCANCODE_F2]) {
+    if (gameState.currentMode != EngineMode::EDITOR_2D) {
+      SetEngineMode(gameState, EngineMode::EDITOR_2D, sdlWindow);
+    }
+  } else if (gameState.input.keys[SDL_SCANCODE_F3]) {
+    if (gameState.currentMode != EngineMode::BSP_VIEWER) {
+      SetEngineMode(gameState, EngineMode::BSP_VIEWER, sdlWindow);
+    }
+  }
+}
+
 int main(int argc, char *argv[])
 {
   std::shared_ptr<Level> level;
@@ -114,13 +131,27 @@ int main(int argc, char *argv[])
 
   // setup sdl window
   auto sdlWindow = std::make_shared<SdlWindow>(
-    "Doom Clone", WINDOW_WIDTH, WINDOW_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_SHOWN);
+    "Doom Clone", WINDOW_WIDTH, WINDOW_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_RESIZABLE);
 
-  // setup Dear ImGui
-  auto editorRenderer = std::make_shared<EditorRenderer>(sdlWindow, *level, 1, numOfLevels);
+
+  std::vector<Texture> textures;
+  // initialize palette/textures
+  {
+    FileReader fr(PROJECT_ROOT_PATH "/PLAYPAL.pal");
+    auto paletteManager = std::make_unique<PaletteManager>(fr);
+
+    std::vector<FlatTexture> flatTextures = FlatTexture::ReadAll();
+    textures.reserve(flatTextures.size());
+    textures.insert_range(textures.begin(), std::move(flatTextures));
+
+    // TODO: load wall textures
+  }
+
+  auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, textures);
 
   // setup the game renderer
   auto renderer = std::make_shared<Renderer>(sdlWindow, level);
+
 
   GameState gameState{ .player = { .x = 100 << FRAC_BITS,
                                    .y = 0 << FRAC_BITS,
@@ -131,13 +162,9 @@ int main(int argc, char *argv[])
                        .levelNum = 1,
                        .sdlWindow = std::move(sdlWindow),
                        .renderer = std::move(renderer),
-                       .editorRenderer = std::move(editorRenderer) };
+                       .editor = std::move(editor),
+                       .textures = textures };
 
-  // initialize palette
-  {
-    FileReader fr(PROJECT_ROOT_PATH"/PLAYPAL.pal");
-    auto paletteManager = std::make_unique<PaletteManager>(fr);
-  }
 
   running = true;
   // game loop
@@ -154,10 +181,13 @@ int main(int argc, char *argv[])
     const size_t frameStart = SDL_GetPerformanceCounter();
     gameState.Reset();
 
-    PollSdlEvents(gameState, gameState.input, gameState.sdlWindow);
+    gameState.sdlWindow->PollEvents(gameState.input, running);
+
+    // early handle of the mode change key
+    HandleModeChange(gameState, gameState.sdlWindow);
 
     if (gameState.currentMode == EngineMode::EDITOR_2D) {
-      gameState.editorRenderer->Render();
+      gameState.editor->Render();
     } else if (gameState.currentMode == EngineMode::BSP_VIEWER) {
       BSPBuilder::Visualize(*gameState.sdlWindow, gameState.input, *level);
     } else {
@@ -174,7 +204,7 @@ int main(int argc, char *argv[])
         acc -= dt;
       }
 
-      gameState.renderer->Render(gameState.player);
+      gameState.renderer->Render(gameState);
 
       // FPS tracking
       frameCount++;
@@ -195,56 +225,4 @@ int main(int argc, char *argv[])
 
 
   return 0;
-}
-
-void PollSdlEvents(GameState &gameState, InputState &input, const std::shared_ptr<SdlWindow> &sdlWindow)
-{
-  SDL_Event event;
-
-  while (SDL_PollEvent(&event)) {
-    ImGui_ImplSDL2_ProcessEvent(&event);
-
-    if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
-        && event.window.windowID == SDL_GetWindowID(sdlWindow->getWindow())) {
-      running = false;
-      continue;
-    } else if (event.type == SDL_QUIT) {
-      running = false;
-      continue;
-    }
-
-    // early handle of the mode change key
-    if (event.type == SDL_KEYDOWN) {
-      if (event.key.keysym.sym == SDLK_F1) {
-        if (gameState.currentMode != EngineMode::GAMEPLAY_3D) {
-          SetEngineMode(gameState, EngineMode::GAMEPLAY_3D, sdlWindow);
-        }
-        continue;
-      } else if (event.key.keysym.sym == SDLK_F2) {
-        if (gameState.currentMode != EngineMode::EDITOR_2D) {
-          SetEngineMode(gameState, EngineMode::EDITOR_2D, sdlWindow);
-        }
-      } else if (event.key.keysym.sym == SDLK_F3) {
-        if (gameState.currentMode != EngineMode::BSP_VIEWER) {
-          SetEngineMode(gameState, EngineMode::BSP_VIEWER, sdlWindow);
-        }
-      }
-    }
-
-    // early skip for preventing capturing mouse and keyboard inputs, while in EDITOR_2D engine mode
-    if (gameState.currentMode == EngineMode::EDITOR_2D && ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP))) {
-      continue;
-    }
-
-    switch (event.type) {
-    case SDL_KEYDOWN:
-    case SDL_KEYUP:
-      HandleKeyInput(event, input);
-      break;
-    case SDL_MOUSEMOTION:
-      HandleMouseMovement(event, input);
-      break;
-    default:;
-    }
-  }
 }

@@ -2,6 +2,7 @@
 
 #include "../../core/math_utils.h"
 #include "commands.h"
+#include "core/serialization/texture_serializer.h"
 #include "editor.h"
 
 #include "imgui/backends/imgui_impl_sdl2.h"
@@ -13,6 +14,7 @@
 #include <memory>
 #include <ranges>
 #include <string>
+#include <utility>
 #include <vector>
 
 static ImU32 g_defaultColor = IM_COL32(255, 255, 255, 255);
@@ -22,11 +24,8 @@ static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 static float g_defaultVertexRadius = 4.0f;
 static float g_defaultLinedefThickness = 2.0f;
 
-EditorRenderer::EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow,
-                               Level &level,
-                               const uint16_t _levelNum,
-                               const uint16_t _numOfLevels)
-  : m_sdlWindow(sdlWindow)
+EditorRenderer::EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow, Editor &editor)
+  : m_sdlWindow(std::move(sdlWindow)), m_editor(&editor)
 {
   const float_t mainScale = ImGui_ImplSDL2_GetContentScaleForDisplay(0);
 
@@ -46,11 +45,9 @@ EditorRenderer::EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow,
   style.FontScaleDpi = mainScale;// Set initial font scale.
 
   // Setup Platform/Renderer backends
-  ImGui_ImplSDL2_InitForSDLRenderer(m_sdlWindow->getWindow(), m_sdlWindow->getRenderer());
-  ImGui_ImplSDLRenderer2_Init(m_sdlWindow->getRenderer());
+  ImGui_ImplSDL2_InitForSDLRenderer(m_sdlWindow->GetWindow(), m_sdlWindow->GetRenderer());
+  ImGui_ImplSDLRenderer2_Init(m_sdlWindow->GetRenderer());
 
-  this->m_editor = std::make_unique<Editor>(
-    level, _levelNum, _numOfLevels, m_sdlWindow->getRenderWidth(), m_sdlWindow->getRenderHeight());
 }
 
 EditorRenderer::~EditorRenderer()
@@ -72,15 +69,13 @@ void EditorRenderer::endFrame() const
   ImGui::Render();
   const ImGuiIO &currentIo = ImGui::GetIO();
   SDL_RenderSetScale(
-    m_sdlWindow->getRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
+    m_sdlWindow->GetRenderer(), currentIo.DisplayFramebufferScale.x, currentIo.DisplayFramebufferScale.y);
 
-  SDL_RenderClear(m_sdlWindow->getRenderer());
-  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_sdlWindow->getRenderer());
-  SDL_RenderPresent(m_sdlWindow->getRenderer());
+  SDL_RenderClear(m_sdlWindow->GetRenderer());
+  ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), m_sdlWindow->GetRenderer());
+  SDL_RenderPresent(m_sdlWindow->GetRenderer());
 }
 
-
-std::array<char8_t, 8> EditorRenderer::GetLevelName() const { return m_editor->state->level->name; }
 
 void EditorRenderer::drawLinePreview(const float_t thickness) const
 {
@@ -137,11 +132,10 @@ void EditorRenderer::drawPopupsForSelectedObjects() const
 
 void EditorRenderer::Render() const
 {
-  SDL_SetRenderDrawColor(m_sdlWindow->getRenderer(), 0, 0, 0, 255);
+  SDL_SetRenderDrawColor(m_sdlWindow->GetRenderer(), 0, 0, 0, 255);
 
   // Start the Dear ImGui frame
   startFrame();
-  m_editor->resetStateFrame();
 
   const ImGuiIO &io = ImGui::GetIO();
   ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -159,16 +153,10 @@ void EditorRenderer::Render() const
   // 3. Draw "screen-level" elements
   ImGui::TextColored(ImVec4(1, 1, 0, 1), "FPS: %.1f", io.Framerate);
 
-  // for rendering the map of the level will be used a coordinate system which is rotated by 90 degrees
-  // so (x, y) will be now (y, x)
-  m_editor->ProcessInput(vertexRadius);
-
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
     showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
-
-  m_editor->TransformVertices();
 
   drawCoordinatesCenter(vertexRadius);
 
@@ -177,6 +165,9 @@ void EditorRenderer::Render() const
 
   // render a window showing all sidedefs
   drawSidedefsWindow();
+
+  // render textures
+  drawTexturesWindow();
 
   // draw map outlines
   drawMapOutlines(vertexRadius, thickness);
@@ -249,6 +240,29 @@ void EditorRenderer::drawBlockSelection() const
   drawList->AddRectFilled({ minX, minY }, { maxX, maxY }, IM_COL32(100, 100, 0, 150));
 }
 
+void EditorRenderer::drawPropertiesTable(const char *tableId,
+                                         const char *columnLabel,
+                                         const std::function<void()> &drawContent) const
+{
+  constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH
+    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody
+    | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
+
+  if (!ImGui::BeginTable(tableId, 1, tableFlags)) {
+    return;
+  }
+
+  ImGui::TableSetupColumn(columnLabel, ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableHeadersRow();
+
+  ImGui::TableNextRow();
+  ImGui::TableSetColumnIndex(0);
+
+  drawContent();
+
+  ImGui::EndTable();
+}
+
 void EditorRenderer::drawSidedefsWindow() const
 {
   ImGui::Begin("SideDefs");
@@ -258,24 +272,8 @@ void EditorRenderer::drawSidedefsWindow() const
     m_editor->state->level->sidedefs.emplace_back(-1, 0, 0);
   }
 
-  constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH
-    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody
-    | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
-
-  if (ImGui::BeginTable("PropertyTable", 1, tableFlags)) {
-    ImGui::TableSetupColumn("Sidedefs table", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableHeadersRow();
-
-    // Setup columns: The right column stretches to fill available space
-    // ---------------------------------------------------------
-    // Property Category 1: Transform (Closed by default)
-    // ---------------------------------------------------------
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
-
+  drawPropertiesTable("PropertyTable", "Sidedefs table", [this]() {
     // Flags for the parent category
-    // - SpanFullWidth: Allows clicking anywhere on the row to open/close
-    // - We omit ImGuiTreeNodeFlags_DefaultOpen so it stays closed initially
     constexpr ImGuiTreeNodeFlags categoryFlags = ImGuiTreeNodeFlags_SpanFullWidth;
 
     for (size_t i = 0; i < m_editor->state->level->sidedefs.size(); i++) {
@@ -292,11 +290,28 @@ void EditorRenderer::drawSidedefsWindow() const
         int sectorId = sd.sectorId;
         double xOffset = sd.xOffset;
         double yOffset = sd.yOffset;
+        char8_t *upper =
+          sd.upperWallTexture >= 0 ? (*m_editor->state->textures)[sd.upperWallTexture].name.data() : (char8_t *)"empty";
+        char8_t *lower = sd.bottomWallTexture >= 0 ? (*m_editor->state->textures)[sd.bottomWallTexture].name.data()
+                                                   : (char8_t *)"empty";
+        char8_t *middle = sd.middleWallTexture >= 0 ? (*m_editor->state->textures)[sd.middleWallTexture].name.data()
+                                                    : (char8_t *)"empty";
 
         ImGui::SetNextItemWidth(100);
         if (ImGui::InputInt("Sector id", &sectorId)) {
           // update sector id
           sd.sectorId = static_cast<int16_t>(sectorId);
+        }
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputText("Lower texture", (char *)lower, 8)) {
+        }
+
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputText("Middle texture", (char *)middle, 8)) {
+        }
+        ImGui::SetNextItemWidth(100);
+        if (ImGui::InputText("Bottom texture", (char *)upper, 8)) {
         }
 
         ImGui::SetNextItemWidth(100);
@@ -330,9 +345,7 @@ void EditorRenderer::drawSidedefsWindow() const
 
       ImGui::PopID();
     }
-
-    ImGui::EndTable();
-  }
+  });
 
   ImGui::End();
 }
@@ -346,24 +359,8 @@ void EditorRenderer::drawSectorsWindow() const
     m_editor->state->level->sectors.emplace_back();
   }
 
-  constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH
-    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody
-    | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
-
-  if (ImGui::BeginTable("PropertyTable", 1, tableFlags)) {
-    ImGui::TableSetupColumn("Sectors table", ImGuiTableColumnFlags_WidthStretch);
-    ImGui::TableHeadersRow();
-
-    // Setup columns: The right column stretches to fill available space
-    // ---------------------------------------------------------
-    // Property Category 1: Transform (Closed by default)
-    // ---------------------------------------------------------
-    ImGui::TableNextRow();
-    ImGui::TableSetColumnIndex(0);
-
+  drawPropertiesTable("PropertyTable", "Sectors table", [this]() {
     // Flags for the parent category
-    // - SpanFullWidth: Allows clicking anywhere on the row to open/close
-    // - We omit ImGuiTreeNodeFlags_DefaultOpen so it stays closed initially
     constexpr ImGuiTreeNodeFlags categoryFlags = ImGuiTreeNodeFlags_SpanFullWidth;
 
     for (size_t i = 0; i < m_editor->state->level->sectors.size(); i++) {
@@ -372,67 +369,81 @@ void EditorRenderer::drawSectorsWindow() const
       ImGui::PushID(i);
       const bool isTransformOpen = ImGui::TreeNodeEx(label.c_str(), categoryFlags);
 
-      if (isTransformOpen) {
-        // Sub-property: Position
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-
-        int floorHeight = sector.floorHeight;
-        int ceilingHeight = sector.ceilingHeight;
-        int lightLevel = sector.lightLevel;
-
-        ImGui::SetNextItemWidth(100);
-        if (ImGui::InputInt("Floor Height", &floorHeight)) {
-          // update sector id
-          sector.floorHeight = static_cast<int16_t>(floorHeight);
-        }
-
-        ImGui::SetNextItemWidth(100);
-        if (ImGui::InputInt("Ceiling height", &ceilingHeight)) {
-          // update texture offset x
-          sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
-        }
-
-        ImGui::SetNextItemWidth(100);
-        if (ImGui::InputInt("Light level", &lightLevel)) {
-          // update texture offset y
-          sector.lightLevel = static_cast<int16_t>(lightLevel);
-        }
-
-        ImGui::SetNextItemWidth(200);
-
-        float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
-                           ImGui::ColorConvertU32ToFloat4(sector.color).y,
-                           ImGui::ColorConvertU32ToFloat4(sector.color).z };
-
-        if (ImGui::ColorPicker3("Sector color", color)) {
-          // update sector color
-          sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
-        }
-
-        if (ImGui::Button("Delete")) {
-          for (auto &linedef : m_editor->state->level->linedefs) {
-            if (linedef.backSideDef == static_cast<int32_t>(i)) {
-              linedef.backSideDef = -1;
-            } else if (linedef.frontSideDef == static_cast<int32_t>(i)) {
-              linedef.frontSideDef = -1;
-            }
-          }
-
-          m_editor->state->level->sidedefs.erase(m_editor->state->level->sidedefs.begin() + i);
-        }
-
-        ImGui::NewLine();
-
-        // Pop the parent node
-        ImGui::TreePop();
+      if (!isTransformOpen) {
+        ImGui::PopID();
+        continue;
       }
 
-      ImGui::PopID();
-    }
+      // Sub-property: Position
+      ImGui::TableNextRow();
+      ImGui::TableSetColumnIndex(0);
 
-    ImGui::EndTable();
+      int floorHeight = sector.floorHeight;
+      int ceilingHeight = sector.ceilingHeight;
+      int lightLevel = sector.lightLevel;
+
+      ImGui::SetNextItemWidth(100);
+      if (ImGui::InputInt("Floor Height", &floorHeight)) {
+        // update sector id
+        sector.floorHeight = static_cast<int16_t>(floorHeight);
+      }
+
+      ImGui::SetNextItemWidth(100);
+      if (ImGui::InputInt("Ceiling height", &ceilingHeight)) {
+        // update texture offset x
+        sector.ceilingHeight = static_cast<int16_t>(ceilingHeight);
+      }
+
+      ImGui::SetNextItemWidth(100);
+      if (ImGui::InputInt("Light level", &lightLevel)) {
+        // update texture offset y
+        sector.lightLevel = static_cast<int16_t>(lightLevel);
+      }
+
+      ImGui::SetNextItemWidth(200);
+
+      float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
+                         ImGui::ColorConvertU32ToFloat4(sector.color).y,
+                         ImGui::ColorConvertU32ToFloat4(sector.color).z };
+
+      if (ImGui::ColorPicker3("Sector color", color)) {
+        // update sector color
+        sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+      }
+
+      if (ImGui::Button("Delete")) {
+        for (auto &linedef : m_editor->state->level->linedefs) {
+          if (linedef.backSideDef == static_cast<int32_t>(i)) {
+            linedef.backSideDef = -1;
+          } else if (linedef.frontSideDef == static_cast<int32_t>(i)) {
+            linedef.frontSideDef = -1;
+          }
+        }
+
+        m_editor->state->level->sidedefs.erase(m_editor->state->level->sidedefs.begin() + i);
+      }
+
+      ImGui::NewLine();
+      ImGui::PopID();
+
+      // Pop the parent node
+      ImGui::TreePop();
+    }
+  });
+
+  ImGui::End();
+}
+void EditorRenderer::drawTexturesWindow() const
+{
+  ImGui::Begin("Textures");
+
+  if (ImGui::Button("Add")) {
+
   }
+
+  drawPropertiesTable("PropertyTable", "Textures table", []() {
+
+  });
 
   ImGui::End();
 }
@@ -499,13 +510,6 @@ void EditorRenderer::drawLinedef(const EditorLineDef &ld, const float_t thicknes
   const ImVec2 &startVec = m_editor->state->transformedVertices[getObjectIndex(ld.start)];
   const ImVec2 &endVec = m_editor->state->transformedVertices[getObjectIndex(ld.end)];
 
-  if (startVec.x < 0 || startVec.y < 0 || m_sdlWindow->getRenderWidth() <= startVec.x
-      || m_sdlWindow->getRenderHeight() <= startVec.y)
-    return;
-  if (endVec.x < 0 || endVec.y < 0 || m_sdlWindow->getRenderWidth() <= endVec.x
-      || m_sdlWindow->getRenderHeight() <= endVec.y)
-    return;
-
   drawList->AddLine(startVec, endVec, color, thickness);
 
   // draw a small arrow showing the direction of the linedef
@@ -528,8 +532,8 @@ void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t t
 
 void EditorRenderer::drawCoordinatesCenter(const float vertexRadius) const
 {
-  const EditorVertex center = math_utils::fromCenterCoordinates(
-    EditorVertex(0, 0), m_sdlWindow->getRenderWidth(), m_sdlWindow->getRenderHeight());
+  const EditorVertex center =
+    math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow->GetWidth(), m_sdlWindow->GetHeight());
   const ImVec2 centerTransformed = m_editor->TransformVertex(center);
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
@@ -708,7 +712,7 @@ void EditorRenderer::createSelect(const char *label,
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
 {
   const auto &v = m_editor->state->findVertex(vertexId);
-  if (v.x < 0 || v.y < 0 || m_sdlWindow->getRenderWidth() <= v.x || m_sdlWindow->getRenderHeight() <= v.y)
+  if (v.x < 0 || v.y < 0 || m_sdlWindow->GetWidth() <= v.x || m_sdlWindow->GetHeight() <= v.y)
     return;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();

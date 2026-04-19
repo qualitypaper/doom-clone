@@ -18,6 +18,7 @@ class BSPBuilder;
 // forward declarations
 struct CommandHistory;
 struct Command;
+class EditorRenderer;
 
 // forward declaractions
 struct EditorState;
@@ -325,6 +326,7 @@ struct EditorState
   uint16_t numOfLevels = 0;
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
+  std::vector<Texture> *textures;
 
   // dragging state
   bool isDragging = false;
@@ -433,6 +435,7 @@ class Editor
 private:
   std::shared_ptr<CommandHistory> m_history;
   std::unique_ptr<EditorInputHandler> m_inputHandler;
+  std::unique_ptr<EditorRenderer> m_renderer;
 
 private:
   void updateAABB(uint32_t sectorID) const;
@@ -441,7 +444,15 @@ public:
   std::shared_ptr<EditorState> state;
 
 public:
-  Editor(Level &_level, uint16_t _levelNum, uint16_t _numOfLevels, uint16_t _width, uint16_t _height);
+  Editor(std::shared_ptr<SdlWindow> sdlWindow,
+         Level &_level,
+         uint16_t _levelNum,
+         uint16_t _numOfLevels,
+         std::vector<Texture> &textures);
+  ~Editor();
+
+  void Render() const;
+  [[nodiscard]] std::array<char8_t, 8> GetLevelName() const;
 
   void resetStateFrame() const;
 

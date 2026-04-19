@@ -167,7 +167,7 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
     throw std::runtime_error("Level couldn't be found.");
   }
 
-  fr.SetPos(entry->offset);
+  fr.SetPos(entry.value()->offset);
 
   fr.ReadVector(linedefs);
   fr.ReadVector(sidedefs);
@@ -222,7 +222,7 @@ size_t EditorLevel::Load(std::unique_ptr<Level> &level)
     throw std::runtime_error("Level couldn't be found.");
   }
 
-  fr.SetPos(entry->offset);
+  fr.SetPos(entry.value()->offset);
 
   level->Load(fr);
 

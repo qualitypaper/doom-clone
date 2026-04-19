@@ -4,7 +4,6 @@
 #include "../../core/math_utils.h"
 #include "../../core/sdl_window.h"
 #include "editor.h"
-#include "editor_input_handler.h"
 
 #include <functional>
 #include <memory>
@@ -16,15 +15,14 @@ struct ImVec2;
 class EditorRenderer
 {
 public:
-  EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow, Level &level, uint16_t _levelNum, uint16_t _numOfLevels);
+  EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow, Editor &editor);
   ~EditorRenderer();
 
   void Render() const;
-  std::array<char8_t, 8> GetLevelName() const;
 
 private:
   std::shared_ptr<SdlWindow> m_sdlWindow;
-  std::unique_ptr<Editor> m_editor;
+  Editor *m_editor;
 
   static void startFrame();
   void endFrame() const;
@@ -44,8 +42,10 @@ private:
   // popups
   void drawSidedefsWindow() const;
   void drawSectorsWindow() const;
-  bool drawSelectedLinePopup(uint32_t lineId) const;
-  bool drawSelectedVertexPopup(uint32_t selectedId) const;
+  void drawTexturesWindow() const;
+  void drawPropertiesTable(const char *tableId, const char *columnLabel, const std::function<void()> &drawContent) const;
+  [[nodiscard]] bool drawSelectedLinePopup(uint32_t lineId) const;
+  [[nodiscard]] bool drawSelectedVertexPopup(uint32_t selectedId) const;
   void drawPopupsForSelectedObjects() const;
   void showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const;
   void drawLevelSelection() const;

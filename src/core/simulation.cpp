@@ -12,7 +12,7 @@ void update(GameState &gameState, const double_t dt)
                                               finetangent[FINE_ANGLES / 4 + (HALF_FOV >> ANGLE_TO_FINE_SHIFT)]);
 
   // mouse
-  const fixed_t mouseMovement = DoubleToFixed(static_cast<double>(gameState.input.mouse_dx) * MOUSE_SENSITIVITY);
+  const fixed_t mouseMovement = DoubleToFixed(static_cast<double>(gameState.input.mousedx) * MOUSE_SENSITIVITY);
   const angle_t angleDiff = (mouseMovement < 0 ? 1 : -1) * tantoangle[SlopeDiv(std::abs(mouseMovement), focalLength)];
   gameState.player.angle += angleDiff;
 

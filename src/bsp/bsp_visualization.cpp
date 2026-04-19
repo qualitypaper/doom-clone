@@ -20,8 +20,8 @@ void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow,
                         static_cast<int>(_max.x - _min.x),
                         static_cast<int>(_min.y - _max.y) };
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), r, g, b, a);
-  SDL_RenderDrawRect(sdlWindow.getRenderer(), &_rect);
+  SDL_SetRenderDrawColor(sdlWindow.GetRenderer(), r, g, b, a);
+  SDL_RenderDrawRect(sdlWindow.GetRenderer(), &_rect);
 }
 
 void BSPBuilder::DrawBoundingBoxes(const SdlWindow &sdlWindow, const Node &root)
@@ -32,18 +32,18 @@ void BSPBuilder::DrawBoundingBoxes(const SdlWindow &sdlWindow, const Node &root)
 
 void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
 {
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 255, 0, 255);
+  SDL_SetRenderDrawColor(sdlWindow.GetRenderer(), 0, 255, 0, 255);
 
   for (const auto &subsector : level.subsectors) {
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
       const auto &seg = level.segments[i];
 
       const ImVec2 mappedStart =
-        seg.start->fromCenterCoords(sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight()).toImVec();
+        seg.start->fromCenterCoords(sdlWindow.GetRenderWidth(), sdlWindow.GetRenderHeight()).toImVec();
       const ImVec2 mappedEnd =
-        seg.end->fromCenterCoords(sdlWindow.getRenderWidth(), sdlWindow.getRenderHeight()).toImVec();
+        seg.end->fromCenterCoords(sdlWindow.GetRenderWidth(), sdlWindow.GetRenderHeight()).toImVec();
 
-      SDL_RenderDrawLine(sdlWindow.getRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
+      SDL_RenderDrawLine(sdlWindow.GetRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
     }
   }
 }
@@ -59,15 +59,15 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const Node &root)
 
   const ImVec2 lineStart = math_utils::fromCenterCoordinates(
     ImVec2{ static_cast<float>(rootX - dirX * lineLen), static_cast<float>(rootY - dirY * lineLen) },
-    sdlWindow.getRenderWidth(),
-    sdlWindow.getRenderHeight());
+    sdlWindow.GetRenderWidth(),
+    sdlWindow.GetRenderHeight());
   const ImVec2 lineEnd = math_utils::fromCenterCoordinates(
     ImVec2{ static_cast<float>(rootX + dirX * lineLen), static_cast<float>(rootY + dirY * lineLen) },
-    sdlWindow.getRenderWidth(),
-    sdlWindow.getRenderHeight());
+    sdlWindow.GetRenderWidth(),
+    sdlWindow.GetRenderHeight());
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 255, 255, 0, 255);
-  SDL_RenderDrawLine(sdlWindow.getRenderer(),
+  SDL_SetRenderDrawColor(sdlWindow.GetRenderer(), 255, 255, 0, 255);
+  SDL_RenderDrawLine(sdlWindow.GetRenderer(),
                      static_cast<int>(lineStart.x),
                      static_cast<int>(lineStart.y),
                      static_cast<int>(lineEnd.x),
@@ -78,8 +78,8 @@ void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const 
 {
   static size_t s_nodesIndex = 0;
 
-  SDL_SetRenderDrawColor(sdlWindow.getRenderer(), 0, 0, 0, 255);
-  SDL_RenderClear(sdlWindow.getRenderer());
+  SDL_SetRenderDrawColor(sdlWindow.GetRenderer(), 0, 0, 0, 255);
+  SDL_RenderClear(sdlWindow.GetRenderer());
 
   DrawSubsectors(sdlWindow, level);
 
@@ -93,7 +93,7 @@ void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const 
   }
 
   if (level.nodes.empty()) {
-    SDL_RenderPresent(sdlWindow.getRenderer());
+    SDL_RenderPresent(sdlWindow.GetRenderer());
     return;
   }
 
@@ -102,7 +102,7 @@ void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const 
   DrawSplittingLine(sdlWindow, root);
   DrawBoundingBoxes(sdlWindow, root);
 
-  SDL_RenderPresent(sdlWindow.getRenderer());
+  SDL_RenderPresent(sdlWindow.GetRenderer());
 }
 
 size_t BSPBuilder::MaxDepth() const { return MaxDepthRecursive(0); }

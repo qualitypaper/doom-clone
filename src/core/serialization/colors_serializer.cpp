@@ -19,7 +19,7 @@ PaletteManager::PaletteManager(FileReader &fr, const header &hdr)
     throw std::runtime_error("PLAYPAL lump was not found.");
   }
 
-  fr.SetPos(entry->offset);
+  fr.SetPos(entry.value()->offset);
 
   ReadPalette(fr);
 

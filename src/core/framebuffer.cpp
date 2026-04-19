@@ -2,7 +2,7 @@
 #include "config.h"
 
 FrameBuffer::FrameBuffer(std::shared_ptr<SdlWindow> sdlWindow)
-  : sdlWindow(sdlWindow), width(sdlWindow->getRenderWidth()), height(sdlWindow->getRenderHeight())
+  : sdlWindow(sdlWindow), width(sdlWindow->GetRenderWidth()), height(sdlWindow->GetRenderHeight())
 {
   const uint32_t n = width * height;
   this->pixels = new uint32_t[n];
@@ -15,8 +15,8 @@ FrameBuffer::~FrameBuffer() { delete[] pixels; }
 
 void FrameBuffer::update() const
 {
-  sdlWindow->updatePixels(this->pixels);
-  sdlWindow->updateScreen();
+  sdlWindow->UpdatePixels(this->pixels);
+  sdlWindow->UpdateScreen();
 }
 
 void FrameBuffer::reset() const { memset(this->pixels, UINT32_MAX, width * height * sizeof(uint32_t)); }

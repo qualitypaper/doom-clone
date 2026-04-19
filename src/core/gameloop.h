@@ -11,7 +11,8 @@
 #include <vector>
 
 
-class EditorRenderer;
+struct Texture;
+class Editor;
 class Renderer;
 /*
  X, Y - horizontal planes, X - east-west, Y - north-south
@@ -56,12 +57,13 @@ struct GameState
   uint16_t levelNum{};
   std::shared_ptr<SdlWindow> sdlWindow;
   std::shared_ptr<Renderer> renderer;
-  std::shared_ptr<EditorRenderer> editorRenderer;
+  std::shared_ptr<Editor> editor;
   InputState input;
+  std::vector<Texture> &textures;
 
   void Reset();
 };
 
 void HandleMouseMovement(const SDL_Event &event, InputState &input);
 void HandleKeyInput(const SDL_Event &event, InputState &input);
-void SetEngineMode(GameState &gameState, EngineMode newMode, const std::shared_ptr<SdlWindow> &sdlWindow);
+void SetEngineMode(GameState &state, EngineMode newMode, const std::shared_ptr<SdlWindow> &sdlWindow);

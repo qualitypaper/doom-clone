@@ -1,5 +1,10 @@
 #include "sdl_window.h"
 
+#include "gameloop.h"
+#include "imgui/backends/imgui_impl_sdl2.h"
+
+#include <memory>
+
 SdlWindow::SdlWindow(const char *title,
                      const uint16_t windowWidth,
                      const uint16_t windowHeight,
@@ -30,6 +35,10 @@ SdlWindow::SdlWindow(const char *title,
     SDL_Quit();
     ThrowSDL("SDL_CreateWindow failed");
   }
+  int w, h;
+  SDL_GetWindowSize(this->window, &w, &h);
+  this->width = w;
+  this->height = h;
 
   this->renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
 
@@ -68,15 +77,49 @@ SdlWindow::~SdlWindow()
   SDL_Quit();
 }
 
-void SdlWindow::updatePixels(const uint32_t *pixels) const
+void SdlWindow::UpdatePixels(const uint32_t *pixels) const
 {
   // pitch = bytes per row
   SDL_UpdateTexture(texture, nullptr, pixels, static_cast<int>(renderWidth * sizeof(uint32_t)));
 }
 
-void SdlWindow::updateScreen() const
+void SdlWindow::UpdateScreen() const
 {
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, texture, nullptr, nullptr);
   SDL_RenderPresent(renderer);
+}
+
+void SdlWindow::PollEvents(InputState &input, bool &running)
+{
+  SDL_Event event;
+
+  while (SDL_PollEvent(&event)) {
+    ImGui_ImplSDL2_ProcessEvent(&event);
+
+    // process window quit/close early
+    const bool isCloseWindow = event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE
+      && event.window.windowID == SDL_GetWindowID(window);
+
+    if (event.type == SDL_QUIT || isCloseWindow) {
+      running = false;
+      continue;
+    }
+
+    switch (event.type) {
+    case SDL_WINDOWEVENT_RESIZED:
+    case SDL_WINDOWEVENT_SIZE_CHANGED:
+      width = event.window.data1;
+      height = event.window.data2;
+      break;
+    case SDL_KEYDOWN:
+    case SDL_KEYUP:
+      HandleKeyInput(event, input);
+      break;
+    case SDL_MOUSEMOTION:
+      HandleMouseMovement(event, input);
+      break;
+    default:;
+    }
+  }
 }

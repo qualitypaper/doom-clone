@@ -1,9 +1,10 @@
 #include "editor.h"
 
-#include "core/math_utils.h"
-#include "core/serialization/wad_serializer.h"
 #include "commands.h"
 #include "core/gameloop.h"
+#include "core/math_utils.h"
+#include "core/serialization/texture_serializer.h"
+#include "core/serialization/wad_serializer.h"
 #include "editor_input_handler.h"
 #include "editor_renderer.h"
 
@@ -131,7 +132,7 @@ EditorState::EditorState(Level &_level,
                          const uint16_t _numOfLevels,
                          const uint16_t _width,
                          const uint16_t _height)
-  : width(_width), height(_height), numOfLevels(_numOfLevels)
+  : width(_width), height(_height), numOfLevels(_numOfLevels), textures(nullptr)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -144,7 +145,6 @@ EditorState::EditorState(Level &_level,
   editorLinedefs.reserve(_level.linedefs.size());
   editorSectors.reserve(_level.sectors.size());
   editorSidedefs.reserve(_level.sidedefs.size());
-
 
   this->level = std::make_unique<EditorLevel>(_level, _levelNum, _width, _height);
 }
@@ -222,16 +222,35 @@ void Editor::updateAABB(const uint32_t sectorID) const
   }
 }
 
-Editor::Editor(Level &_level,
+Editor::Editor(std::shared_ptr<SdlWindow> sdlWindow,
+               Level &_level,
                const uint16_t _levelNum,
                const uint16_t _numOfLevels,
-               const uint16_t _width,
-               const uint16_t _height)
+               std::vector<Texture> &textures)
   : m_history(std::make_shared<CommandHistory>()),
-    state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, _width, _height))
+    state(std::make_shared<EditorState>(
+      _level, _levelNum, _numOfLevels, sdlWindow->GetWidth(), sdlWindow->GetHeight()))
 {
   this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
+  this->m_renderer = std::make_unique<EditorRenderer>(std::move(sdlWindow), *this);
+  state->textures = &textures;
 }
+
+Editor::~Editor() = default;
+
+void Editor::Render() const
+{
+  resetStateFrame();
+
+  // Keep input/update orchestration in Editor; renderer only draws UI.
+  const float vertexRadius = 4.0f * state->canvasZoom;
+  ProcessInput(vertexRadius);
+  TransformVertices();
+
+  m_renderer->Render();
+}
+
+std::array<char8_t, 8> Editor::GetLevelName() const { return state->level->name; }
 
 /**
  * function resets the state, the must be set to default on each frame
@@ -241,7 +260,7 @@ void Editor::resetStateFrame() const
   DraggableObject::resetDraggableState(state.get());
 
   if (state->hoveredObjectId != UINT32_MAX) {
-    auto object = state->findObject(state->hoveredObjectId);
+    EditorObject *object = state->findObject(state->hoveredObjectId);
     object->hovered = false;
 
     state->hoveredObjectId = UINT32_MAX;

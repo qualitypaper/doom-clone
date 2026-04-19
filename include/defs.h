@@ -11,6 +11,7 @@
 #include <vector>
 
 
+using lumpName = std::array<char8_t, 8>;
 
 struct Visplane
 {

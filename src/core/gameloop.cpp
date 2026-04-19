@@ -1,6 +1,6 @@
 #include "gameloop.h"
 #include "bsp/bsp.h"
-#include "renderer/editor/editor_renderer.h"
+#include "renderer/editor/editor.h"
 #include "renderer/game/renderer.h"
 #include "sdl_window.h"
 
@@ -11,14 +11,14 @@
 void GameState::Reset()
 {
   // reset transient input state each frame
-  input.mouse_dx = 0;
-  input.mouse_dy = 0;
+  input.mousedx = 0;
+  input.mousedy = 0;
 }
 
 void HandleMouseMovement(const SDL_Event &event, InputState &input)
 {
-  input.mouse_dx = event.motion.xrel;
-  input.mouse_dy = event.motion.yrel;
+  input.mousedx = event.motion.xrel;
+  input.mousedy = event.motion.yrel;
 }
 
 void HandleKeyInput(const SDL_Event &event, InputState &input)
@@ -39,9 +39,9 @@ void SetEngineMode(GameState &state, const EngineMode newMode, const std::shared
   if (newMode == EngineMode::GAMEPLAY_3D) {
     // disable absolute mouse
     // SDL_SetRelativeMouseMode(SDL_TRUE);
-    SDL_SetWindowFullscreen(sdlWindow->getWindow(), SDL_FALSE);
+    SDL_SetWindowFullscreen(sdlWindow->GetWindow(), SDL_FALSE);
 
-    auto newLevel = std::make_unique<Level>(state.editorRenderer->GetLevelName());
+    auto newLevel = std::make_unique<Level>(state.editor->GetLevelName());
     EditorLevel::Load(newLevel);
     state.renderer->SetLevel(std::move(newLevel));
 
@@ -57,10 +57,10 @@ void SetEngineMode(GameState &state, const EngineMode newMode, const std::shared
   }
   // wiping clean the state, in order to prevent unexpected key and mouse inputs
   state.input.keys.fill(false);
-  state.input.mouse_buttons.fill(false);
+  state.input.mouseButtons.fill(false);
 
-  state.input.mouse_dx = 0;
-  state.input.mouse_dy = 0;
+  state.input.mousedx = 0;
+  state.input.mousedy = 0;
 }
 
 void Level::Load(FileReader &fr)

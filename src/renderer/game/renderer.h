@@ -6,8 +6,11 @@
 
 #include <array>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
+
+struct Texture;
 class SdlWindow;
 struct GameState;
 struct Level;
@@ -53,7 +56,7 @@ class Renderer
 {
 public:
   Renderer(std::shared_ptr<SdlWindow> sdlWindow, std::shared_ptr<Level> _level);
-  void Render(const Player &player);
+  void Render(const GameState &gameState);
   void Reset();
 
   void SetLevel(std::shared_ptr<Level> _level);
@@ -133,5 +136,6 @@ private:
 
   FrameBuffer m_fb;
   const Player *m_player;
+  const std::vector<Texture> *m_textures;
   std::shared_ptr<Level> m_level;
 };

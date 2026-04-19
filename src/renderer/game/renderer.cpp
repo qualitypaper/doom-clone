@@ -116,7 +116,7 @@ void Renderer::InitDistScale()
 }
 
 Renderer::Renderer(std::shared_ptr<SdlWindow> sdlWindow, std::shared_ptr<Level> _level)
-  : m_fb(sdlWindow), m_player(nullptr), m_level(std::move(_level))
+  : m_fb(std::move(sdlWindow)), m_player(nullptr), m_textures(nullptr), m_level(std::move(_level))
 {
   m_centerXFrac = static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1);
   m_centerYFrac = static_cast<fixed_t>(m_fb.height) << (FRAC_BITS - 1);
@@ -132,10 +132,11 @@ Renderer::Renderer(std::shared_ptr<SdlWindow> sdlWindow, std::shared_ptr<Level> 
 
   m_visplanes.reserve(MAX_VISPLANES);
   m_solidSegs.resize(MAX_SEGMENTS);
+
   ResetSolidSegs();
+
   InitViewAngleToX();
   InitXToViewAngle();
-
   InitYSlope();
   InitDistScale();
 }
@@ -626,9 +627,10 @@ void Renderer::RenderBSPNode(const int16_t nodeIndex)
   RenderBSPNode(farNodeIndex);
 }
 
-void Renderer::Render(const Player &player)
+void Renderer::Render(const GameState &gameState)
 {
-  this->m_player = &player;
+  this->m_player = &gameState.player;
+  this->m_textures = &gameState.textures;
   Reset();
 
   if (m_level->nodes.empty()) {

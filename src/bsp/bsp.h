@@ -1,5 +1,5 @@
 #pragma once
-#include "../core/serialization/serialization.h"
+#include "core/serialization/serialization.h"
 #include "defs.h"
 
 #include <array>
