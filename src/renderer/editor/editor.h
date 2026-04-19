@@ -14,6 +14,8 @@
 #include <set>
 #include <vector>
 
+
+class PaletteManager;
 class BSPBuilder;
 // forward declarations
 struct CommandHistory;
@@ -327,6 +329,7 @@ struct EditorState
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
   std::vector<Texture> *textures;
+  PaletteManager *palManager;
 
   // dragging state
   bool isDragging = false;
@@ -448,7 +451,8 @@ public:
          Level &_level,
          uint16_t _levelNum,
          uint16_t _numOfLevels,
-         std::vector<Texture> &textures);
+         std::vector<Texture> &textures,
+         PaletteManager &palManager);
   ~Editor();
 
   void Render() const;

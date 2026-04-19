@@ -13,7 +13,7 @@
 struct header;
 class FileReader;
 
-constexpr uint8_t PALETTE_SIZE = 256;
+constexpr uint16_t PALETTE_SIZE = 256;
 constexpr uint8_t NUMBER_OF_PALETTES = 14;
 
 struct RGB
@@ -27,6 +27,8 @@ struct RGB
     serialization::serialize(w, g);
     serialization::serialize(w, b);
   }
+
+  [[nodiscard]] uint32_t ToU32() const { return (r << 24) | (g << 16) | (b << 8) | 255; }
 };
 
 

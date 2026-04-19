@@ -41,7 +41,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}")
+PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
 
 # ---- Install rules ----
 install(TARGETS ${PROJECT_NAME}

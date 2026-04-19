@@ -41,7 +41,8 @@ public:
   std::vector<uint8_t> &buffer;
 
 public:
-  template<typename T> void WriteRaw(const T &data)
+  template<typename T>
+  void WriteRaw(const T &data)
   {
     static_assert(std::is_trivially_copyable_v<T>);
 
@@ -49,7 +50,8 @@ public:
     buffer.insert(buffer.end(), src, src + sizeof(T));
   }
 
-  template<typename T> void WriteVector(const std::vector<T> &data, const bool writeSize = true)
+  template<typename T>
+  void WriteVector(const std::vector<T> &data, const bool writeSize = true)
   {
     if (writeSize) {
       WriteRaw(data.size());
@@ -70,13 +72,18 @@ public:
   ~FileWriter();
 
   bool IsStreamGood() const { return m_fos && !m_fos.fail(); }
-  template<typename T> void WriteRaw(const T &data) { WriteData(reinterpret_cast<const char *>(&data), sizeof(T)); }
+  template<typename T>
+  void WriteRaw(const T &data)
+  {
+    WriteData(reinterpret_cast<const char *>(&data), sizeof(T));
+  }
 
   void Skip(const size_t bytesToSkip) { m_fos.seekp(bytesToSkip, std::ios::cur); }
   size_t Cursor() { return m_fos.tellp(); }
   void SetPos(const size_t pos) { m_fos.seekp(pos, std::ios::beg); }
 
-  template<typename T> void WriteVector(const std::vector<T> &vec, const bool writeSize = true)
+  template<typename T>
+  void WriteVector(const std::vector<T> &vec, const bool writeSize = true)
   {
     if (writeSize) {
       WriteRaw(static_cast<uint64_t>(vec.size()));
@@ -87,7 +94,11 @@ public:
     }
   }
 
-  template<typename T> void WriteObject(T &obj) { obj.serialize(*this); }
+  template<typename T>
+  void WriteObject(T &obj)
+  {
+    obj.serialize(*this);
+  }
 
   void WriteData(const char *data, const size_t size)
   {
@@ -110,16 +121,25 @@ public:
   ~FileReader();
 
   bool IsStreamGood() const { return !m_fis.fail(); }
-  template<typename T> void ReadRaw(T &type) { ReadData((char *)&type, sizeof(T)); }
+  template<typename T>
+  void ReadRaw(T &type)
+  {
+    ReadData((char *)&type, sizeof(T));
+  }
 
   void Skip(const size_t bytesToSkip) { m_fis.seekg(bytesToSkip, std::ios::cur); }
 
   size_t Cursor() { return m_fis.tellg(); }
   void SetPos(const size_t pos) { m_fis.seekg(pos, std::ios::beg); }
 
-  template<typename T> void ReadObject(T &obj) { obj.deserialize(*this); }
+  template<typename T>
+  void ReadObject(T &obj)
+  {
+    obj.deserialize(*this);
+  }
 
-  template<typename T> void ReadVector(std::vector<T> &vec, const bool readSize = true)
+  template<typename T>
+  void ReadVector(std::vector<T> &vec, const bool readSize = true)
   {
     size_t n;
     if (readSize) {
@@ -143,6 +163,15 @@ public:
     if (IsStreamGood()) {
       m_fis.read(data, size);
     }
+  }
+
+  size_t GetFileSize()
+  {
+    const size_t currPos = Cursor();
+    const size_t size = m_fis.seekg(std::ios::end).tellg();
+    SetPos(currPos);
+
+    return size;
   }
 
 private:

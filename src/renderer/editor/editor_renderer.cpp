@@ -1,9 +1,11 @@
 #include "editor_renderer.h"
 
-#include "../../core/math_utils.h"
 #include "commands.h"
+#include "core/math_utils.h"
+#include "core/serialization/image_converter.h"
 #include "core/serialization/texture_serializer.h"
 #include "editor.h"
+#include "magic_enum.h"
 
 #include "imgui/backends/imgui_impl_sdl2.h"
 #include "imgui/backends/imgui_impl_sdlrenderer2.h"
@@ -11,6 +13,7 @@
 #include "imgui/imgui_internal.h"
 
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <ranges>
 #include <string>
@@ -44,10 +47,13 @@ EditorRenderer::EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow, Editor &edi
   style.ScaleAllSizes(mainScale);// Bake a fixed style scale.
   style.FontScaleDpi = mainScale;// Set initial font scale.
 
+  io.Fonts->AddFontDefaultVector();
+  io.Fonts->AddFontDefaultBitmap();
+  io.Fonts->AddFontFromFileTTF(PROJECT_ROOT_PATH "MartianMono.ttf");
+
   // Setup Platform/Renderer backends
   ImGui_ImplSDL2_InitForSDLRenderer(m_sdlWindow->GetWindow(), m_sdlWindow->GetRenderer());
   ImGui_ImplSDLRenderer2_Init(m_sdlWindow->GetRenderer());
-
 }
 
 EditorRenderer::~EditorRenderer()
@@ -433,16 +439,103 @@ void EditorRenderer::drawSectorsWindow() const
 
   ImGui::End();
 }
+
 void EditorRenderer::drawTexturesWindow() const
 {
   ImGui::Begin("Textures");
 
   if (ImGui::Button("Add")) {
-
+    m_editor->state->textures->emplace_back(
+      WadSerializer::MakeLumpName("TEX" + std::to_string(m_editor->state->textures->size() + 1)), TextureType::FLAT);
   }
 
-  drawPropertiesTable("PropertyTable", "Textures table", []() {
+  drawPropertiesTable("PropertyTable", "Textures table", [this]() {
+    for (Texture &texture : *this->m_editor->state->textures) {
+      const auto textureName = (char *)texture.name.data();
+      ImGui::PushID(textureName);
 
+      const bool opened = ImGui::TreeNodeEx(textureName, ImGuiTreeNodeFlags_SpanFullWidth);
+
+      if (!opened) {
+        ImGui::PopID();
+        continue;
+      }
+
+      ImGui::InputText("Name", textureName, 8);
+
+      constexpr auto &names = magic_enum::enum_entries<TextureType>();
+
+      std::string currentType;
+      for (auto &name : names) {
+        if (texture.type == name.first) {
+          currentType = name.second;
+          break;
+        }
+      }
+
+      if (ImGui::BeginCombo("Type", currentType.data())) {
+        for (auto type : names) {
+          const bool isSelected = texture.type == type.first;
+
+          if (ImGui::Selectable(type.second.data(), isSelected)) {
+            texture.type = type.first;
+          }
+        }
+        ImGui::EndCombo();
+      }
+
+      static char originPath[32];
+      if (ImGui::InputText(std::format("Origin##{}", textureName).c_str(), originPath, 32)) {
+      }
+
+      if (ImGui::Button("Update") && strlen(originPath)) {
+        if (!m_editor->state->palManager) {
+          std::cerr << "Palette manager is not defined -> skip loading new image.\n";
+        }
+
+        RawImage rawImage =
+          image::LoadRawImage(PROJECT_ROOT_PATH + std::string(originPath), *m_editor->state->palManager);
+
+        switch (texture.type) {
+        case TextureType::FLAT: {
+          std::vector<uint8_t> bin = image::ConvertRawToFlat(rawImage);
+          FlatTexture flatTexture{ texture.name };
+          flatTexture.data = std::move(bin);
+          flatTexture.Write();
+
+          texture.data = std::move(flatTexture.data);
+          break;
+        }
+        case TextureType::WALL: {
+          std::vector<uint8_t> bin = image::ConvertRawToWall(rawImage);
+          texture.data = std::move(bin);
+
+          ((WallTexture &)texture).Write();
+          break;
+        }
+        default:;
+        }
+        std::cout << "Updated texture." << '\n';
+        memset(originPath, 0, 32);
+      }
+
+      SDL_Texture *sdlTexture = nullptr;
+      int width, height;
+
+      if (!texture.data.empty()) {
+        m_editor->state->palManager->SetCurrentPalette(0);
+        std::vector<uint32_t> img = image::ConvertFlatToRaw(texture.data, *m_editor->state->palManager);
+
+        if (LoadTextureFromMemory(img.data(), img.size(), m_sdlWindow->GetRenderer(), &sdlTexture, &width, &height)) {
+          ImGui::Image(sdlTexture, { static_cast<float>(width), static_cast<float>(height) });
+        }
+      }
+
+
+      // pop the parent node
+      ImGui::TreePop();
+      ImGui::PopID();
+    }
   });
 
   ImGui::End();
@@ -726,6 +819,8 @@ void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadiu
   } else {
     color = g_defaultColor;
   }
-
-  drawList->AddCircleFilled(m_editor->state->transformedVertices[getObjectIndex(vertexId)], vertexRadius, color);
+  if (!m_editor->state->transformedVertices.empty()
+      && m_editor->state->transformedVertices.size() - 1 >= getObjectIndex(vertexId)) {
+    drawList->AddCircleFilled(m_editor->state->transformedVertices[getObjectIndex(vertexId)], vertexRadius, color);
+  }
 }

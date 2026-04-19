@@ -186,4 +186,17 @@ std::vector<uint8_t> ConvertRawToWall(const RawImage &img)
 
   return std::move(res);
 }
+
+std::vector<uint32_t> ConvertFlatToRaw(const std::vector<uint8_t> &data, const PaletteManager &palManager)
+{
+  std::vector<uint32_t> res;
+  res.reserve(data.size());
+
+  for (const uint8_t index : data) {
+    RGB color = palManager.GetColor(index);
+    res.emplace_back(color.ToU32());
+  }
+
+  return std::move(res);
+}
 }// namespace image

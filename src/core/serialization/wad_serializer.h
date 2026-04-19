@@ -34,7 +34,6 @@ struct header
   }
 };
 
-
 struct directoryEntry
 {
   uint32_t offset;
@@ -87,7 +86,7 @@ public:
   [[nodiscard]] const std::vector<LumpData> &GetLoadedLumps() const;
   [[nodiscard]] std::vector<LumpData> &GetLoadedLumps();
 
-  [[nodiscard]] std::optional<directoryEntry*> FindDirectoryEntry(const lumpName &name);
+  [[nodiscard]] std::optional<directoryEntry *> FindDirectoryEntry(const lumpName &name);
   [[nodiscard]] const LumpData *FindLoadedLump(const lumpName &name) const;
 
   void SetHeader(const header &hdr);
@@ -100,7 +99,7 @@ public:
 
 private:
   static std::vector<directoryEntry> ReadDirectory(FileReader &fr, const header &hdr);
-  static void WriteLump(FileWriter &fw, LumpData &lumpData);
+  static void WriteLumpData(FileWriter &fw, LumpData &lumpData);
   static void WriteLumpsToPath(std::vector<LumpData> &allLumps, header &hdr, const std::filesystem::path &filePath);
 
 private:

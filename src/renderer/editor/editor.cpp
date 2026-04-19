@@ -132,7 +132,7 @@ EditorState::EditorState(Level &_level,
                          const uint16_t _numOfLevels,
                          const uint16_t _width,
                          const uint16_t _height)
-  : width(_width), height(_height), numOfLevels(_numOfLevels), textures(nullptr)
+  : width(_width), height(_height), numOfLevels(_numOfLevels), textures(nullptr), palManager(nullptr)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -226,14 +226,17 @@ Editor::Editor(std::shared_ptr<SdlWindow> sdlWindow,
                Level &_level,
                const uint16_t _levelNum,
                const uint16_t _numOfLevels,
-               std::vector<Texture> &textures)
+               std::vector<Texture> &textures,
+               PaletteManager &palManager)
   : m_history(std::make_shared<CommandHistory>()),
     state(std::make_shared<EditorState>(
       _level, _levelNum, _numOfLevels, sdlWindow->GetWidth(), sdlWindow->GetHeight()))
 {
   this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
   this->m_renderer = std::make_unique<EditorRenderer>(std::move(sdlWindow), *this);
+
   state->textures = &textures;
+  state->palManager = &palManager;
 }
 
 Editor::~Editor() = default;

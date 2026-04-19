@@ -42,7 +42,7 @@ bool WadSerializer::LoadHeader(FileReader &fr)
   }
 
   fr.SetPos(0);
-  fr.ReadRaw(m_header);
+  fr.ReadObject(m_header);
   return fr.IsStreamGood();
 }
 
@@ -61,7 +61,8 @@ LumpData WadSerializer::ReadLump(FileReader &fr, const directoryEntry &entry)
   LumpData lumpData;
   lumpData.entry = entry;
 
-  fr.SetPos(entry.offset + sizeof(header));
+  // Lump offsets are stored as absolute file positions by WriteLumpData.
+  fr.SetPos(entry.offset);
 
   lumpData.rawData.resize(entry.size);
   fr.ReadData(reinterpret_cast<char *>(lumpData.rawData.data()), entry.size);
@@ -197,7 +198,7 @@ std::vector<directoryEntry> WadSerializer::ReadDirectory(FileReader &fr, const h
   return entries;
 }
 
-void WadSerializer::WriteLump(FileWriter &fw, LumpData &lumpData)
+void WadSerializer::WriteLumpData(FileWriter &fw, LumpData &lumpData)
 {
   lumpData.entry.offset = static_cast<uint32_t>(fw.Cursor());
   lumpData.entry.size = static_cast<uint32_t>(lumpData.rawData.size());
@@ -215,20 +216,20 @@ void WadSerializer::WriteLumpsToPath(std::vector<LumpData> &allLumps,
     throw std::runtime_error("Failed to open file for saving.\n");
   }
 
-  fw.WriteRaw(hdr);
+  fw.WriteObject(hdr);
 
   for (auto &lumpData : allLumps) {
-    WriteLump(fw, lumpData);
+    WriteLumpData(fw, lumpData);
   }
 
   const size_t directoryOffset = fw.Cursor() - sizeof(header);
   for (const LumpData &lumpData : allLumps) {
-    fw.WriteRaw(lumpData.entry);
+    fw.WriteObject(lumpData.entry);
   }
 
   hdr.numDirectories = static_cast<uint32_t>(allLumps.size());
   hdr.directoryOffset = static_cast<uint32_t>(directoryOffset);
 
   fw.SetPos(0);
-  fw.WriteRaw(hdr);
+  fw.WriteObject(hdr);
 }

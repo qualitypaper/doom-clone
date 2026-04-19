@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
   std::shared_ptr<Level> level;
   size_t numOfLevels;
 
-  if (true) {
+  if (1) {
     std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(1);
     auto tempLevel = std::make_unique<Level>(levelName);
     numOfLevels = EditorLevel::Load(tempLevel);
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
     level->vertices = std::move(vertices);
     level->sectors = std::move(sectors);
     Level::Init(*level, linedefs, sidedefs, std::vector<Seg>{});
-    level->name = WadSerializer::MakeLevelName(1);
+    level->name = levelName;
   }
 
   // setup sdl window
@@ -134,11 +134,12 @@ int main(int argc, char *argv[])
     "Doom Clone", WINDOW_WIDTH, WINDOW_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_RESIZABLE);
 
 
+  std::unique_ptr<PaletteManager> paletteManager;
   std::vector<Texture> textures;
   // initialize palette/textures
   {
-    FileReader fr(PROJECT_ROOT_PATH "/PLAYPAL.pal");
-    auto paletteManager = std::make_unique<PaletteManager>(fr);
+    FileReader fr(PROJECT_ROOT_PATH "PLAYPAL.pal");
+    paletteManager = std::make_unique<PaletteManager>(fr);
 
     std::vector<FlatTexture> flatTextures = FlatTexture::ReadAll();
     textures.reserve(flatTextures.size());
@@ -147,7 +148,7 @@ int main(int argc, char *argv[])
     // TODO: load wall textures
   }
 
-  auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, textures);
+  auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, textures, *paletteManager);
 
   // setup the game renderer
   auto renderer = std::make_shared<Renderer>(sdlWindow, level);
