@@ -41,8 +41,9 @@ void DraggableObject::resetDraggableState(EditorState *state)
 
 bool EditorVertex::isAnyConnectedLineDefSelected(const EditorState &state) const
 {
-  return std::ranges::any_of(connectedLineDefs,
-                             [&](auto ldObjectId) { return state.findLinedef(getObjectIndex(ldObjectId)).selected; });
+  return std::ranges::any_of(connectedLineDefs, [&](auto ldObjectId) {
+    return state.findLinedef(getObjectIndex(ldObjectId)).selected;
+  });
 }
 
 void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
@@ -72,9 +73,12 @@ void EditorLineDef::remove(const EditorState &state, const uint32_t ldId)
 
     ld = lastLd;
   }
-  std::erase_if(vStart.connectedLineDefs,
-                [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
-  std::erase_if(vEnd.connectedLineDefs, [ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+  std::erase_if(vStart.connectedLineDefs, [ldId](const auto &ldObjectId) {
+    return getObjectIndex(ldObjectId) == ldId;
+  });
+  std::erase_if(vEnd.connectedLineDefs, [ldId](const auto &ldObjectId) {
+    return getObjectIndex(ldObjectId) == ldId;
+  });
 
   state.level->linedefs.pop_back();
 }
@@ -92,13 +96,15 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
     if (ld.start == vertexId) {
       auto &vEnd = state.findVertex(ld.end);
 
-      std::erase_if(vEnd.connectedLineDefs,
-                    [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+      std::erase_if(vEnd.connectedLineDefs, [&ldId](const auto &ldObjectId) {
+        return getObjectIndex(ldObjectId) == ldId;
+      });
     } else if (ld.end == vertexId) {
       auto &vStart = state.findVertex(ld.start);
 
-      std::erase_if(vStart.connectedLineDefs,
-                    [&ldId](const auto &ldObjectId) { return getObjectIndex(ldObjectId) == ldId; });
+      std::erase_if(vStart.connectedLineDefs, [&ldId](const auto &ldObjectId) {
+        return getObjectIndex(ldObjectId) == ldId;
+      });
     }
 
     EditorLineDef::remove(state, ldId);
@@ -132,7 +138,7 @@ EditorState::EditorState(Level &_level,
                          const uint16_t _numOfLevels,
                          const uint16_t _width,
                          const uint16_t _height)
-  : width(_width), height(_height), numOfLevels(_numOfLevels), textures(nullptr), palManager(nullptr)
+  : width(_width), height(_height), numOfLevels(_numOfLevels), texManager(nullptr), palManager(nullptr)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -226,20 +232,17 @@ Editor::Editor(std::shared_ptr<SdlWindow> sdlWindow,
                Level &_level,
                const uint16_t _levelNum,
                const uint16_t _numOfLevels,
-               std::vector<Texture> &textures,
+               TextureManager &textureManager,
                PaletteManager &palManager)
   : m_history(std::make_shared<CommandHistory>()),
-    state(std::make_shared<EditorState>(
-      _level, _levelNum, _numOfLevels, sdlWindow->GetWidth(), sdlWindow->GetHeight()))
+    state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, sdlWindow->GetWidth(), sdlWindow->GetHeight()))
 {
   this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
   this->m_renderer = std::make_unique<EditorRenderer>(std::move(sdlWindow), *this);
 
-  state->textures = &textures;
+  state->texManager = &textureManager;
   state->palManager = &palManager;
 }
-
-Editor::~Editor() = default;
 
 void Editor::Render() const
 {
@@ -253,7 +256,10 @@ void Editor::Render() const
   m_renderer->Render();
 }
 
-std::array<char8_t, 8> Editor::GetLevelName() const { return state->level->name; }
+std::array<char8_t, 8> Editor::GetLevelName() const
+{
+  return state->level->name;
+}
 
 /**
  * function resets the state, the must be set to default on each frame
@@ -270,7 +276,10 @@ void Editor::resetStateFrame() const
   }
 }
 
-void Editor::ProcessInput(const float_t vertexRadius) const { m_inputHandler->ProcessInput(vertexRadius); }
+void Editor::ProcessInput(const float_t vertexRadius) const
+{
+  m_inputHandler->ProcessInput(vertexRadius);
+}
 
 void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 {
@@ -293,7 +302,10 @@ void Editor::addVertex(const double x, const double y) const
   m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(temp.x, temp.y)), *state);
 }
 
-void Editor::executeCommand(std::unique_ptr<Command> cmd) const { m_history->execute(std::move(cmd), *state); }
+void Editor::executeCommand(std::unique_ptr<Command> cmd) const
+{
+  m_history->execute(std::move(cmd), *state);
+}
 
 
 void Editor::drawConnectedLine(const uint32_t vertexId) const
@@ -434,13 +446,23 @@ EditorLevel::EditorLevel(const Level &_level, const uint16_t _levelNum, const ui
 
   // process sectors
   for (const auto &sector : _level.sectors) {
-    sectors.emplace_back(
-      sector.floorHeight, sector.ceilingHeight, sector.specialType, sector.lightLevel, sector.tag, sector.color);
+    sectors.emplace_back(FixedToDouble(sector.floorHeight),
+                         FixedToDouble(sector.ceilingHeight),
+                         sector.floorTextureIndex,
+                         sector.ceilingTextureIndex,
+                         sector.lightLevel,
+                         sector.specialType,
+                         sector.tag);
   }
 
   // process sidedefs
   for (const auto &sd : _level.sidedefs) {
-    sidedefs.emplace_back(sd.sector ? sd.sector - _level.sectors.data() : -1, sd.xOffset, sd.yOffset);
+    sidedefs.emplace_back(sd.sector ? sd.sector - _level.sectors.data() : -1,
+                          sd.xOffset,
+                          sd.yOffset,
+                          sd.upperWallTexture,
+                          sd.middlWallTexture,
+                          sd.bottomWallTexture);
   }
 
   // process linedefs

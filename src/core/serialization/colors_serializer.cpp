@@ -27,8 +27,9 @@ PaletteManager::PaletteManager(FileReader &fr, const header &hdr)
 }
 
 // expects a file at a position of exclusively binary data of the palette
-PaletteManager::PaletteManager(FileReader &fr)
+PaletteManager::PaletteManager(const std::filesystem::path &path)
 {
+  FileReader fr(path);
   ReadPalette(fr);
   this->m_activePal = this->m_playpal.data();
 }

@@ -116,7 +116,7 @@ void Renderer::InitDistScale()
 }
 
 Renderer::Renderer(std::shared_ptr<SdlWindow> sdlWindow, std::shared_ptr<Level> _level)
-  : m_fb(std::move(sdlWindow)), m_player(nullptr), m_textures(nullptr), m_level(std::move(_level))
+  : m_fb(std::move(sdlWindow)), m_player(nullptr), m_texManager(nullptr), m_level(std::move(_level))
 {
   m_centerXFrac = static_cast<fixed_t>(m_fb.width) << (FRAC_BITS - 1);
   m_centerYFrac = static_cast<fixed_t>(m_fb.height) << (FRAC_BITS - 1);
@@ -397,7 +397,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
       }
     }
 
-    const uint32_t color = ds.frontSide->sector->color;
+    const uint32_t color = MapColor(100, 100, 100, 255);
 
     if (!ds.backSide) {
       // test version, in order to understand which wall is which
@@ -494,7 +494,6 @@ void Renderer::StoreWallRange(const ClipRange &range, const seg_t *seg, const si
   // }
 
   const angle_t disAngle = ANG90 - offsetAngle;
-  // Distance must use the current seg start, not linedef start.
   const fixed_t hyp = PointToDist(seg->start->x, seg->start->y, *m_player);
   const fixed_t sineval = finesine[disAngle >> ANGLE_TO_FINE_SHIFT];
   m_rwDistance = FixedMul(hyp, sineval);
@@ -583,13 +582,13 @@ void Renderer::RenderSSector(const SubSector &subsector)
   const seg_t *seg = &m_level->segments[subsector.firstSegIndex];
 
   if (frontsector->floorHeight < m_player->z) {
-    m_floorPlane = FindVisPlane(frontsector->floorHeight, frontsector->color, frontsector->lightLevel);
+    m_floorPlane = FindVisPlane(frontsector->floorHeight, frontsector->floorTextureIndex, frontsector->lightLevel);
   } else {
     m_floorPlane = nullptr;
   }
 
   if (frontsector->ceilingHeight > m_player->z) {
-    m_ceilPlane = FindVisPlane(frontsector->ceilingHeight, frontsector->color, frontsector->lightLevel);
+    m_ceilPlane = FindVisPlane(frontsector->ceilingHeight, frontsector->floorTextureIndex, frontsector->lightLevel);
   } else {
     m_ceilPlane = nullptr;
   }
@@ -630,7 +629,8 @@ void Renderer::RenderBSPNode(const int16_t nodeIndex)
 void Renderer::Render(const GameState &gameState)
 {
   this->m_player = &gameState.player;
-  this->m_textures = &gameState.textures;
+  this->m_texManager = gameState.texManager.get();
+  this->m_palManager = gameState.palManager.get();
   Reset();
 
   if (m_level->nodes.empty()) {

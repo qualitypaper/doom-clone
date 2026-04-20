@@ -279,7 +279,7 @@ void EditorRenderer::drawSidedefsWindow() const
 
   if (ImGui::Button("Create sidedef")) {
     // create new sidedef
-    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0);
+    m_editor->state->level->sidedefs.emplace_back(-1, 0, 0, -1, -1, -1);
   }
 
   drawPropertiesTable("PropertyTable", "Sidedefs table", [this]() {
@@ -300,12 +300,10 @@ void EditorRenderer::drawSidedefsWindow() const
         int sectorId = sd.sectorId;
         double xOffset = sd.xOffset;
         double yOffset = sd.yOffset;
-        char8_t *upper =
-          sd.upperWallTexture >= 0 ? (*m_editor->state->textures)[sd.upperWallTexture].name.data() : (char8_t *)"empty";
-        char8_t *lower = sd.bottomWallTexture >= 0 ? (*m_editor->state->textures)[sd.bottomWallTexture].name.data()
-                                                   : (char8_t *)"empty";
-        char8_t *middle = sd.middleWallTexture >= 0 ? (*m_editor->state->textures)[sd.middleWallTexture].name.data()
-                                                    : (char8_t *)"empty";
+
+        int lowerTextureId = sd.bottomWallTexture;
+        int middleTextureId = sd.middleWallTexture;
+        int upperTextureId = sd.upperWallTexture;
 
         ImGui::SetNextItemWidth(100);
         if (ImGui::InputInt("Sector id", &sectorId)) {
@@ -313,16 +311,23 @@ void EditorRenderer::drawSidedefsWindow() const
           sd.sectorId = static_cast<int16_t>(sectorId);
         }
 
-        ImGui::SetNextItemWidth(100);
-        if (ImGui::InputText("Lower texture", (char *)lower, 8)) {
+        ImGui::SetNextItemWidth(140);
+        if (ImGui::InputInt(std::format("Lower texture id##sd{}_lower", i).c_str(), &lowerTextureId)) {
+          sd.bottomWallTexture = static_cast<int16_t>(lowerTextureId);
         }
+        ImGui::Text("Lower: %s", m_editor->state->texManager->GetFlatTextureName(sd.bottomWallTexture).c_str());
 
-        ImGui::SetNextItemWidth(100);
-        if (ImGui::InputText("Middle texture", (char *)middle, 8)) {
+        ImGui::SetNextItemWidth(140);
+        if (ImGui::InputInt(std::format("Middle texture id##sd{}_middle", i).c_str(), &middleTextureId)) {
+          sd.middleWallTexture = static_cast<int16_t>(middleTextureId);
         }
-        ImGui::SetNextItemWidth(100);
-        if (ImGui::InputText("Bottom texture", (char *)upper, 8)) {
+        ImGui::Text("Middle: %s", m_editor->state->texManager->GetFlatTextureName(sd.middleWallTexture).c_str());
+
+        ImGui::SetNextItemWidth(140);
+        if (ImGui::InputInt(std::format("Upper texture id##sd{}_upper", i).c_str(), &upperTextureId)) {
+          sd.upperWallTexture = static_cast<int16_t>(upperTextureId);
         }
+        ImGui::Text("Upper: %s", m_editor->state->texManager->GetFlatTextureName(sd.upperWallTexture).c_str());
 
         ImGui::SetNextItemWidth(100);
         if (ImGui::InputDouble("Texture offset x", &xOffset)) {
@@ -410,16 +415,31 @@ void EditorRenderer::drawSectorsWindow() const
         sector.lightLevel = static_cast<int16_t>(lightLevel);
       }
 
-      ImGui::SetNextItemWidth(200);
+      int ceilingTex = sector.ceilingPic;
+      int floorTex = sector.floorPic;
 
-      float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
-                         ImGui::ColorConvertU32ToFloat4(sector.color).y,
-                         ImGui::ColorConvertU32ToFloat4(sector.color).z };
-
-      if (ImGui::ColorPicker3("Sector color", color)) {
-        // update sector color
-        sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+      ImGui::SetNextItemWidth(140);
+      if (ImGui::InputInt(std::format("Ceil texture id##sd{}_upper", i).c_str(), &ceilingTex)) {
+        sector.ceilingPic = static_cast<int16_t>(ceilingTex);
       }
+      ImGui::Text("Ceiling: %s", m_editor->state->texManager->GetFlatTextureName(sector.ceilingPic).c_str());
+
+      ImGui::SetNextItemWidth(140);
+      if (ImGui::InputInt(std::format("Floor texture id##sd{}_upper", i).c_str(), &floorTex)) {
+        sector.floorPic = static_cast<int16_t>(floorTex);
+      }
+      ImGui::Text("Floor: %s", m_editor->state->texManager->GetFlatTextureName(sector.floorPic).c_str());
+
+      // ImGui::SetNextItemWidth(200);
+      //
+      // float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
+      //                    ImGui::ColorConvertU32ToFloat4(sector.color).y,
+      //                    ImGui::ColorConvertU32ToFloat4(sector.color).z };
+      //
+      // if (ImGui::ColorPicker3("Sector color", color)) {
+      //   // update sector color
+      //   sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
+      // }
 
       if (ImGui::Button("Delete")) {
         for (auto &linedef : m_editor->state->level->linedefs) {
@@ -449,97 +469,150 @@ void EditorRenderer::drawTexturesWindow() const
   ImGui::Begin("Textures");
 
   if (ImGui::Button("Add")) {
-    m_editor->state->textures->emplace_back(
-      WadSerializer::MakeLumpName("TEX" + std::to_string(m_editor->state->textures->size() + 1)), TextureType::FLAT);
+    m_editor->state->texManager->AddDefaultFlatTexture();
   }
 
   drawPropertiesTable("PropertyTable", "Textures table", [this]() {
-    for (Texture &texture : *this->m_editor->state->textures) {
-      const auto textureName = (char *)texture.name.data();
-      ImGui::PushID(textureName);
+    TextureManager &textureManager = *m_editor->state->texManager;
 
-      const bool opened = ImGui::TreeNodeEx(textureName, ImGuiTreeNodeFlags_SpanFullWidth);
-
-      if (!opened) {
-        ImGui::PopID();
-        continue;
+    const auto renderPreview = [this](const Texture &texture) {
+      if (texture.width <= 0 || texture.height <= 0 || texture.data.empty() || !m_editor->state->palManager) {
+        return;
       }
 
-      ImGui::InputText("Name", textureName, 8);
+      m_editor->state->palManager->SetCurrentPalette(0);
+      const std::vector<uint32_t> img = image::ConvertFlatToRaw(texture.data, *m_editor->state->palManager);
 
+      SDL_Texture *sdlTexture = nullptr;
+      if (LoadTextureFromMemory(img.data(), texture.width, texture.height, m_sdlWindow->GetRenderer(), &sdlTexture)) {
+        ImGui::Image(sdlTexture, { static_cast<float>(texture.width), static_cast<float>(texture.height) });
+      }
+    };
+
+    const auto renderTypeSelect = [this](Texture &texture, const std::function<void(TextureType)> &onSelect) {
       constexpr auto names = magic_enum::enum_entries<TextureType>();
 
       const auto selectedTypeIter = std::ranges::find_if(names, [&texture](const auto &entry) {
         return texture.type == entry.first;
       });
-      std::string currentType = selectedTypeIter != names.end() ? std::string(selectedTypeIter->second) : "Unknown";
+      const std::string currentType =
+        selectedTypeIter != names.end() ? std::string(selectedTypeIter->second) : "Unknown";
 
-      createDropdown(
-        "Type",
-        currentType,
-        names.size(),
-        [&texture, names](const int index) {
-          return texture.type == names[index].first;
-        },
-        [names](const int index) {
-          return std::string(names[index].second);
-        },
-        [&texture, names](const int index) {
-          texture.type = names[index].first;
-        });
+      const auto isSelected = [&texture, &names](const int index) -> bool {
+        return texture.type == names[static_cast<size_t>(index)].first;
+      };
+      const auto itemLabel = [&names](const int index) -> std::string {
+        return std::string(names[static_cast<size_t>(index)].second);
+      };
+      const auto select = [&onSelect, &names](const int index) {
+        onSelect(names[static_cast<size_t>(index)].first);
+      };
 
-      static char originPath[32];
-      if (ImGui::InputText(std::format("Origin##{}", textureName).c_str(), originPath, 32)) {
+      createDropdown("Type",
+                     currentType,
+                     static_cast<int>(names.size()),
+                     std::function<bool(int)>(isSelected),
+                     std::function<std::string(int)>(itemLabel),
+                     std::function<void(int)>(select));
+    };
+
+    const auto renderTextureEntry = [&](Texture &texture,
+                                        const size_t index,
+                                        const char *groupId,
+                                        const std::function<void(Texture &)> &renderExtra,
+                                        const bool wasConverted) {
+      ImGui::PushID(groupId);
+      ImGui::PushID(static_cast<int>(index));
+
+      char *textureName = reinterpret_cast<char *>(texture.name.data());
+      const bool opened = ImGui::TreeNodeEx(textureName, ImGuiTreeNodeFlags_SpanFullWidth);
+
+      if (!opened) {
+        ImGui::PopID();
+        ImGui::PopID();
+        return;
       }
 
-      if (ImGui::Button("Update") && strlen(originPath)) {
-        if (!m_editor->state->palManager) {
-          std::cerr << "Palette manager is not defined -> skip loading new image.\n";
-        }
-
-        RawImage rawImage =
-          image::LoadRawImage(PROJECT_ROOT_PATH + std::string(originPath), *m_editor->state->palManager);
-
-        switch (texture.type) {
-        case TextureType::FLAT: {
-          std::vector<uint8_t> bin = image::ConvertRawToFlat(rawImage);
-          FlatTexture flatTexture{ texture.name };
-          // copy bin
-          flatTexture.data = bin;
-          flatTexture.Write();
-
-          texture.data = std::move(bin);
-          break;
-        }
-        case TextureType::WALL: {
-          std::vector<uint8_t> bin = image::ConvertRawToWall(rawImage);
-          texture.data = std::move(bin);
-
-          ((WallTexture &)texture).Write();
-          break;
-        }
-        default:;
-        }
-        std::cout << "Updated texture." << '\n';
-        memset(originPath, 0, 32);
+      if (ImGui::InputText("Name", textureName, texture.name.size())) {
       }
 
-      SDL_Texture *sdlTexture = nullptr;
-      int width, height;
-
-      if (!texture.data.empty()) {
-        m_editor->state->palManager->SetCurrentPalette(0);
-        std::vector<uint32_t> img = image::ConvertFlatToRaw(texture.data, *m_editor->state->palManager);
-
-        if (LoadTextureFromMemory(img.data(), img.size(), m_sdlWindow->GetRenderer(), &sdlTexture, &width, &height)) {
-          ImGui::Image(sdlTexture, { static_cast<float>(width), static_cast<float>(height) });
-        }
+      renderExtra(texture);
+      if (!wasConverted) {
+        renderPreview(texture);
       }
 
-
-      // pop the parent node
       ImGui::TreePop();
       ImGui::PopID();
+      ImGui::PopID();
+    };
+
+    if (ImGui::CollapsingHeader("Flat textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+      for (size_t i = 0; i < textureManager.flatTextures.size(); ++i) {
+        bool converted = false;
+        renderTextureEntry(
+          textureManager.flatTextures[i],
+          i,
+          "flat",
+          [&](Texture &baseTexture) {
+            auto &texture = dynamic_cast<FlatTexture &>(baseTexture);
+
+            renderTypeSelect(texture, [&](const TextureType selectedType) {
+              if (selectedType == TextureType::WALL) {
+                textureManager.ConvertFlatToWall(i);
+                converted = true;
+              }
+            });
+
+            if (converted) {
+              return;
+            }
+
+            static char originPath[32] = {};
+            if (ImGui::InputText(std::format("Origin##flat{}", i).c_str(), originPath, sizeof(originPath))) {
+            }
+
+            if (ImGui::Button("Update") && strlen(originPath)) {
+              if (!m_editor->state->palManager) {
+                std::cerr << "Palette manager is not defined -> skip loading new image.\n";
+                return;
+              }
+
+              m_editor->state->texManager->LoadFlatTexture(PROJECT_ROOT_PATH + std::string(originPath), texture);
+              texture.Write();
+
+              std::cout << "Updated flat texture." << '\n';
+              memset(originPath, 0, sizeof(originPath));
+            }
+          },
+          converted);
+
+        if (converted) {
+          break;
+        }
+      }
+    }
+
+    if (ImGui::CollapsingHeader("Wall textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+      for (size_t i = 0; i < textureManager.wallTextures.size(); ++i) {
+        bool converted = false;
+        renderTextureEntry(
+          textureManager.wallTextures[i],
+          i,
+          "wall",
+          [&](Texture &baseTexture) {
+            renderTypeSelect(baseTexture, [&](const TextureType selectedType) {
+              if (selectedType == TextureType::FLAT) {
+                textureManager.ConvertWallToFlat(i);
+                converted = true;
+              }
+            });
+          },
+          converted);
+
+        if (converted) {
+          break;
+        }
+      }
     }
   });
 

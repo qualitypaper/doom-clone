@@ -1,7 +1,10 @@
 #pragma once
 
-#include "editor.h"
+#include "imgui/imgui.h"
+#include <memory>
 
+
+struct EditorState;
 struct CommandHistory;
 
 class Interaction
@@ -30,14 +33,14 @@ private:
   [[nodiscard]] uint32_t findNearestPastThreshold(float vertexRadius, bool shouldProcessLinedefs, float hoveringThresholdSq) const;
   void processNearestObject(uint32_t bestObjectId) const;
   void createLine(uint32_t toObjectId) const;
-  void processMouseInteractions(float_t vertexRadius) const;
+  void processMouseInteractions(float vertexRadius) const;
   void updateSelection(uint32_t id, bool selected) const;
   void resetSelection() const;
 
   void flushBlockSelecting() const;
   void flushDragging() const;
 
-  static float_t getDistanceToSegmentSq(ImVec2 start, ImVec2 end, ImVec2 origin);
+  static float getDistanceToSegmentSq(ImVec2 start, ImVec2 end, ImVec2 origin);
 
 public:
   EditorInputHandler() = default;
@@ -46,5 +49,5 @@ public:
   {}
 
 public:
-  void ProcessInput(float_t vertexRadius) const;
+  void ProcessInput(float vertexRadius) const;
 };

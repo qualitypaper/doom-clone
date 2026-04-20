@@ -10,6 +10,8 @@
 #include <vector>
 
 
+class PaletteManager;
+class TextureManager;
 struct Texture;
 class SdlWindow;
 struct GameState;
@@ -27,8 +29,7 @@ struct drawspan_t
   fixed_t xStep, yStep;
   fixed_t xFrac, yFrac;
 
-  // TODO: change to texture implementation
-  uint32_t color;
+  int16_t textureId;
 };
 
 struct drawseg_t
@@ -76,7 +77,7 @@ private:
 
   void ResetSolidSegs();
   void ResetPlanes();
-  Visplane *FindVisPlane(fixed_t height, uint32_t color, int16_t lightLevel);
+  Visplane *FindVisPlane(fixed_t height, int16_t texIndex, int16_t lightLevel);
   Visplane *CheckVisPlane(Visplane *visplane, int start, int end);
   void RenderVisPlanes();
 
@@ -136,6 +137,7 @@ private:
 
   FrameBuffer m_fb;
   const Player *m_player;
-  const std::vector<Texture> *m_textures;
+  const TextureManager *m_texManager;
+  const PaletteManager *m_palManager;
   std::shared_ptr<Level> m_level;
 };

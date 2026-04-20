@@ -36,7 +36,7 @@ class PaletteManager
 {
 public:
   PaletteManager(FileReader &fr, const header &hdr);
-  explicit PaletteManager(FileReader &fr);
+  explicit PaletteManager(const std::filesystem::path &path);
 
   void SetCurrentPalette(uint8_t index);
   [[nodiscard]] const RGB &GetColor(uint8_t index) const;

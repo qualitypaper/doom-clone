@@ -16,8 +16,7 @@ using lumpName = std::array<char8_t, 8>;
 struct Visplane
 {
   fixed_t height = 0;
-  // TODO: change to texture index
-  uint32_t color = -1;
+  int16_t textureIndex = -1;
   int lightLevel = 0;
   int minX = 0;
   int maxX = 0;
@@ -27,12 +26,13 @@ struct Visplane
 
   Visplane() = default;
   Visplane(const fixed_t _height,
-           const uint32_t _color,
+           const int16_t _texIndex,
            const int _lightLevel,
            const int _minX,
            const int _maxX,
            const std::size_t width)
-    : height(_height), color(_color), lightLevel(_lightLevel), minX(_minX), maxX(_maxX), top(width, -1), bottom(width, -1)
+    : height(_height), textureIndex(_texIndex), lightLevel(_lightLevel), minX(_minX), maxX(_maxX), top(width, -1),
+      bottom(width, -1)
   {}
 };
 
@@ -42,7 +42,8 @@ struct ClipRange
   int end = 0;
 
   ClipRange() = default;
-  ClipRange(const int _start, const int _end) : start(_start), end(_end) {}
+  ClipRange(const int _start, const int _end) : start(_start), end(_end)
+  {}
 };
 
 struct Sector
@@ -63,16 +64,10 @@ struct Sector
          const int16_t _ceilingTextureIndex,
          const int16_t _lightLevel,
          const int16_t _specialType,
-         const int16_t _tag,
-         const uint32_t _color = 0xFFFFFFFF)
+         const int16_t _tag)
     : floorHeight(_floorHeight), ceilingHeight(_ceilingHeight), floorTextureIndex(_floorTextureIndex),
-      ceilingTextureIndex(_ceilingTextureIndex), lightLevel(_lightLevel), specialType(_specialType), tag(_tag),
-      color(_color)
+      ceilingTextureIndex(_ceilingTextureIndex), lightLevel(_lightLevel), specialType(_specialType), tag(_tag)
   {}
-
-  // temporary, till textures will not be added, RGBA format
-  // default - BLACK
-  uint32_t color = 0xFFFFFFFF;
 
   template<typename Writer>
   void serialize(Writer &w) const
@@ -84,7 +79,6 @@ struct Sector
     serialization::serialize(w, lightLevel);
     serialization::serialize(w, specialType);
     serialization::serialize(w, tag);
-    serialization::serialize(w, color);
   }
 
   template<typename Reader>
@@ -97,7 +91,6 @@ struct Sector
     serialization::deserialize(r, lightLevel);
     serialization::deserialize(r, specialType);
     serialization::deserialize(r, tag);
-    serialization::deserialize(r, color);
   }
 };
 
@@ -107,18 +100,40 @@ struct Vertex
   fixed_t y = 0;
 
   Vertex() = default;
-  Vertex(const int32_t _x, const int32_t _y) : x(_x), y(_y) {}
+  Vertex(const int32_t _x, const int32_t _y) : x(_x), y(_y)
+  {}
 
-  Vertex operator+(const Vertex &other) const { return Vertex{ x + other.x, y + other.y }; }
-  Vertex operator-(const Vertex &other) const { return Vertex{ x - other.x, y - other.y }; }
+  Vertex operator+(const Vertex &other) const
+  {
+    return Vertex{ x + other.x, y + other.y };
+  }
+  Vertex operator-(const Vertex &other) const
+  {
+    return Vertex{ x - other.x, y - other.y };
+  }
   // dot product
-  fixed_t operator*(const Vertex &other) const { return FixedMul(x, other.x) + FixedMul(y, other.y); }
-  Vertex operator*(const double c) const { return Vertex{ FixedMul(c, x), FixedMul(c, y) }; }
-  Vertex operator/(const double c) const { return Vertex{ FixedDiv(x, c), FixedDiv(y, c) }; }
-  bool operator==(const Vertex &other) const { return x == other.x && y == other.y; }
+  fixed_t operator*(const Vertex &other) const
+  {
+    return FixedMul(x, other.x) + FixedMul(y, other.y);
+  }
+  Vertex operator*(const double c) const
+  {
+    return Vertex{ FixedMul(c, x), FixedMul(c, y) };
+  }
+  Vertex operator/(const double c) const
+  {
+    return Vertex{ FixedDiv(x, c), FixedDiv(y, c) };
+  }
+  bool operator==(const Vertex &other) const
+  {
+    return x == other.x && y == other.y;
+  }
 
   // gives the length of cross product v \cross other
-  [[nodiscard]] fixed_t cross(const Vertex &other) const { return FixedMul(x, other.y) - FixedMul(y, other.x); }
+  [[nodiscard]] fixed_t cross(const Vertex &other) const
+  {
+    return FixedMul(x, other.y) - FixedMul(y, other.x);
+  }
 
   [[nodiscard]] Vertex toCenterCoords(const uint16_t width, const uint16_t height) const
   {

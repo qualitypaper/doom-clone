@@ -3,9 +3,9 @@
 #include "core/gameloop.h"
 #include "core/serialization/colors_serializer.h"
 #include "core/serialization/texture_serializer.h"
-#include "core/serialization/wad_serializer.h"
 #include "core/simulation.h"
 #include "renderer/editor/editor.h"
+#include "renderer/editor/editor_input_handler.h"
 #include "renderer/game/renderer.h"
 
 #include "imgui/backends/imgui_impl_sdl2.h"
@@ -135,20 +135,19 @@ int main(int argc, char *argv[])
 
 
   std::unique_ptr<PaletteManager> paletteManager;
-  std::vector<Texture> textures;
+  std::unique_ptr<TextureManager> textureManager;
   // initialize palette/textures
   {
-    FileReader fr(PROJECT_ROOT_PATH "PLAYPAL.pal");
-    paletteManager = std::make_unique<PaletteManager>(fr);
+    paletteManager = std::make_unique<PaletteManager>(PROJECT_ROOT_PATH "PLAYPAL.pal");
 
     std::vector<FlatTexture> flatTextures = FlatTexture::ReadAll();
-    textures.reserve(flatTextures.size());
-    textures.insert_range(textures.begin(), std::move(flatTextures));
-
     // TODO: load wall textures
+
+    textureManager =
+      std::make_unique<TextureManager>(std::move(flatTextures), std::vector<WallTexture>(), paletteManager.get());
   }
 
-  auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, textures, *paletteManager);
+  auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, *textureManager, *paletteManager);
 
   // setup the game renderer
   auto renderer = std::make_shared<Renderer>(sdlWindow, level);
@@ -164,7 +163,10 @@ int main(int argc, char *argv[])
                        .sdlWindow = std::move(sdlWindow),
                        .renderer = std::move(renderer),
                        .editor = std::move(editor),
-                       .textures = textures };
+                       .texManager =  std::move(textureManager),
+            .palManager = std::move(paletteManager)
+
+  };
 
 
   running = true;

@@ -1,5 +1,6 @@
 #include "core/framebuffer.h"
 #include "core/gameloop.h"
+#include "core/serialization/texture_serializer.h"
 #include "renderer.h"
 
 #include <algorithm>
@@ -37,6 +38,8 @@ void Renderer::MakeSpans(const Visplane &plane, const int x, int t1, int b1, int
 
 void Renderer::DrawSpan(drawspan_t &ds) const
 {
+  assert(m_texManager);
+
   // scale the point to the window size
   ds.y = std::clamp(ds.y, 0, m_fb.height - 1);
   ds.x1 = std::clamp(ds.x1, 0, m_fb.width - 1);
@@ -49,7 +52,18 @@ void Renderer::DrawSpan(drawspan_t &ds) const
   uint32_t *ptr = this->m_fb.pixels + ds.y * pitch + ds.x1;
 
   for (uint32_t *curr = ptr; curr <= ptr + (ds.x2 - ds.x1); curr++) {
-    *(uint32_t *)curr = ds.color;
+    // completely stolen from Doom source code, no idea how to works
+    const int spot = ((ds.yFrac >> (16-6)) & (63 * 64)) + ((ds.xFrac >> 16) & 63);
+
+    if (ds.textureId >= 0) {
+      const uint8_t palIndex = m_texManager->flatTextures[ds.textureId].data[spot];
+      RGB col = m_palManager->GetColor(palIndex);
+      *(uint32_t *)curr = col.ToU32();
+    } else {
+      *(uint32_t *)curr = 0xFFFFFFFF;
+    }
+    ds.yFrac += ds.yStep;
+    ds.xFrac += ds.xStep;
   }
 }
 
@@ -65,7 +79,7 @@ void Renderer::MapPlane(const Visplane &plane, const int y, const int x1, const 
   const fixed_t xFrac = m_centerXFrac + FixedMul(finesine[(angle + ANG90) >> ANGLE_TO_FINE_SHIFT], length);
   const fixed_t yFrac = -m_centerYFrac - FixedMul(finesine[angle >> ANGLE_TO_FINE_SHIFT], length);
 
-  drawspan_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.color };
+  drawspan_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.textureIndex };
   DrawSpan(ds);
 }
 
@@ -84,15 +98,15 @@ void Renderer::ResetPlanes()
 }
 
 // TODO: change color to texture implementation
-Visplane *Renderer::FindVisPlane(const fixed_t height, const uint32_t color, const int16_t lightLevel)
+Visplane *Renderer::FindVisPlane(const fixed_t height, const int16_t texIndex, const int16_t lightLevel)
 {
   for (Visplane &vp : m_visplanes) {
-    if (vp.height == height && vp.color == color && vp.lightLevel == lightLevel) {
+    if (vp.height == height && vp.textureIndex == texIndex && vp.lightLevel == lightLevel) {
       return &vp;
     }
   }
 
-  m_visplanes.emplace_back(height, color, lightLevel, static_cast<int>(m_fb.width), -1, m_fb.width);
+  m_visplanes.emplace_back(height, texIndex, lightLevel, static_cast<int>(m_fb.width), -1, m_fb.width);
 
   return &m_visplanes.back();
 }
@@ -145,9 +159,9 @@ Visplane *Renderer::CheckVisPlane(Visplane *visplane, const int start, const int
   // make a new visplane
   const fixed_t sourceHeight = visplane->height;
   const int sourceLightLevel = visplane->lightLevel;
-  const uint32_t sourceColor = visplane->color;
+  const int16_t sourceTex = visplane->textureIndex;
 
-  visplane = &m_visplanes.emplace_back(sourceHeight, sourceColor, sourceLightLevel, start, end, m_fb.width);
+  visplane = &m_visplanes.emplace_back(sourceHeight, sourceTex, sourceLightLevel, start, end, m_fb.width);
 
   return visplane;
 }

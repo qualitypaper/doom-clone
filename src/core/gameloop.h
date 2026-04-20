@@ -12,6 +12,8 @@
 #include <vector>
 
 
+class PaletteManager;
+class TextureManager;
 struct Texture;
 class Editor;
 class Renderer;
@@ -71,7 +73,8 @@ struct GameState
   std::shared_ptr<Renderer> renderer;
   std::shared_ptr<Editor> editor;
   InputState input;
-  std::vector<Texture> &textures;
+  std::unique_ptr<TextureManager> texManager;
+  std::unique_ptr<PaletteManager> palManager;
 
   void Reset();
 };

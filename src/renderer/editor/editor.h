@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../../core/math_utils.h"
-#include "../../core/serialization/serialization.h"
-#include "../../core/serialization/wad_serializer.h"
 #include "bsp/bsp.h"
 #include "core/gameloop.h"
+#include "core/math_utils.h"
+#include "core/serialization/serialization.h"
+#include "core/serialization/wad_serializer.h"
 #include "defs.h"
 #include "imgui/imgui.h"
 
@@ -15,16 +15,15 @@
 #include <vector>
 
 
-class PaletteManager;
-class BSPBuilder;
 // forward declarations
+class TextureManager;
+class PaletteManager;
+
+class BSPBuilder;
 struct CommandHistory;
 struct Command;
-class EditorRenderer;
 
-// forward declaractions
 struct EditorState;
-struct EditorInputHandler;
 
 
 struct AABB
@@ -57,7 +56,10 @@ constexpr EditorObjectType getObjectType(const uint32_t objectId)
   return static_cast<EditorObjectType>((objectId >> kObjectTypeShift) & 0x3u);
 }
 
-constexpr uint32_t getObjectIndex(const uint32_t objectId) { return objectId & kObjectIndexMask; }
+constexpr uint32_t getObjectIndex(const uint32_t objectId)
+{
+  return objectId & kObjectIndexMask;
+}
 
 struct DraggableObject
 {
@@ -74,21 +76,29 @@ struct EditorObject
   : public Serializable
   , public DraggableObject
 {
-  explicit EditorObject(const EditorObjectType _type) : type(_type) {}
+  explicit EditorObject(const EditorObjectType _type) : type(_type)
+  {}
   ~EditorObject() override = default;
 
   EditorObjectType type;
   bool selected = false;
   bool hovered = false;
 
-  virtual void select() { this->selected = !this->selected; }
+  virtual void select()
+  {
+    this->selected = !this->selected;
+  }
 
-  virtual void hover() { this->hovered = !this->hovered; }
+  virtual void hover()
+  {
+    this->hovered = !this->hovered;
+  }
 };
 
 struct EditorLineDef : public EditorObject
 {
-  EditorLineDef() : EditorObject(EditorObjectType::LINEDEF) {}
+  EditorLineDef() : EditorObject(EditorObjectType::LINEDEF)
+  {}
   explicit EditorLineDef(const LineDef &_linedef)
     : EditorObject(EditorObjectType::LINEDEF), start(makeObjectId(EditorObjectType::VERTEX, _linedef.start)),
       end(makeObjectId(EditorObjectType::VERTEX, _linedef.end)), type(_linedef.type),
@@ -119,8 +129,10 @@ struct EditorLineDef : public EditorObject
 
 struct EditorVertex : public EditorObject
 {
-  EditorVertex() : EditorObject(EditorObjectType::VERTEX) {}
-  EditorVertex(const double _x, const double _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y) {}
+  EditorVertex() : EditorObject(EditorObjectType::VERTEX)
+  {}
+  EditorVertex(const double _x, const double _y) : EditorObject(EditorObjectType::VERTEX), x(_x), y(_y)
+  {}
   explicit EditorVertex(const ImVec2 &vec)
     : EditorObject(EditorObjectType::VERTEX), x(static_cast<int32_t>(vec.x)), y(static_cast<int32_t>(vec.y))
   {}
@@ -137,17 +149,32 @@ struct EditorVertex : public EditorObject
   double x = 0, y = 0;
   std::vector<uint32_t> connectedLineDefs = {};// Linedef object IDs (EditorObjectType::LINEDEF).
 
-  EditorVertex operator+(const EditorVertex &other) const { return { x + other.x, y + other.y }; }
-  EditorVertex operator-(const EditorVertex &other) const { return { x - other.x, y - other.y }; }
+  EditorVertex operator+(const EditorVertex &other) const
+  {
+    return { x + other.x, y + other.y };
+  }
+  EditorVertex operator-(const EditorVertex &other) const
+  {
+    return { x - other.x, y - other.y };
+  }
 
-  EditorVertex operator+(const ImVec2 &other) const { return { x + other.x, y + other.y }; }
+  EditorVertex operator+(const ImVec2 &other) const
+  {
+    return { x + other.x, y + other.y };
+  }
   EditorVertex operator-(const ImVec2 &other) const
   {
     return { x - static_cast<int32_t>(other.x), y - static_cast<int32_t>(other.y) };
   }
 
-  EditorVertex operator*(const double c) const { return { x * c, y * c }; }
-  EditorVertex operator/(const double c) const { return { x / c, y / c }; }
+  EditorVertex operator*(const double c) const
+  {
+    return { x * c, y * c };
+  }
+  EditorVertex operator/(const double c) const
+  {
+    return { x / c, y / c };
+  }
 
   EditorVertex &operator+=(const ImVec2 &offset)
   {
@@ -165,8 +192,14 @@ struct EditorVertex : public EditorObject
   }
 
   [[nodiscard]] bool isAnyConnectedLineDefSelected(const EditorState &state) const;
-  [[nodiscard]] ImVec2 toImVec2() const { return { static_cast<float_t>(x), static_cast<float_t>(y) }; }
-  [[nodiscard]] double length() const { return std::sqrt(x * x + y * y); }
+  [[nodiscard]] ImVec2 toImVec2() const
+  {
+    return { static_cast<float_t>(x), static_cast<float_t>(y) };
+  }
+  [[nodiscard]] double length() const
+  {
+    return std::sqrt(x * x + y * y);
+  }
 
   void normalize()
   {
@@ -186,11 +219,17 @@ struct EditorVertex : public EditorObject
 
 struct EditorSidedef : EditorObject
 {
-  EditorSidedef(const int16_t _sectorId, const double _xOffset, const double _yOffset)
-    : EditorObject(EditorObjectType::SIDEDEF), sectorId(_sectorId), xOffset(_xOffset), yOffset(_yOffset)
+  EditorSidedef() : EditorObject(EditorObjectType::SIDEDEF)
   {}
-  EditorSidedef() : EditorObject(EditorObjectType::SIDEDEF) {}
-
+  EditorSidedef(const int16_t sectorId,
+                const double xOffset,
+                const double yOffset,
+                const int16_t upperWallTexture,
+                const int16_t middleWallTexture,
+                const int16_t bottomWallTexture)
+    : EditorObject(EditorObjectType::SIDEDEF), sectorId(sectorId), xOffset(xOffset), yOffset(yOffset),
+      upperWallTexture(upperWallTexture), middleWallTexture(middleWallTexture), bottomWallTexture(bottomWallTexture)
+  {}
   int16_t sectorId = -1;
   double xOffset = 0;
   double yOffset = 0;
@@ -229,26 +268,26 @@ struct EditorSidedef : EditorObject
 
 struct EditorSector : EditorObject
 {
-  EditorSector(const fixed_t _floorHeight,
-               const fixed_t _ceilingHeight,
-               const int16_t _specialType,
-               const int16_t _lightLevel,
-               const int16_t _tag,
-               const uint32_t _color = 0)
-    : EditorObject(EditorObjectType::SECTOR), floorHeight(FixedToDouble(_floorHeight)),
-      ceilingHeight(FixedToDouble(_ceilingHeight)), lightLevel(_lightLevel), specialType(_specialType), tag(_tag),
-      color(_color)
+  EditorSector(const double floorHeight,
+               const double ceilingHeight,
+               const int16_t floorPic,
+               const int16_t ceilingPic,
+               const int16_t lightLevel,
+               const int16_t specialType,
+               const int16_t tag)
+    : EditorObject(EditorObjectType::SECTOR), floorHeight(floorHeight), ceilingHeight(ceilingHeight),
+      floorPic(floorPic), ceilingPic(ceilingPic), lightLevel(lightLevel), specialType(specialType), tag(tag)
   {}
-  EditorSector() : EditorObject(EditorObjectType::SECTOR) {}
+  EditorSector() : EditorObject(EditorObjectType::SECTOR)
+  {}
 
   double floorHeight = 0;
   double ceilingHeight = 0;
-  int16_t floorTextureIndex = -1;
-  int16_t ceilingTextureIndex = -1;
+  int16_t floorPic = -1;
+  int16_t ceilingPic = -1;
   int16_t lightLevel = 0;
   int16_t specialType = 0;
   int16_t tag = 0;
-  uint32_t color = 0;
   AABB bounding_box{};
   std::vector<uint32_t> linedefIds;
 
@@ -257,12 +296,11 @@ struct EditorSector : EditorObject
   {
     serialization::serialize(w, DoubleToFixed(floorHeight));
     serialization::serialize(w, DoubleToFixed(ceilingHeight));
-    serialization::serialize(w, floorTextureIndex);
-    serialization::serialize(w, ceilingTextureIndex);
+    serialization::serialize(w, floorPic);
+    serialization::serialize(w, ceilingPic);
     serialization::serialize(w, lightLevel);
     serialization::serialize(w, specialType);
     serialization::serialize(w, tag);
-    serialization::serialize(w, color);
   }
 
   template<typename Reader>
@@ -276,12 +314,11 @@ struct EditorSector : EditorObject
     floorHeight = FixedToDouble(floorHeightFixed);
     ceilingHeight = FixedToDouble(ceilHeightFixed);
 
-    serialization::deserialize(r, floorTextureIndex);
-    serialization::deserialize(r, ceilingTextureIndex);
+    serialization::deserialize(r, floorPic);
+    serialization::deserialize(r, ceilingPic);
     serialization::deserialize(r, lightLevel);
     serialization::deserialize(r, specialType);
     serialization::deserialize(r, tag);
-    serialization::deserialize(r, color);
   }
 };
 
@@ -297,7 +334,8 @@ struct EditorLevel
     : vertices(std::move(_vertices)), linedefs(std::move(_lines)), sectors(std::move(_sectors)),
       sidedefs(std::move(_sidedefs)), levelNum(_levelNum), name(_name)
   {}
-  explicit EditorLevel(const size_t _levelNum, const std::array<char8_t, 8> _name) : levelNum(_levelNum), name(_name) {}
+  explicit EditorLevel(const size_t _levelNum, const std::array<char8_t, 8> _name) : levelNum(_levelNum), name(_name)
+  {}
   EditorLevel(const Level &_level, uint16_t _levelNum, uint16_t _width, uint16_t _height_);
 
   void SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const;
@@ -328,7 +366,7 @@ struct EditorState
   uint16_t numOfLevels = 0;
   // information about the linedefs/sidedefs/vertices
   std::unique_ptr<EditorLevel> level;
-  std::vector<Texture> *textures;
+  TextureManager *texManager;
   PaletteManager *palManager;
 
   // dragging state
@@ -433,6 +471,10 @@ struct EditorState
   }
 };
 
+
+#include "editor_input_handler.h"
+#include "editor_renderer.h"
+
 class Editor
 {
 private:
@@ -451,9 +493,9 @@ public:
          Level &_level,
          uint16_t _levelNum,
          uint16_t _numOfLevels,
-         std::vector<Texture> &textures,
+         TextureManager &textureManager,
          PaletteManager &palManager);
-  ~Editor();
+  ~Editor() = default;
 
   void Render() const;
   [[nodiscard]] std::array<char8_t, 8> GetLevelName() const;

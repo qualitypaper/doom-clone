@@ -1,14 +1,16 @@
 #pragma once
 
-#include "../../core/gameloop.h"
-#include "../../core/math_utils.h"
-#include "../../core/sdl_window.h"
-#include "editor.h"
+#include "core/gameloop.h"
+#include "core/math_utils.h"
+#include "core/sdl_window.h"
 
 #include <functional>
 #include <memory>
 #include <vector>
 
+
+struct EditorSidedef;
+struct EditorLineDef;
 struct ImVec2;
 
 

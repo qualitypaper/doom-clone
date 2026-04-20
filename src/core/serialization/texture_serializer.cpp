@@ -6,51 +6,25 @@
 #include <SDL_surface.h>
 #include <iostream>
 
-bool LoadTextureFromFile(const char *fileName,
-                         SDL_Renderer *renderer,
-                         SDL_Texture **out_texture,
-                         int *outWidth,
-                         int *outHeight)
-{
-  FileReader fr(fileName);
-  if (!fr.IsStreamGood()) {
-    std::cout << std::format("Failed to open texture file {}\n", fileName);
-  }
-
-  const size_t size = fr.GetFileSize();
-  char buf[size];
-  fr.ReadData(buf, size);
-
-  return LoadTextureFromMemory(buf, size, renderer, out_texture, outWidth, outHeight);
-}
+static constexpr std::string_view DEFAULT_FLAT_TEX_FORMAT = "FTEX{}";
 
 bool LoadTextureFromMemory(const void *data,
-                           const size_t data_size,
+                           const int width,
+                           const int height,
                            SDL_Renderer *renderer,
-                           SDL_Texture **out_texture,
-                           int *out_width,
-                           int *out_height)
+                           SDL_Texture **out_texture)
 {
-  int image_width = 64;
-  int image_height = 64;
-  int channels = 4;
-  // unsigned char *image_data =
-  //   stbi_load_from_memory((const unsigned char *)data, (int)data_size, &image_width, &image_height, nullptr, channels);
-  //
-  // if (image_data == nullptr) {
-  //   fprintf(stderr, "Failed to load image: %s\n", stbi_failure_reason());
-  //   return false;
-  // }
-  //
-  SDL_Surface *surface = SDL_CreateRGBSurfaceFrom((void *)data,
-                                                  image_width,
-                                                  image_height,
+  constexpr int channels = 4;
+
+  SDL_Surface *surface = SDL_CreateRGBSurfaceFrom(const_cast<void *>(data),
+                                                  width,
+                                                  height,
                                                   channels * 8,
-                                                  channels * image_width,
-                                                  0x000000ff,
-                                                  0x0000ff00,
+                                                  channels * width,
+                                                  0xff000000,
                                                   0x00ff0000,
-                                                  0xff000000);
+                                                  0x0000ff00,
+                                                  0x000000ff);
   if (surface == nullptr) {
     fprintf(stderr, "Failed to create SDL surface: %s\n", SDL_GetError());
     return false;
@@ -61,11 +35,8 @@ bool LoadTextureFromMemory(const void *data,
     fprintf(stderr, "Failed to create SDL texture: %s\n", SDL_GetError());
 
   *out_texture = texture;
-  *out_width = image_width;
-  *out_height = image_height;
 
   SDL_FreeSurface(surface);
-  // stbi_image_free(image_data);
 
   return true;
 }
@@ -105,7 +76,10 @@ void FlatTexture::Write()
     fEndIndex = fEndOptional.value() - directory;
   }
 
-  const auto it = std::ranges::find_if(lumps, [&](const LumpData &lump) { return lump.entry.name == name; });
+  const auto it = std::ranges::find_if(lumps, [&](const LumpData &lump) {
+    return lump.entry.name == name;
+  });
+  const int index = it - lumps.begin();
 
   LumpData flatLump{};
   flatLump.entry.name = name;
@@ -119,6 +93,12 @@ void FlatTexture::Write()
 
   wadSerializer.SetLumps(std::move(lumps));
   wadSerializer.Write();
+
+  if (it == lumps.end()) {
+    this->data = std::move(wadSerializer.GetLoadedLumps().back().rawData);
+  } else {
+    this->data = std::move(wadSerializer.GetLoadedLumps()[index].rawData);
+  }
 }
 
 void FlatTexture::Read()
@@ -165,7 +145,7 @@ std::vector<FlatTexture> FlatTexture::ReadAll()
   directoryEntry *curr = fStartOptional.value() + 1;
 
   while (curr != fEndOptional.value()) {
-    FlatTexture & flatTexture = res.emplace_back(curr->name);
+    FlatTexture &flatTexture = res.emplace_back(curr->name);
     flatTexture.data = std::move(wadSerializer.ReadLump(*curr).rawData);
     curr++;
   }
@@ -174,3 +154,85 @@ std::vector<FlatTexture> FlatTexture::ReadAll()
 }
 
 // TODO: implement texture read/write for walls
+void WallTexture::Write()
+{}
+
+void WallTexture::Read()
+{}
+
+void TextureManager::LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const
+{
+  assert(palManager);
+  const RawImage &rawImage = image::LoadRawImage(path, *palManager);
+  std::vector<uint8_t> rawData = image::ConvertRawToFlat(rawImage);
+
+  outFlatTexture.data = std::move(rawData);
+  outFlatTexture.width = outFlatTexture.height = FLAT_TEXTURE_SIZE;
+}
+
+void TextureManager::ConvertFlatToWall(FlatTexture &texture)
+{
+  const auto &it = std::ranges::find_if(flatTextures, [&texture](const FlatTexture &ft) {
+    return ft.name == texture.name;
+  });
+  if (it == flatTextures.end()) {
+    std::cerr << "Texture: " << (char*) texture.name.data() << " wasn't found\n";
+    return;
+  }
+
+  WallTexture wallTexture{ texture.name };
+
+  // TODO: convert into wall data format
+  wallTexture.data = std::move(texture.data);
+  wallTexture.width = wallTexture.height = 64;
+
+  wallTextures.emplace_back(wallTexture);
+  flatTextures.erase(it);
+}
+
+void TextureManager::ConvertFlatToWall(const size_t index)
+{
+  if (index >= flatTextures.size()) {
+    std::cerr << "Index is bigger than flatTextures array: " << index << '\n';
+    return;
+  }
+
+  ConvertFlatToWall(flatTextures[index]);
+}
+
+void TextureManager::ConvertWallToFlat(const size_t index)
+{
+  if (index >= wallTextures.size())
+    return;
+
+  WallTexture &wallTexture = wallTextures.at(index);
+  FlatTexture flatTexture{ wallTexture.name };
+
+  // TODO: convert into flat data format
+  flatTexture.data = std::move(wallTexture.data);
+  flatTextures.emplace_back(flatTexture);
+
+  wallTextures.erase(wallTextures.begin() + index);
+}
+
+std::optional<FlatTexture *> TextureManager::GetFlatTexture(const size_t index)
+{
+  if (index >= flatTextures.size())
+    return {};
+
+  return &flatTextures.at(index);
+}
+
+std::string TextureManager::GetFlatTextureName(const size_t index)
+{
+  std::string textureName = GetFlatTexture(index)
+                              .and_then([](FlatTexture *ft) {
+                                return std::optional(std::string((char *)ft->name.data()));
+                              })
+                              .value_or("###");
+  return std::move(textureName);
+}
+void TextureManager::AddDefaultFlatTexture()
+{
+  flatTextures.emplace_back(WadSerializer::MakeLumpName(std::format(DEFAULT_FLAT_TEX_FORMAT, flatTextures.size())));
+}

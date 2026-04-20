@@ -3,6 +3,8 @@
 #include "imgui/imgui.h"
 #include "renderer/editor/editor_renderer.h"
 
+#include <iostream>
+
 void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow,
                                  const std::array<fixed_t, 4> boundingBox,
                                  const int r,

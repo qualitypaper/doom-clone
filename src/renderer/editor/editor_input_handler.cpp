@@ -1,12 +1,10 @@
 #include "editor_input_handler.h"
-#include "../../core/math_utils.h"
-#include "../../imgui/imgui.h"
-#include "../../imgui/imgui_internal.h"
+#include "core/math_utils.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
 #include "commands.h"
 
 #include <algorithm>
-#include <filesystem>
-#include <limits>
 #include <ranges>
 #include <unordered_map>
 
