@@ -115,13 +115,13 @@ int main(int argc, char *argv[])
   size_t numOfLevels;
 
   if (1) {
-    std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(1);
+    std::array<char8_t, 8> levelName = Level::MakeLevelName(1);
     auto tempLevel = std::make_unique<Level>(levelName);
     numOfLevels = EditorLevel::Load(tempLevel);
     level = std::move(tempLevel);
   } else {
     numOfLevels = 1;
-    std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(1);
+    std::array<char8_t, 8> levelName = Level::MakeLevelName(1);
     level = std::make_shared<Level>(levelName);
     level->vertices = std::move(vertices);
     level->sectors = std::move(sectors);

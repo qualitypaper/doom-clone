@@ -51,6 +51,13 @@ private:
   void drawLevelSelection() const;
 
   // static methods
+  static void createDropdown(const char *label,
+                             std::string_view previewValue,
+                             int itemCount,
+                             const std::function<bool(int)> &isSelected,
+                             const std::function<std::string(int)> &itemLabel,
+                             const std::function<void(int)> &onSelect,
+                             const std::function<void()> &drawFooter = nullptr);
   static void createSidedefSelect(const char *label,
     const std::vector<EditorSidedef> &sidedefs,
     int16_t &currentItem,

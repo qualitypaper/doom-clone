@@ -165,7 +165,8 @@ std::vector<FlatTexture> FlatTexture::ReadAll()
   directoryEntry *curr = fStartOptional.value() + 1;
 
   while (curr != fEndOptional.value()) {
-    res.emplace_back(curr->name);
+    FlatTexture & flatTexture = res.emplace_back(curr->name);
+    flatTexture.data = std::move(wadSerializer.ReadLump(*curr).rawData);
     curr++;
   }
 

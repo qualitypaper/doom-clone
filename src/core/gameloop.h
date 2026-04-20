@@ -2,6 +2,7 @@
 
 #include "core/sdl_window.h"
 #include "defs.h"
+#include "serialization/wad_serializer.h"
 
 #include <algorithm>
 #include <array>
@@ -31,7 +32,8 @@ struct Player
 
 struct Level
 {
-  explicit Level(const std::array<char8_t, 8> _name) : name(_name) {}
+  explicit Level(const std::array<char8_t, 8> _name) : name(_name)
+  {}
 
   std::vector<Vertex> vertices{};
   std::vector<line_t> linedefs{};
@@ -48,6 +50,16 @@ struct Level
                    const std::vector<LineDef> &_lines,
                    const std::vector<SideDef> &_sides,
                    const std::vector<Seg> &_segs);
+
+  static lumpName MakeLevelName(const uint16_t number)
+  {
+    return WadSerializer::MakeLumpName(MakeLevelNameStr(number));
+  }
+
+  static std::string MakeLevelNameStr(const uint16_t number)
+  {
+    return std::move("Map" + std::to_string(number));
+  }
 };
 
 struct GameState

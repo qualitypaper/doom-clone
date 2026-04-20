@@ -470,8 +470,8 @@ public:
   [[nodiscard]] ImVec2 TransformVertex(const EditorVertex &v) const;
   [[nodiscard]] ImVec2 UntransformVertex(ImVec2 transformed) const;
 
-  void addEmptyLevel() const;
-  void changeLevel(uint16_t newLevelNum) const;
+  void AddEmptyLevel() const;
+  void ChangeLevel(uint16_t newLevelNum) const;
 
 
   template<HasXY T>

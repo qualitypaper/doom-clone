@@ -389,16 +389,16 @@ void Editor::TransformVertices() const
   }
 }
 
-void Editor::addEmptyLevel() const
+void Editor::AddEmptyLevel() const
 {
   state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
   state->numOfLevels++;
-  const std::array<char8_t, 8> levelName = WadSerializer::MakeLevelName(state->numOfLevels);
+  const std::array<char8_t, 8> levelName = Level::MakeLevelName(state->numOfLevels);
 
   state->level = std::make_unique<EditorLevel>(state->numOfLevels, levelName);
 }
 
-void Editor::changeLevel(const uint16_t newLevelNum) const
+void Editor::ChangeLevel(const uint16_t newLevelNum) const
 {
   if (state->level->levelNum == newLevelNum)
     return;
@@ -407,11 +407,7 @@ void Editor::changeLevel(const uint16_t newLevelNum) const
 
   state->reset();
 
-  auto levelName = std::array<char8_t, 8>{};
-  const std::string nameStr = std::format("Map{}", newLevelNum);
-
-  const size_t copyLen = std::min(nameStr.size(), size_t{ 8 });
-  std::memcpy(levelName.data(), nameStr.data(), copyLen);
+  const lumpName levelName = Level::MakeLevelName(newLevelNum);
 
   auto newLevel = std::make_unique<Level>(levelName);
 

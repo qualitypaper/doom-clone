@@ -75,6 +75,7 @@ public:
   bool Load(bool readLumps = false);
   bool LoadHeader(FileReader &fr);
   bool LoadDirectory(FileReader &fr);
+  LumpData ReadLump(const directoryEntry &entry) const;
 
   static LumpData ReadLump(FileReader &fr, const directoryEntry &entry);
   static std::vector<LumpData> ReadLumps(FileReader &fr, const std::vector<directoryEntry> &entries);
@@ -94,7 +95,6 @@ public:
   void Write(const std::filesystem::path &filePath, header *hdrOverride = nullptr);
   void Write(header *hdrOverride = nullptr);
 
-  static lumpName MakeLevelName(uint16_t number);
   static lumpName MakeLumpName(std::string_view name);
 
 private:

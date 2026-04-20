@@ -71,6 +71,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   std::vector<LumpData> allLumps;
   header _header{};
   int32_t targetLevelIndex = -1;
+  size_t levelCount = 0;
   // tries to find the last map lump and add the new level at the next position to support the structure of the wad file
   bool found = false;
 
@@ -81,20 +82,24 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
       allLumps = std::move(wadSerializer.GetLoadedLumps());
 
       for (size_t i = 0; i < allLumps.size(); ++i) {
-        if (allLumps[i].entry.name == _name) {
+        if (!found && allLumps[i].entry.name == _name) {
           targetLevelIndex = static_cast<int32_t>(i);
           found = true;
-          break;
         }
-        if (memcmp(allLumps[i].entry.name.data(), "Map", 3)) {
-          targetLevelIndex = static_cast<int32_t>(i);
+        if (memcmp(allLumps[i].entry.name.data(), "Map", 3) == 0) {
+          if (!found) {
+            targetLevelIndex = static_cast<int32_t>(i);
+          }
+          levelCount++;
         }
       }
     } else {
       _header = { { 'P', 'W', 'A', 'D' }, 1, 0 };
+      levelCount = 1;
     }
   } else {
     _header = { { 'P', 'W', 'A', 'D' }, 1, 0 };
+    levelCount = 1;
   }
 
   std::vector<uint8_t> newLevelBuffer;
@@ -120,7 +125,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   wadSerializer.SetLumps(std::move(allLumps));
   wadSerializer.Write();
 
-  numberOfLevels = static_cast<uint16_t>(wadSerializer.GetDirectory().size());
+  numberOfLevels = levelCount;
   std::cout << "Saved Level: " << (char *)_name.data() << '\n';
 }
 
@@ -235,5 +240,11 @@ size_t EditorLevel::Load(std::unique_ptr<Level> &level)
 
   level->Load(fr);
 
-  return wadSerializer.GetHeader().numDirectories;
+  size_t numOfLevels = 0;
+  for (auto &directoryEntry : wadSerializer.GetDirectory()) {
+    if (strncmp((char *)directoryEntry.name.data(), "Map", 3) == 0) {
+      numOfLevels++;
+    }
+  }
+  return numOfLevels;
 }

@@ -5,11 +5,18 @@
 #include <algorithm>
 #include <format>
 
-WadSerializer::WadSerializer(std::filesystem::path filePath) : m_filePath(std::move(filePath)) {}
+WadSerializer::WadSerializer(std::filesystem::path filePath) : m_filePath(std::move(filePath))
+{}
 
-void WadSerializer::SetFilePath(const std::filesystem::path &filePath) { m_filePath = filePath; }
+void WadSerializer::SetFilePath(const std::filesystem::path &filePath)
+{
+  m_filePath = filePath;
+}
 
-const std::filesystem::path &WadSerializer::GetFilePath() const { return m_filePath; }
+const std::filesystem::path &WadSerializer::GetFilePath() const
+{
+  return m_filePath;
+}
 
 bool WadSerializer::Load(const bool readLumps)
 {
@@ -56,6 +63,12 @@ bool WadSerializer::LoadDirectory(FileReader &fr)
   return fr.IsStreamGood();
 }
 
+LumpData WadSerializer::ReadLump(const directoryEntry &entry) const
+{
+  FileReader fr(m_filePath);
+  return std::move(ReadLump(fr, entry));
+}
+
 LumpData WadSerializer::ReadLump(FileReader &fr, const directoryEntry &entry)
 {
   LumpData lumpData;
@@ -82,22 +95,42 @@ std::vector<LumpData> WadSerializer::ReadLumps(FileReader &fr, const std::vector
   return lumps;
 }
 
-void WadSerializer::LoadAllLumps(FileReader &fr) { m_loadedLumps = ReadLumps(fr, m_directory); }
+void WadSerializer::LoadAllLumps(FileReader &fr)
+{
+  m_loadedLumps = ReadLumps(fr, m_directory);
+}
 
-const header &WadSerializer::GetHeader() const { return m_header; }
+const header &WadSerializer::GetHeader() const
+{
+  return m_header;
+}
 
-const std::vector<directoryEntry> &WadSerializer::GetDirectory() const { return m_directory; }
+const std::vector<directoryEntry> &WadSerializer::GetDirectory() const
+{
+  return m_directory;
+}
 
-std::vector<directoryEntry> &WadSerializer::GetDirectory() { return m_directory; }
+std::vector<directoryEntry> &WadSerializer::GetDirectory()
+{
+  return m_directory;
+}
 
 
-const std::vector<LumpData> &WadSerializer::GetLoadedLumps() const { return m_loadedLumps; }
+const std::vector<LumpData> &WadSerializer::GetLoadedLumps() const
+{
+  return m_loadedLumps;
+}
 
-std::vector<LumpData> &WadSerializer::GetLoadedLumps() { return m_loadedLumps; }
+std::vector<LumpData> &WadSerializer::GetLoadedLumps()
+{
+  return m_loadedLumps;
+}
 
 std::optional<directoryEntry *> WadSerializer::FindDirectoryEntry(const lumpName &name)
 {
-  auto it = std::ranges::find_if(m_directory, [&](const directoryEntry &entry) { return entry.name == name; });
+  auto it = std::ranges::find_if(m_directory, [&](const directoryEntry &entry) {
+    return entry.name == name;
+  });
 
   if (it == m_directory.end()) {
     return std::nullopt;
@@ -108,8 +141,9 @@ std::optional<directoryEntry *> WadSerializer::FindDirectoryEntry(const lumpName
 
 const LumpData *WadSerializer::FindLoadedLump(const lumpName &name) const
 {
-  const auto it =
-    std::ranges::find_if(m_loadedLumps, [&](const LumpData &lumpData) { return lumpData.entry.name == name; });
+  const auto it = std::ranges::find_if(m_loadedLumps, [&](const LumpData &lumpData) {
+    return lumpData.entry.name == name;
+  });
 
   if (it == m_loadedLumps.end()) {
     return nullptr;
@@ -118,7 +152,10 @@ const LumpData *WadSerializer::FindLoadedLump(const lumpName &name) const
   return &(*it);
 }
 
-void WadSerializer::SetHeader(const header &hdr) { m_header = hdr; }
+void WadSerializer::SetHeader(const header &hdr)
+{
+  m_header = hdr;
+}
 
 void WadSerializer::SetLumps(std::vector<LumpData> lumps)
 {
@@ -164,11 +201,6 @@ void WadSerializer::Write(header *hdrOverride)
   Write(m_filePath, hdrOverride);
 }
 
-std::array<char8_t, 8> WadSerializer::MakeLevelName(const uint16_t number)
-{
-  const std::string s = std::format("Map{}", number);
-  return MakeLumpName(s);
-}
 
 std::array<char8_t, 8> WadSerializer::MakeLumpName(const std::string_view name)
 {

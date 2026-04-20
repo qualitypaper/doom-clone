@@ -205,25 +205,29 @@ void EditorRenderer::drawLevelSelection() const
                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
   // TODO: rewrite createSelect to use a index based for loop instead of storing indices in a seperate array
-  std::vector<std::uint16_t> levelOptions;
-  levelOptions.reserve(m_editor->state->numOfLevels);
+  uint16_t currentLevelNum = m_editor->state->level->levelNum;
 
-  for (uint16_t i = 0; i < m_editor->state->numOfLevels; i++) {
-    levelOptions.emplace_back(i + 1);
-  }
-
-  uint16_t currentLevelOption = m_editor->state->level->levelNum;
-
-  createSelect(
+  createDropdown(
     "Select level",
-    levelOptions,
-    currentLevelOption,
-    [this, &currentLevelOption](const uint16_t selectedOption) {
-      currentLevelOption = selectedOption;
-
-      m_editor->changeLevel(selectedOption);
+    std::format("Map: {}", currentLevelNum),
+    m_editor->state->numOfLevels,
+    [&](const int optionIndex) {
+      return optionIndex == currentLevelNum - 1;
     },
-    [this]() { m_editor->addEmptyLevel(); });
+    [&](const int optionIndex) {
+      return std::format("Map {}", optionIndex + 1);
+    },
+    [&](const int optionIndex) {
+      currentLevelNum = optionIndex + 1;
+
+      // level count begins with 1
+      m_editor->ChangeLevel(currentLevelNum);
+    },
+    [this]() {
+      if (ImGui::Button("Add New")) {
+        m_editor->AddEmptyLevel();
+      }
+    });
 
   ImGui::End();
 }
@@ -463,26 +467,26 @@ void EditorRenderer::drawTexturesWindow() const
 
       ImGui::InputText("Name", textureName, 8);
 
-      constexpr auto &names = magic_enum::enum_entries<TextureType>();
+      constexpr auto names = magic_enum::enum_entries<TextureType>();
 
-      std::string currentType;
-      for (auto &name : names) {
-        if (texture.type == name.first) {
-          currentType = name.second;
-          break;
-        }
-      }
+      const auto selectedTypeIter = std::ranges::find_if(names, [&texture](const auto &entry) {
+        return texture.type == entry.first;
+      });
+      std::string currentType = selectedTypeIter != names.end() ? std::string(selectedTypeIter->second) : "Unknown";
 
-      if (ImGui::BeginCombo("Type", currentType.data())) {
-        for (auto type : names) {
-          const bool isSelected = texture.type == type.first;
-
-          if (ImGui::Selectable(type.second.data(), isSelected)) {
-            texture.type = type.first;
-          }
-        }
-        ImGui::EndCombo();
-      }
+      createDropdown(
+        "Type",
+        currentType,
+        names.size(),
+        [&texture, names](const int index) {
+          return texture.type == names[index].first;
+        },
+        [names](const int index) {
+          return std::string(names[index].second);
+        },
+        [&texture, names](const int index) {
+          texture.type = names[index].first;
+        });
 
       static char originPath[32];
       if (ImGui::InputText(std::format("Origin##{}", textureName).c_str(), originPath, 32)) {
@@ -500,10 +504,11 @@ void EditorRenderer::drawTexturesWindow() const
         case TextureType::FLAT: {
           std::vector<uint8_t> bin = image::ConvertRawToFlat(rawImage);
           FlatTexture flatTexture{ texture.name };
-          flatTexture.data = std::move(bin);
+          // copy bin
+          flatTexture.data = bin;
           flatTexture.Write();
 
-          texture.data = std::move(flatTexture.data);
+          texture.data = std::move(bin);
           break;
         }
         case TextureType::WALL: {
@@ -743,63 +748,86 @@ bool EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
   return deleteRequested;
 }
 
+void EditorRenderer::createDropdown(const char *label,
+                                    const std::string_view previewValue,
+                                    const int itemCount,
+                                    const std::function<bool(int)> &isSelected,
+                                    const std::function<std::string(int)> &itemLabel,
+                                    const std::function<void(int)> &onSelect,
+                                    const std::function<void()> &drawFooter)
+{
+  if (!ImGui::BeginCombo(label, previewValue.data())) {
+    return;
+  }
+
+  for (int i = 0; i < itemCount; i++) {
+    const bool selected = isSelected(i);
+    const std::string labelText = itemLabel(i);
+
+    if (ImGui::Selectable(labelText.c_str(), selected)) {
+      onSelect(i);
+    }
+
+    if (selected) {
+      ImGui::SetItemDefaultFocus();
+    }
+  }
+
+  if (drawFooter) {
+    drawFooter();
+  }
+
+  ImGui::EndCombo();
+}
+
 void EditorRenderer::createSidedefSelect(const char *label,
                                          const std::vector<EditorSidedef> &sidedefs,
                                          int16_t &currentItem,
                                          const bool hasReset)
 {
-  if (ImGui::BeginCombo(label, std::to_string(currentItem).c_str())) {
-    // handling -1 option separately
-    if (hasReset || currentItem == -1) {
-      const bool isReset = currentItem == -1;
+  const bool hasResetOption = hasReset || currentItem == -1;
+  const int resetOptionOffset = hasResetOption ? 1 : 0;
+  const int itemCount = static_cast<int>(sidedefs.size()) + resetOptionOffset;
 
-      const auto resetLabel = "-1";
-      if (ImGui::Selectable(resetLabel, isReset)) {
+  createDropdown(
+    label,
+    std::to_string(currentItem),
+    itemCount,
+    [currentItem, hasResetOption](const int optionIndex) {
+      if (hasResetOption && optionIndex == 0) {
+        return currentItem == -1;
+      }
+
+      if (currentItem < 0) {
+        return false;
+      }
+
+      const int sidedefIndex = optionIndex - (hasResetOption ? 1 : 0);
+      return static_cast<int>(currentItem) == sidedefIndex;
+    },
+    [hasResetOption](const int optionIndex) {
+      if (hasResetOption && optionIndex == 0) {
+        return std::string("-1");
+      }
+
+      return std::to_string(optionIndex - (hasResetOption ? 1 : 0));
+    },
+    [&currentItem, hasResetOption](const int optionIndex) {
+      if (hasResetOption && optionIndex == 0) {
         currentItem = -1;
-      }
-    }
-
-    for (size_t i = 0; i < sidedefs.size(); i++) {
-      const bool is_selected = static_cast<size_t>(currentItem) == i;
-      std::string optionLabel = std::to_string(i);
-
-      if (ImGui::Selectable(optionLabel.c_str(), is_selected)) {
-        currentItem = static_cast<int32_t>(i);
+        return;
       }
 
-      // Set the initial focus when opening the combo (scrolling to selection)
-      if (is_selected) {
-        ImGui::SetItemDefaultFocus();
-      }
-    }
-    ImGui::EndCombo();
-  }
+      currentItem = static_cast<int16_t>(optionIndex - (hasResetOption ? 1 : 0));
+    });
 }
 
 void EditorRenderer::createSelect(const char *label,
                                   const std::vector<std::uint16_t> &options,
-                                  std::uint16_t currentItem,
+                                  const uint16_t currentItem,
                                   const std::function<void(uint16_t)> &setCurrElem,
                                   const std::function<void()> &addNewElem)
-{
-  if (ImGui::BeginCombo(label, std::format("Level: {}", currentItem).c_str())) {
-    for (const std::uint16_t &option : options) {
-      const bool is_selected = currentItem == option;
-      if (ImGui::Selectable(std::format("Level {}", option).c_str(), is_selected)) {
-        setCurrElem(option);
-      }
-      // Set the initial focus when opening the combo (scrolling to selection)
-      if (is_selected) {
-        ImGui::SetItemDefaultFocus();
-      }
-    }
-
-    if (ImGui::Button("Add New")) {
-      addNewElem();
-    }
-    ImGui::EndCombo();
-  }
-}
+{}
 
 
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
