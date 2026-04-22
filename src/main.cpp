@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
   auto renderer = std::make_shared<Renderer>(sdlWindow, level);
 
 
-  GameState gameState{ .player = { .x = 100 << FRAC_BITS,
+  GameState gameState{ .player = { .x = 0 << FRAC_BITS,
                                    .y = 0 << FRAC_BITS,
                                    .z = 10 << FRAC_BITS,
                                    .velocity = 30 << FRAC_BITS,

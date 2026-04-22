@@ -588,7 +588,7 @@ void Renderer::RenderSSector(const SubSector &subsector)
   }
 
   if (frontsector->ceilingHeight > m_player->z) {
-    m_ceilPlane = FindVisPlane(frontsector->ceilingHeight, frontsector->floorTextureIndex, frontsector->lightLevel);
+    m_ceilPlane = FindVisPlane(frontsector->ceilingHeight, frontsector->ceilingTextureIndex, frontsector->lightLevel);
   } else {
     m_ceilPlane = nullptr;
   }

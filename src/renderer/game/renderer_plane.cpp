@@ -53,7 +53,7 @@ void Renderer::DrawSpan(drawspan_t &ds) const
 
   for (uint32_t *curr = ptr; curr <= ptr + (ds.x2 - ds.x1); curr++) {
     // completely stolen from Doom source code, no idea how to works
-    const int spot = ((ds.yFrac >> (16-6)) & (63 * 64)) + ((ds.xFrac >> 16) & 63);
+    const int spot = ((ds.yFrac >> (16-6)) & (127 * 128)) + ((ds.xFrac >> 16) & 127);
 
     if (ds.textureId >= 0) {
       const uint8_t palIndex = m_texManager->flatTextures[ds.textureId].data[spot];
@@ -76,8 +76,8 @@ void Renderer::MapPlane(const Visplane &plane, const int y, const int x1, const 
   const fixed_t length = FixedMul(distance, m_distScale[x1]);
   const angle_t angle = m_player->angle + m_xToViewAngle[x1];
 
-  const fixed_t xFrac = m_centerXFrac + FixedMul(finesine[(angle + ANG90) >> ANGLE_TO_FINE_SHIFT], length);
-  const fixed_t yFrac = -m_centerYFrac - FixedMul(finesine[angle >> ANGLE_TO_FINE_SHIFT], length);
+  const fixed_t xFrac = m_player->x + FixedMul(finesine[(angle + ANG90) >> ANGLE_TO_FINE_SHIFT], length);
+  const fixed_t yFrac = -m_player->y - FixedMul(finesine[angle >> ANGLE_TO_FINE_SHIFT], length);
 
   drawspan_t ds{ y, x1, x2, xStep, yStep, xFrac, yFrac, plane.textureIndex };
   DrawSpan(ds);

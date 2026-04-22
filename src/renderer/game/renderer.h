@@ -110,9 +110,10 @@ private:
   std::vector<ClipRange> m_solidSegs;
   std::vector<Visplane> m_visplanes;
 
-  // distance to each row from the center (player view)
+  // when multiplied with the height of an object gives a horizontal distance to each row from the center
+  // z = height * focal / dy
   std::vector<fixed_t> m_ySlope;
-  // essentially 1/cos(angle)
+  // essentially 1/cos(angle), adjust for fish-eye effect
   std::vector<int> m_distScale;
 
   // maps a fine angle onto screen x

@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <vector>
 
-constexpr uint16_t FLAT_TEXTURE_SIZE = 64;
+constexpr uint16_t FLAT_TEXTURE_SIZE = 128;
 
 enum class TextureType : int { FLAT, WALL };
 
