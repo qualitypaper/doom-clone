@@ -155,7 +155,9 @@ std::vector<FlatTexture> FlatTexture::ReadAll()
 
 // TODO: implement texture read/write for walls
 void WallTexture::Write()
-{}
+{
+
+}
 
 void WallTexture::Read()
 {}

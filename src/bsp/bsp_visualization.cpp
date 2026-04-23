@@ -1,5 +1,5 @@
-#include "../core/math_utils.h"
 #include "bsp.h"
+#include "core/math_utils.h"
 #include "imgui/imgui.h"
 #include "renderer/editor/editor_renderer.h"
 
@@ -17,13 +17,16 @@ void BSPBuilder::DrawBoundingBox(const SdlWindow &sdlWindow,
   const ImVec2 _max{ static_cast<float>(FixedToDouble(boundingBox[1])),
                      static_cast<float>(FixedToDouble(boundingBox[0])) };
 
-  const SDL_Rect _rect{ static_cast<int>(_min.x),
-                        static_cast<int>(_max.y),
-                        static_cast<int>(_max.x - _min.x),
-                        static_cast<int>(_min.y - _max.y) };
+  const ImVec2 _minCenter = math_utils::fromCenterCoordinates(_min, sdlWindow.GetWidth(), sdlWindow.GetHeight());
+  const ImVec2 _maxCenter = math_utils::fromCenterCoordinates(_max, sdlWindow.GetWidth(), sdlWindow.GetHeight());
+
+  const SDL_Rect rect{ static_cast<int>(_minCenter.x),
+                        static_cast<int>(_maxCenter.y),
+                        static_cast<int>(_maxCenter.x - _minCenter.x),
+                        static_cast<int>(_minCenter.y - _maxCenter.y) };
 
   SDL_SetRenderDrawColor(sdlWindow.GetRenderer(), r, g, b, a);
-  SDL_RenderDrawRect(sdlWindow.GetRenderer(), &_rect);
+  SDL_RenderDrawRect(sdlWindow.GetRenderer(), &rect);
 }
 
 void BSPBuilder::DrawBoundingBoxes(const SdlWindow &sdlWindow, const Node &root)
@@ -40,10 +43,8 @@ void BSPBuilder::DrawSubsectors(const SdlWindow &sdlWindow, const Level &level)
     for (int i = subsector.firstSegIndex; i < subsector.segCount + subsector.firstSegIndex; i++) {
       const auto &seg = level.segments[i];
 
-      const ImVec2 mappedStart =
-        seg.start->fromCenterCoords(sdlWindow.GetRenderWidth(), sdlWindow.GetRenderHeight()).toImVec();
-      const ImVec2 mappedEnd =
-        seg.end->fromCenterCoords(sdlWindow.GetRenderWidth(), sdlWindow.GetRenderHeight()).toImVec();
+      const ImVec2 mappedStart = seg.start->fromCenterCoords(sdlWindow.GetWidth(), sdlWindow.GetHeight()).toImVec();
+      const ImVec2 mappedEnd = seg.end->fromCenterCoords(sdlWindow.GetWidth(), sdlWindow.GetHeight()).toImVec();
 
       SDL_RenderDrawLine(sdlWindow.GetRenderer(), mappedStart.x, mappedStart.y, mappedEnd.x, mappedEnd.y);
     }
@@ -61,12 +62,12 @@ void BSPBuilder::DrawSplittingLine(const SdlWindow &sdlWindow, const Node &root)
 
   const ImVec2 lineStart = math_utils::fromCenterCoordinates(
     ImVec2{ static_cast<float>(rootX - dirX * lineLen), static_cast<float>(rootY - dirY * lineLen) },
-    sdlWindow.GetRenderWidth(),
-    sdlWindow.GetRenderHeight());
+    sdlWindow.GetWidth(),
+    sdlWindow.GetHeight());
   const ImVec2 lineEnd = math_utils::fromCenterCoordinates(
     ImVec2{ static_cast<float>(rootX + dirX * lineLen), static_cast<float>(rootY + dirY * lineLen) },
-    sdlWindow.GetRenderWidth(),
-    sdlWindow.GetRenderHeight());
+    sdlWindow.GetWidth(),
+    sdlWindow.GetHeight());
 
   SDL_SetRenderDrawColor(sdlWindow.GetRenderer(), 255, 255, 0, 255);
   SDL_RenderDrawLine(sdlWindow.GetRenderer(),
@@ -107,7 +108,10 @@ void BSPBuilder::Visualize(const SdlWindow &sdlWindow, InputState &input, const 
   SDL_RenderPresent(sdlWindow.GetRenderer());
 }
 
-size_t BSPBuilder::MaxDepth() const { return MaxDepthRecursive(0); }
+size_t BSPBuilder::MaxDepth() const
+{
+  return MaxDepthRecursive(0);
+}
 
 size_t BSPBuilder::MaxDepthRecursive(const int16_t currentIndex) const
 {

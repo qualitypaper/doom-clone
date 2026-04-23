@@ -1,8 +1,8 @@
 #ifndef DOOMCLONE_DEFS_H
 #define DOOMCLONE_DEFS_H
-#include "../src/core/serialization/serialization.h"
 #include "config.h"
 #include "core/fixed_math.h"
+#include "core/serialization/serialization.h"
 #include "imgui/imgui.h"
 #include "tables.h"
 
@@ -10,6 +10,10 @@
 #include <cstdint>
 #include <vector>
 
+struct Post
+{
+
+};
 
 using lumpName = std::array<char8_t, 8>;
 
@@ -359,8 +363,8 @@ struct Node
   fixed_t x = 0, y = 0;
   fixed_t dx = 0, dy = 0;
 
-  std::array<fixed_t, 4> leftBoundingBox{ INT32_MAX, INT32_MIN, INT32_MIN, INT32_MAX };
-  std::array<fixed_t, 4> rightBoundingBox{ INT32_MAX, INT32_MIN, INT32_MIN, INT32_MAX };
+  std::array<fixed_t, 4> leftBoundingBox{ INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX };
+  std::array<fixed_t, 4> rightBoundingBox{ INT32_MIN, INT32_MIN, INT32_MAX, INT32_MAX };
 
   int16_t leftChild = -1, rightChild = -1;
 

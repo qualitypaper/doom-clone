@@ -1,7 +1,6 @@
 #include "bsp.h"
 
-#include "../core/math_utils.h"
-#include "config.h"
+#include "core/math_utils.h"
 #include "renderer/game/renderer_helper.h"
 
 #include <iostream>
@@ -10,17 +9,17 @@
 void BSPBuilder::AdjustBoundingBoxes(const std::vector<Seg> &segs, std::array<fixed_t, 4> &boundingBox) const
 {
   for (const auto &seg : segs) {
-    const Vertex start = vertices[seg.startVertex].fromCenterCoords(WINDOW_WIDTH, WINDOW_HEIGHT);
-    const Vertex end = vertices[seg.endVertex].fromCenterCoords(WINDOW_WIDTH, WINDOW_HEIGHT);
+    const Vertex start = vertices[seg.startVertex];
+    const Vertex end = vertices[seg.endVertex];
 
-    boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(start.y));
-    boundingBox[0] = std::min(boundingBox[0], static_cast<fixed_t>(end.y));
+    boundingBox[0] = std::max(boundingBox[0], static_cast<fixed_t>(start.y));
+    boundingBox[0] = std::max(boundingBox[0], static_cast<fixed_t>(end.y));
 
     boundingBox[1] = std::max(boundingBox[1], static_cast<fixed_t>(start.x));
     boundingBox[1] = std::max(boundingBox[1], static_cast<fixed_t>(end.x));
 
-    boundingBox[2] = std::max(boundingBox[2], static_cast<fixed_t>(start.y));
-    boundingBox[2] = std::max(boundingBox[2], static_cast<fixed_t>(end.y));
+    boundingBox[2] = std::min(boundingBox[2], static_cast<fixed_t>(start.y));
+    boundingBox[2] = std::min(boundingBox[2], static_cast<fixed_t>(end.y));
 
     boundingBox[3] = std::min(boundingBox[3], static_cast<fixed_t>(start.x));
     boundingBox[3] = std::min(boundingBox[3], static_cast<fixed_t>(end.x));

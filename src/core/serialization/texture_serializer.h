@@ -91,7 +91,7 @@ public:
   void ConvertFlatToWall(size_t index);
   void ConvertWallToFlat(size_t index);
 
-  [[nodiscard]] void LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const;
+  void LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const;
   void ConvertFlatToWall(FlatTexture &texture);
 
   [[nodiscard]] std::optional<FlatTexture *> GetFlatTexture(size_t index);
