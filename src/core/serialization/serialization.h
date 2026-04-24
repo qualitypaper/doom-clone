@@ -63,6 +63,45 @@ public:
   }
 };
 
+class VectorReader
+{
+public:
+  explicit VectorReader(const std::vector<uint8_t> &_buffer) : buffer(_buffer), pos(0) {}
+
+  const std::vector<uint8_t> &buffer;
+  size_t pos;
+public:
+
+  template<typename T>
+  void ReadRaw(T &data)
+  {
+    static_assert(std::is_trivially_copyable_v<T>);
+
+    if (pos + sizeof(T) > buffer.size()) {
+      throw std::runtime_error("Attempt to read beyond the end of the buffer.");
+    }
+
+    data = *reinterpret_cast<const T *>(buffer.data() + pos);
+    pos += sizeof(T);
+  }
+
+  template<typename T>
+  void ReadVector(std::vector<T> &vec, const bool readSize = true)
+  {
+    size_t n = SIZE_MAX;
+    if (readSize) {
+      ReadRaw(n);
+      vec.reserve(n);
+    }
+
+    for (size_t i = 0; i < n && pos < buffer.size(); i++) {
+      T val{};
+      val.deserialize(*this);
+      vec.emplace_back(std::move(val));
+    }
+  }
+};
+
 class FileWriter
 {
 public:
@@ -141,13 +180,13 @@ public:
   template<typename T>
   void ReadVector(std::vector<T> &vec, const bool readSize = true)
   {
-    size_t n;
+    size_t n = SIZE_MAX;
     if (readSize) {
       ReadRaw(n);
       vec.reserve(n);
     }
 
-    for (size_t i = 0; IsStreamGood() && (!readSize || (readSize && i < n)); i++) {
+    for (size_t i = 0; IsStreamGood() && i < n; i++) {
       T val{};
       if constexpr (std::is_trivial_v<T>) {
         ReadRaw(val);

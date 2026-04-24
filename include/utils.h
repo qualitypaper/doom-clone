@@ -19,3 +19,8 @@ private:
   std::string_view format;
   size_t delayCounter = 0, delay;
 };
+
+template<typename T>
+bool IsSignedIntPtr(const T* /*ptr*/) {
+  return std::is_integral_v<T> && std::is_signed_v<T> && !std::is_same_v<T,bool>;
+}

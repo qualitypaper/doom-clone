@@ -43,7 +43,7 @@ bool LoadTextureFromMemory(const void *data,
 
 void FlatTexture::Write()
 {
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  WadSerializer wadSerializer(DATA_PATH);
   if (!wadSerializer.Load(true)) {
     return;
   }
@@ -103,7 +103,7 @@ void FlatTexture::Write()
 
 void FlatTexture::Read()
 {
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  WadSerializer wadSerializer(DATA_PATH);
 
   if (!wadSerializer.Load(false)) {
     return;
@@ -116,7 +116,7 @@ void FlatTexture::Read()
     return;
   }
 
-  FileReader fr(SAVED_LEVEL_PATH);
+  FileReader fr(DATA_PATH);
   LumpData flatLump = WadSerializer::ReadLump(fr, *entry.value());
 
   this->data = std::move(flatLump.rawData);
@@ -124,7 +124,7 @@ void FlatTexture::Read()
 
 std::vector<FlatTexture> FlatTexture::ReadAll()
 {
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  WadSerializer wadSerializer(DATA_PATH);
 
   if (!wadSerializer.Load(false)) {
     return {};
@@ -153,23 +153,116 @@ std::vector<FlatTexture> FlatTexture::ReadAll()
   return std::move(res);
 }
 
-// TODO: implement texture read/write for walls
 void WallTexture::Write()
 {
+  WadSerializer wadSerializer(DATA_PATH);
 
+  if (!wadSerializer.Load(true)) {
+    throw std::runtime_error("Couldn't read a data file while reading a wall texture.");
+  }
+
+  std::vector<LumpData> &lumps = wadSerializer.GetLoadedLumps();
+
+  size_t index = 0;
+  // new texture
+  const std::optional<directoryEntry *> &pEnd = wadSerializer.FindDirectoryEntry(WadSerializer::MakeLumpName("P_END"));
+
+  if (!pEnd.has_value()) {
+    std::vector<directoryEntry> &directory = wadSerializer.GetDirectory();
+
+    directory.emplace_back(0, 0, WadSerializer::MakeLumpName("P_START"));
+    directory.emplace_back(0, 0, WadSerializer::MakeLumpName("P_END"));
+    index = directory.size() - 1;
+  } else {
+    index = pEnd.value() - wadSerializer.GetDirectory().data();
+  }
+
+  const auto it = std::ranges::find_if(lumps, [&](const LumpData &lump) {
+    return lump.entry.name == name;
+  });
+
+  LumpData wallLump{};
+  wallLump.entry.name = name;
+
+  std::vector<uint8_t> _binData;
+  VectorWriter writer{ _binData };
+  writer.WriteVector(data);
+
+  wallLump.rawData = std::move(_binData);
+
+  size_t storeIndex;
+
+  if (it == lumps.end()) {
+    lumps.insert(lumps.begin() + index, std::move(wallLump));
+    storeIndex = index;
+  } else {
+    *it = std::move(wallLump);
+    storeIndex = it - lumps.begin();
+  }
+
+  wadSerializer.SetLumps(std::move(lumps));
+  wadSerializer.Write();
+
+  VectorReader reader(wadSerializer.GetLoadedLumps()[storeIndex].rawData);
+  reader.ReadVector(this->data, false);
 }
 
 void WallTexture::Read()
-{}
+{
+  WadSerializer wadSerializer(DATA_PATH);
+
+  if (!wadSerializer.Load(false)) {
+    throw std::runtime_error("Couldn't read a data file while reading a wall texture.");
+  }
+
+  const std::optional<directoryEntry *> &directoryEntry = wadSerializer.FindDirectoryEntry(this->name);
+
+  if (!directoryEntry.has_value()) {
+    throw std::runtime_error(std::format("Couldn't find directory entry with name: {}", (char *)this->name.data()));
+  }
+
+  const LumpData lumpData = std::move(wadSerializer.ReadLump(*directoryEntry.value()));
+
+  size_t index = 0;
+  // width and height are stored as uint16_t
+  uint16_t width, height;
+  memcpy(&width, lumpData.rawData.data(), sizeof(uint16_t));
+  index += sizeof(uint16_t);
+
+  memcpy(&height, lumpData.rawData.data() + index, sizeof(uint16_t));
+  // skip top/left offsets for now, they are stored as int16_t
+  index += 2 * sizeof(int16_t);
+
+  this->width = width;
+  this->height = height;
+
+  // move data from the current index to the end of the lump data into this texture's data vector
+  const std::vector<uint8_t> texData(std::make_move_iterator(lumpData.rawData.begin() + index),
+                                     std::make_move_iterator(lumpData.rawData.end()));
+
+  VectorReader reader(texData);
+  reader.ReadVector(this->data, false);
+}
 
 void TextureManager::LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const
 {
   assert(palManager);
-  const RawImage &rawImage = image::LoadRawImage(path, *palManager);
-  std::vector<uint8_t> rawData = image::ConvertRawToFlat(rawImage);
+  const RawImage<uint8_t> &rawImage = image::LoadRawImage<uint8_t>(path, *palManager);
+  std::vector<uint8_t> rawData = image::ConvertRawToFlat<uint8_t>(rawImage);
 
   outFlatTexture.data = std::move(rawData);
   outFlatTexture.width = outFlatTexture.height = FLAT_TEXTURE_SIZE;
+}
+
+void TextureManager::LoadWallTexture(const std::filesystem::path &path, WallTexture &outWallTexture) const
+{
+  assert(palManager);
+  const RawImage<int16_t> &rawImage = image::LoadRawImage<int16_t>(path, *palManager);
+  Patch patch = image::ConvertRawToWall(rawImage);
+
+  outWallTexture.data = std::move(patch.posts);
+  outWallTexture.width = patch.width;
+  outWallTexture.height = patch.height;
 }
 
 void TextureManager::ConvertFlatToWall(FlatTexture &texture)
@@ -178,43 +271,19 @@ void TextureManager::ConvertFlatToWall(FlatTexture &texture)
     return ft.name == texture.name;
   });
   if (it == flatTextures.end()) {
-    std::cerr << "Texture: " << (char*) texture.name.data() << " wasn't found\n";
+    std::cerr << "Texture: " << (char *)texture.name.data() << " wasn't found\n";
     return;
   }
 
   WallTexture wallTexture{ texture.name };
+  const RawImage<uint8_t> rawImage{ texture.width, texture.height, std::move(texture.data) };
+  wallTexture.data = std::move(image::ConvertRawToWall<uint8_t>(rawImage).posts);
 
-  // TODO: convert into wall data format
-  wallTexture.data = std::move(texture.data);
-  wallTexture.width = wallTexture.height = 64;
+  wallTexture.width = texture.width;
+  wallTexture.height = texture.height;
 
   wallTextures.emplace_back(wallTexture);
   flatTextures.erase(it);
-}
-
-void TextureManager::ConvertFlatToWall(const size_t index)
-{
-  if (index >= flatTextures.size()) {
-    std::cerr << "Index is bigger than flatTextures array: " << index << '\n';
-    return;
-  }
-
-  ConvertFlatToWall(flatTextures[index]);
-}
-
-void TextureManager::ConvertWallToFlat(const size_t index)
-{
-  if (index >= wallTextures.size())
-    return;
-
-  WallTexture &wallTexture = wallTextures.at(index);
-  FlatTexture flatTexture{ wallTexture.name };
-
-  // TODO: convert into flat data format
-  flatTexture.data = std::move(wallTexture.data);
-  flatTextures.emplace_back(flatTexture);
-
-  wallTextures.erase(wallTextures.begin() + index);
 }
 
 std::optional<FlatTexture *> TextureManager::GetFlatTexture(const size_t index)
@@ -237,4 +306,8 @@ std::string TextureManager::GetFlatTextureName(const size_t index)
 void TextureManager::AddDefaultFlatTexture()
 {
   flatTextures.emplace_back(WadSerializer::MakeLumpName(std::format(DEFAULT_FLAT_TEX_FORMAT, flatTextures.size())));
+}
+void TextureManager::AddDefaultWallTexture()
+{
+  wallTextures.emplace_back(WadSerializer::MakeLumpName(std::format("WTEX{}", wallTextures.size())));
 }

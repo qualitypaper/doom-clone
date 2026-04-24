@@ -66,7 +66,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
                                   uint16_t &numberOfLevels,
                                   const std::unique_ptr<BspLevel> &bspLevel) const
 {
-  const bool fileExists = std::filesystem::exists(SAVED_LEVEL_PATH);
+  const bool fileExists = std::filesystem::exists(DATA_PATH);
 
   std::vector<LumpData> allLumps;
   header _header{};
@@ -76,7 +76,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   bool found = false;
 
   if (fileExists) {
-    WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+    WadSerializer wadSerializer(DATA_PATH);
     if (wadSerializer.Load(true)) {
       _header = wadSerializer.GetHeader();
       allLumps = std::move(wadSerializer.GetLoadedLumps());
@@ -120,7 +120,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
     allLumps.push_back(std::move(newLevelData));
   }
 
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  WadSerializer wadSerializer(DATA_PATH);
   wadSerializer.SetHeader(_header);
   wadSerializer.SetLumps(std::move(allLumps));
   wadSerializer.Write();
@@ -165,13 +165,13 @@ void EditorLevel::Save(const std::array<char8_t, 8> _name,
 
 void EditorLevel::Load(const uint16_t width, const uint16_t height)
 {
-  FileReader fr(SAVED_LEVEL_PATH);
+  FileReader fr(DATA_PATH);
   if (!fr.IsStreamGood()) {
-    std::cerr << "Failed to open " << SAVED_LEVEL_PATH << " for loading. Using hardcoded level data." << '\n';
+    std::cerr << "Failed to open " << DATA_PATH << " for loading. Using hardcoded level data." << '\n';
     return;
   }
 
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  WadSerializer wadSerializer(DATA_PATH);
   if (!wadSerializer.Load(false)) {
     throw std::runtime_error("Failed to read WAD file.");
   }
@@ -224,9 +224,9 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
  */
 size_t EditorLevel::Load(std::unique_ptr<Level> &level)
 {
-  FileReader fr(SAVED_LEVEL_PATH);
+  FileReader fr(DATA_PATH);
 
-  WadSerializer wadSerializer(SAVED_LEVEL_PATH);
+  WadSerializer wadSerializer(DATA_PATH);
   if (!wadSerializer.Load(false)) {
     throw std::runtime_error("Failed to read WAD file.");
   }

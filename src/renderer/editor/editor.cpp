@@ -422,8 +422,8 @@ void Editor::ChangeLevel(const uint16_t newLevelNum) const
   const lumpName levelName = Level::MakeLevelName(newLevelNum);
 
   auto newLevel = std::make_unique<Level>(levelName);
-
   EditorLevel::Load(newLevel);
+
   state->level = std::make_unique<EditorLevel>(*newLevel, newLevelNum, this->state->width, this->state->height);
 }
 

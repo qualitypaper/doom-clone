@@ -75,7 +75,7 @@ public:
   bool Load(bool readLumps = false);
   bool LoadHeader(FileReader &fr);
   bool LoadDirectory(FileReader &fr);
-  LumpData ReadLump(const directoryEntry &entry) const;
+  [[nodiscard]] LumpData ReadLump(const directoryEntry &entry) const;
 
   static LumpData ReadLump(FileReader &fr, const directoryEntry &entry);
   static std::vector<LumpData> ReadLumps(FileReader &fr, const std::vector<directoryEntry> &entries);

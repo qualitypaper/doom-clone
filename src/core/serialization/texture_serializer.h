@@ -19,13 +19,6 @@ struct Texture
   Texture(const lumpName &_name, const TextureType _type, const int _width, const int _height)
     : type(_type), name(_name), width(_width), height(_height)
   {}
-  Texture(const lumpName &_name,
-          std::vector<uint8_t> _data,
-          const TextureType _type,
-          const int _width,
-          const int _height)
-    : type(_type), name(_name), data(std::move(_data)), width(_width), height(_height)
-  {}
 
   virtual ~Texture() = default;
 
@@ -36,7 +29,6 @@ struct Texture
 
   TextureType type;
   lumpName name;
-  std::vector<uint8_t> data;
   int width, height;
 };
 
@@ -61,6 +53,8 @@ public:
   void Read() override;
 
   static std::vector<FlatTexture> ReadAll();
+
+  std::vector<uint8_t> data;
 };
 
 class WallTexture : public Texture
@@ -72,6 +66,8 @@ public:
 
   void Write() override;
   void Read() override;
+
+  std::vector<Post> data;
 };
 
 class TextureManager
@@ -88,15 +84,15 @@ public:
   std::vector<FlatTexture> flatTextures;
   std::vector<WallTexture> wallTextures;
 
-  void ConvertFlatToWall(size_t index);
-  void ConvertWallToFlat(size_t index);
-
   void LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const;
+  void LoadWallTexture(const std::filesystem::path &path, WallTexture &outWallTexture) const;
   void ConvertFlatToWall(FlatTexture &texture);
 
   [[nodiscard]] std::optional<FlatTexture *> GetFlatTexture(size_t index);
   [[nodiscard]] std::string GetFlatTextureName(size_t index);
+
   void AddDefaultFlatTexture();
+  void AddDefaultWallTexture();
 };
 
 bool LoadTextureFromMemory(const void *data, int width, int height, SDL_Renderer *renderer, SDL_Texture **out_texture);

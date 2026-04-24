@@ -20,4 +20,4 @@ constexpr uint8_t DESIRED_FRAMERATE = 144;
 
 constexpr double MOUSE_SENSITIVITY = 1;
 
-inline const std::string_view SAVED_LEVEL_PATH = PROJECT_ROOT_PATH "/levels.wad";
+inline constexpr std::string_view DATA_PATH = PROJECT_ROOT_PATH "/doom.wad";
