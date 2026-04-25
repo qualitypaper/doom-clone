@@ -53,7 +53,8 @@ void Renderer::DrawSpan(drawspan_t &ds) const
 
   for (uint32_t *curr = ptr; curr <= ptr + (ds.x2 - ds.x1); curr++) {
     // completely stolen from Doom source code, no idea how to works
-    const int spot = ((ds.yFrac >> (16-6)) & (127 << 7)) + ((ds.xFrac >> 16) & 127);
+    const int spot = ((ds.yFrac >> (16 - 6)) & ((FLAT_TEXTURE_SIZE - 1) * FLAT_TEXTURE_SIZE))
+      + ((ds.xFrac >> 16) & (FLAT_TEXTURE_SIZE - 1));
 
     if (ds.textureId >= 0) {
       const uint8_t palIndex = m_texManager->flatTextures[ds.textureId].data[spot];

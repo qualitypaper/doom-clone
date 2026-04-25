@@ -11,6 +11,8 @@
 #include "imgui/backends/imgui_impl_sdl2.h"
 #include "imgui/imgui.h"
 
+#include "log.h"
+
 #include <SDL.h>
 #include <SDL_events.h>
 
@@ -111,6 +113,12 @@ void HandleModeChange(GameState &gameState, const std::shared_ptr<SdlWindow> &sd
 
 int main(int argc, char *argv[])
 {
+  (void)argc;
+  (void)argv;
+
+  Log::Init();
+  DOOM_CORE_INFO("Logger initialized");
+
   std::shared_ptr<Level> level;
   size_t numOfLevels;
 
@@ -141,10 +149,11 @@ int main(int argc, char *argv[])
     paletteManager = std::make_unique<PaletteManager>(PROJECT_ROOT_PATH "PLAYPAL.pal");
 
     std::vector<FlatTexture> flatTextures = FlatTexture::ReadAll();
+    std::vector<PatchView> wallTextures = PatchView::ReadAll();
     // TODO: load wall textures
 
     textureManager =
-      std::make_unique<TextureManager>(std::move(flatTextures), std::vector<WallTexture>(), paletteManager.get());
+      std::make_unique<TextureManager>(std::move(flatTextures), std::move(wallTextures), paletteManager.get());
   }
 
   auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, *textureManager, *paletteManager);
@@ -213,7 +222,7 @@ int main(int argc, char *argv[])
       frameCount++;
       fpsAccumulator += frameTime;
       if (fpsAccumulator >= 1.0) {
-        std::printf("FPS: %d\n", frameCount);
+        DOOM_INFO("FPS: {}", frameCount);
         frameCount = 0;
         fpsAccumulator = 0.0;
       }

@@ -10,9 +10,9 @@
 #include <cstdint>
 #include <vector>
 
-constexpr uint16_t FLAT_TEXTURE_SIZE = 128;
+constexpr uint16_t FLAT_TEXTURE_SIZE = 64;
 
-enum class TextureType : int { FLAT, WALL };
+enum class TextureType : int { FLAT, PATCH };
 
 struct Texture
 {
@@ -57,17 +57,42 @@ public:
   std::vector<uint8_t> data;
 };
 
-class WallTexture : public Texture
+// defines a wall texture, which is quite similar to a patch in Doom
+struct PatchView : Texture
 {
-public:
-  explicit WallTexture(const lumpName _name) : Texture(_name, TextureType::WALL, -1, -1)
+  explicit PatchView(const lumpName _name) : Texture(_name, TextureType::PATCH, -1, -1)
   {}
-  ~WallTexture() override = default;
+  ~PatchView() override = default;
 
   void Write() override;
   void Read() override;
+  static std::vector<PatchView> ReadAll();
 
+  int16_t topOffset{}, leftOffset{};
   std::vector<Post> data;
+};
+
+struct WallTexture
+{
+  explicit WallTexture(const lumpName _name) : mapTexture(_name)
+  {}
+
+  MapTexture mapTexture;
+
+  void Write();
+  void Read();
+
+  void AddPatch()
+  {
+    mapTexture.patches.emplace_back(0, 0, -1);
+  }
+
+  std::vector<MapPatch> &GetPatches()
+  {
+    return mapTexture.patches;
+  }
+
+  static std::vector<WallTexture> ReadAll();
 };
 
 class TextureManager
@@ -75,23 +100,25 @@ class TextureManager
 public:
   TextureManager() = default;
   TextureManager(std::vector<FlatTexture> _flatTextures,
-                 std::vector<WallTexture> _wallTextures,
+                 std::vector<PatchView> _wallTextures,
                  PaletteManager *_palManager)
-    : palManager(_palManager), flatTextures(std::move(_flatTextures)), wallTextures(std::move(_wallTextures))
+    : palManager(_palManager), flatTextures(std::move(_flatTextures)), patches(std::move(_wallTextures))
   {}
 
   PaletteManager *palManager = nullptr;
   std::vector<FlatTexture> flatTextures;
+  std::vector<PatchView> patches;
   std::vector<WallTexture> wallTextures;
 
   void LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const;
-  void LoadWallTexture(const std::filesystem::path &path, WallTexture &outWallTexture) const;
+  void LoadWallTexture(const std::filesystem::path &path, PatchView &outWallTexture) const;
   void ConvertFlatToWall(FlatTexture &texture);
 
   [[nodiscard]] std::optional<FlatTexture *> GetFlatTexture(size_t index);
   [[nodiscard]] std::string GetFlatTextureName(size_t index);
 
   void AddDefaultFlatTexture();
+  void AddDefaultPatch();
   void AddDefaultWallTexture();
 };
 

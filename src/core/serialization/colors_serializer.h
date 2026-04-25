@@ -28,7 +28,7 @@ struct RGB
     serialization::serialize(w, b);
   }
 
-  [[nodiscard]] uint32_t ToU32() const { return (r << 24) | (g << 16) | (b << 8) | 255; }
+  [[nodiscard]] uint32_t ToU32(const uint8_t alpha = 255) const { return (r << 24) | (g << 16) | (b << 8) | alpha; }
 };
 
 

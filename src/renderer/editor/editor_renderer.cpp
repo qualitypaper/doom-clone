@@ -158,7 +158,16 @@ void EditorRenderer::Render() const
   ImGui::Begin("HUDOverlay", nullptr, flags);
 
   // 3. Draw "screen-level" elements
-  ImGui::TextColored(ImVec4(1, 1, 0, 1), "FPS: %.1f", io.Framerate);
+  // draw FPS in the top right corner
+
+  const std::string fpsText = std::format("FPS: {:.1f}", io.Framerate);
+  const ImVec2 textSize = ImGui::CalcTextSize(fpsText.c_str());
+
+  constexpr float kPadding = 10.0f;
+  const float rightX = ImGui::GetWindowSize().x - textSize.x - kPadding;
+
+  ImGui::SetCursorPos(ImVec2(rightX, kPadding));
+  ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "%s", fpsText.c_str());
 
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
@@ -553,21 +562,21 @@ void EditorRenderer::drawTexturesWindow() const
       }
     }
 
-    if (ImGui::CollapsingHeader("Wall textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui::CollapsingHeader("Patches", ImGuiTreeNodeFlags_DefaultOpen)) {
       if (ImGui::Button("Add##wallTex")) {
-        m_editor->state->texManager->AddDefaultWallTexture();
+        m_editor->state->texManager->AddDefaultPatch();
       }
 
-      for (size_t i = 0; i < textureManager.wallTextures.size(); ++i) {
+      for (size_t i = 0; i < textureManager.patches.size(); ++i) {
         renderTextureEntry(
-          textureManager.wallTextures[i],
+          textureManager.patches[i],
           i,
           "wall",
           [&](Texture &baseTexture) {
-            auto &texture = dynamic_cast<WallTexture &>(baseTexture);
+            auto &texture = dynamic_cast<PatchView &>(baseTexture);
 
             auto &originPath = s_flatTextureOriginPaths[i << 32];
-            if (ImGui::InputText(std::format("Origin##wall{}", i).c_str(), originPath.data(), originPath.size())) {
+            if (ImGui::InputText(std::format("Origin##patch{}", i).c_str(), originPath.data(), originPath.size())) {
             }
 
             if (ImGui::Button("Update") && originPath[0] != '\0') {
@@ -579,14 +588,39 @@ void EditorRenderer::drawTexturesWindow() const
               m_editor->state->texManager->LoadWallTexture(PROJECT_ROOT_PATH + std::string(originPath.data()), texture);
               texture.Write();
 
-              std::cout << "Updated wall texture." << '\n';
+              std::cout << "Updated patch" << '\n';
               originPath.fill('\0');
             }
           },
-          [](Texture &texture) {
+          [this](Texture &texture) {
+            if (texture.width <= 0 || texture.height <= 0 || !m_editor->state->palManager) {
+              return;
+            }
 
+            m_editor->state->palManager->SetCurrentPalette(0);
+            const auto &wallTexture = dynamic_cast<PatchView &>(texture);
+
+            const std::vector<uint32_t> img = image::ConvertWallToRaw(static_cast<uint16_t>(texture.width),
+                                                                       static_cast<uint16_t>(texture.height),
+                                                                       wallTexture.data,
+                                                                       *m_editor->state->palManager);
+
+            SDL_Texture *sdlTexture = nullptr;
+            if (LoadTextureFromMemory(
+                  img.data(), texture.width, texture.height, m_sdlWindow->GetRenderer(), &sdlTexture)) {
+              ImGui::Image(sdlTexture, { static_cast<float>(texture.width), static_cast<float>(texture.height) });
+            }
           });
       }
+    }
+
+
+    if (ImGui::CollapsingHeader("Wall textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+      if (ImGui::Button("Add")) {
+        m_editor->state->texManager->AddDefaultWallTexture();
+      }
+
+
     }
   });
 

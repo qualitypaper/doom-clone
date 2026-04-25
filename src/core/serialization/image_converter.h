@@ -3,15 +3,17 @@
 
 #include "colors_serializer.h"
 #include "defs.h"
+#include "doom_assert.h"
+#include "renderer/editor/editor.h"
 #include "std_image.h"
-#include "utils.h"
+#include "tex_defs.h"
 
 #include <concepts>
-#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 template<std::integral T>
@@ -28,6 +30,18 @@ namespace image {
 [[nodiscard]] uint8_t FindClosestPaletteColor(uint8_t r, uint8_t g, uint8_t b, const PaletteManager &palManager);
 [[nodiscard]] std::vector<uint32_t> ConvertFlatToRaw(const std::vector<uint8_t> &data,
                                                      const PaletteManager &palManager);
+std::vector<uint32_t>
+  ConvertWallToRaw(uint16_t width, uint16_t height, const std::vector<Post> &posts, const PaletteManager &palManager);
+
+template<typename T>
+[[nodiscard]] constexpr bool IsTransparentPixel(const T pixel)
+{
+  if constexpr (std::is_integral_v<T> && std::is_signed_v<T>) {
+    return pixel < 0;
+  }
+
+  return false;
+}
 
 template<typename T>
 void ConvertRawColumnIntoWall(std::vector<Post> &posts, const RawImage<T> &img, int col);
@@ -103,32 +117,28 @@ std::vector<uint8_t> ConvertRawToFlat(const RawImage<T> &img)
 template<typename T>
 void ConvertRawColumnIntoWall(std::vector<Post> &posts, const RawImage<T> &img, const int col)
 {
-  int index = col;
   int y = 0;
 
-  while (y < img.height) {
-    std::vector<uint8_t> runPixels;
-    runPixels.reserve(128);
-
-    while (IsSignedIntPtr(img.pixels.data()) && y < img.height && img.pixels[index] == -1) {
-      y++;
-      index += img.width;
-    }
-
-    if (y >= img.height) {
-      break;
-    }
-
-    const uint8_t runStart = static_cast<uint8_t>(y);
-    while (y < img.height && img.pixels[index] != -1 && runPixels.size() <= 128) {
-      runPixels.push_back(static_cast<uint8_t>(img.pixels[index]));
-      y++;
-      index += img.width;
-    }
-
-    runPixels.shrink_to_fit();
-    posts.emplace_back(runStart, std::move(runPixels));
+  while (y < img.height && IsTransparentPixel(img.pixels[y * img.width + col])) {
+    y++;
   }
+
+  if (y >= img.height) {
+    return;
+  }
+
+  DOOM_CORE_ASSERT(y >= 0 && y < img.height && y <= std::numeric_limits<uint8_t>, "Column index out of bounds while converting raw image to wall texture.");
+
+  std::vector<uint8_t> runPixels;
+  runPixels.reserve(img.height - y);
+
+  while (y < img.height && !IsTransparentPixel(img.pixels[y * img.width + col])) {
+    runPixels.push_back(static_cast<uint8_t>(img.pixels[y * img.width + col]));
+    y++;
+  }
+
+  posts.emplace_back(Post{ .topDelta = static_cast<uint8_t>(y - static_cast<int>(runPixels.size())),
+                           .pixels = std::move(runPixels) });
 }
 
 template<typename T>
@@ -144,6 +154,8 @@ Patch ConvertRawToWall(const RawImage<T> &img)
   for (int x = 0; x < img.width; x++) {
     ConvertRawColumnIntoWall(patch.posts, img, x);
   }
+
+  patch.posts.shrink_to_fit();
 
   return patch;
 }
