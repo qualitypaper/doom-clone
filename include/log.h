@@ -142,7 +142,8 @@ private:
   static std::string Format(const std::string_view fmt, Args &&...args)
   {
     try {
-      return std::vformat(fmt, std::make_format_args(std::forward<Args>(args)...));
+      // std::make_format_args typically expects lvalues; do not forward here.
+      return std::vformat(fmt, std::make_format_args(args...));
     } catch (const std::format_error &e) {
       return std::string(fmt) + " [format_error: " + e.what() + ']';
     }

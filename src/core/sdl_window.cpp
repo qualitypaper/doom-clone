@@ -3,8 +3,6 @@
 #include "gameloop.h"
 #include "imgui/backends/imgui_impl_sdl2.h"
 
-#include <memory>
-
 SdlWindow::SdlWindow(const char *title,
                      const uint16_t windowWidth,
                      const uint16_t windowHeight,
@@ -35,12 +33,13 @@ SdlWindow::SdlWindow(const char *title,
     SDL_Quit();
     ThrowSDL("SDL_CreateWindow failed");
   }
-  int w, h;
-  SDL_GetWindowSize(this->window, &w, &h);
-  this->width = w;
-  this->height = h;
 
   this->renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+
+  int w, h;
+  SDL_GetRendererOutputSize(this->renderer, &w, &h);
+  this->width = w;
+  this->height = h;
 
   if (!renderer) {
     // Fallback to software only if hardware fails

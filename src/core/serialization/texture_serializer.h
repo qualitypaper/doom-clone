@@ -120,6 +120,7 @@ public:
   void AddDefaultFlatTexture();
   void AddDefaultPatch();
   void AddDefaultWallTexture();
+  std::string_view GetPatchTextureName(int16_t patchIndex);
 };
 
 bool LoadTextureFromMemory(const void *data, int width, int height, SDL_Renderer *renderer, SDL_Texture **out_texture);

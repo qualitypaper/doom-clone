@@ -4,12 +4,10 @@
 #include "core/gameloop.h"
 #include "core/math_utils.h"
 #include "core/serialization/texture_serializer.h"
-#include "core/serialization/wad_serializer.h"
 #include "editor_input_handler.h"
 #include "editor_renderer.h"
 
 #include <algorithm>
-#include <cstring>
 #include <limits>
 #include <memory>
 #include <ranges>
@@ -133,12 +131,8 @@ void EditorVertex::remove(EditorState &state, const uint32_t vertexId)
   state.level->vertices.pop_back();
 }
 
-EditorState::EditorState(Level &_level,
-                         const uint16_t _levelNum,
-                         const uint16_t _numOfLevels,
-                         const uint16_t _width,
-                         const uint16_t _height)
-  : width(_width), height(_height), numOfLevels(_numOfLevels), texManager(nullptr), palManager(nullptr)
+EditorState::EditorState(Level &_level, const uint16_t _levelNum, const uint16_t _numOfLevels)
+  : numOfLevels(_numOfLevels), texManager(nullptr), palManager(nullptr)
 {
   std::vector<EditorVertex> editorVertices;
   std::vector<EditorLineDef> editorLinedefs;
@@ -152,10 +146,10 @@ EditorState::EditorState(Level &_level,
   editorSectors.reserve(_level.sectors.size());
   editorSidedefs.reserve(_level.sidedefs.size());
 
-  this->level = std::make_unique<EditorLevel>(_level, _levelNum, _width, _height);
+  this->level = std::make_unique<EditorLevel>(_level, _levelNum);
 }
 
-void EditorState::reset()
+void EditorState::Reset()
 {
   for (auto &vertex : level->vertices) {
     vertex.selected = false;
@@ -235,10 +229,10 @@ Editor::Editor(std::shared_ptr<SdlWindow> sdlWindow,
                TextureManager &textureManager,
                PaletteManager &palManager)
   : m_history(std::make_shared<CommandHistory>()),
-    state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels, sdlWindow->GetWidth(), sdlWindow->GetHeight()))
+    m_renderer(std::make_unique<EditorRenderer>(std::move(sdlWindow), *this)),
+    state(std::make_shared<EditorState>(_level, _levelNum, _numOfLevels))
 {
   this->m_inputHandler = std::make_unique<EditorInputHandler>(state, m_history);
-  this->m_renderer = std::make_unique<EditorRenderer>(std::move(sdlWindow), *this);
 
   state->texManager = &textureManager;
   state->palManager = &palManager;
@@ -296,10 +290,7 @@ void Editor::addLineDef(const int32_t sectorId, LineDef &linedef) const
 
 void Editor::addVertex(const double x, const double y) const
 {
-  const EditorVertex temp{ x, y };
-  // const ImVec2 newVertex = transformVertex(temp);
-
-  m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(temp.x, temp.y)), *state);
+  m_history->execute(std::make_unique<AddVertexCommand>(EditorVertex(x, y)), *state);
 }
 
 void Editor::executeCommand(std::unique_ptr<Command> cmd) const
@@ -316,23 +307,23 @@ void Editor::drawConnectedLine(const uint32_t vertexId) const
 
 void EditorVertex::drag(const uint32_t objectId, EditorState *state, CommandHistory *history)
 {
-  assert(getObjectType(objectId) == EditorObjectType::VERTEX);
+  DOOM_CORE_ASSERT(getObjectType(objectId) == EditorObjectType::VERTEX);
 
   if (dragged)
     return;
 
   DraggableObject::drag(objectId, state, history);
 
-  ImVec2 unzoomedOffset = Editor::unscale(state->draggingOffset, state->canvasZoom);
+  const ImVec2 unzoomedOffset = Editor::unscale(state->draggingOffset, state->canvasZoom);
 
-  auto cmd = std::make_unique<MoveVertexCommand>(objectId, unzoomedOffset);
+  auto cmd = std::make_unique<MoveVertexCommand>(objectId, ImVec2{ unzoomedOffset.x, -unzoomedOffset.y });
 
   history->execute(std::move(cmd), *state);
 }
 
 void EditorLineDef::drag(const uint32_t objectId, EditorState *state, CommandHistory *history)
 {
-  assert(getObjectType(objectId) == EditorObjectType::LINEDEF);
+  DOOM_CORE_ASSERT(getObjectType(objectId) == EditorObjectType::LINEDEF);
 
   if (dragged)
     return;
@@ -347,7 +338,10 @@ void EditorLineDef::drag(const uint32_t objectId, EditorState *state, CommandHis
 
 ImVec2 Editor::TransformVertex(const EditorVertex &v) const
 {
-  ImVec2 transformed = zoomVertex(v);
+  const ImVec2 scaled = scale(v, 1 / state->canvasZoom).toImVec2();
+
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  ImVec2 transformed = math_utils::fromCenterCoordinates(scaled, displaySize.x, displaySize.y);
 
   // apply dragging
   if (v.selected || v.isAnyConnectedLineDefSelected(*state)) {
@@ -368,7 +362,10 @@ ImVec2 Editor::UntransformVertex(ImVec2 transformed) const
   transformed.x = transformed.x - state->scrollingOffset.x;
   transformed.y = transformed.y - state->scrollingOffset.y;
 
-  return zoomVertex(transformed, 1 / state->canvasZoom);
+  const ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+  transformed = math_utils::toCenterCoordinates(transformed, displaySize.x, displaySize.y);
+
+  return scale(transformed, 1 / state->canvasZoom);
 }
 
 /**
@@ -403,7 +400,7 @@ void Editor::TransformVertices() const
 
 void Editor::AddEmptyLevel() const
 {
-  state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
+  state->level->Save(state->numOfLevels);
   state->numOfLevels++;
   const std::array<char8_t, 8> levelName = Level::MakeLevelName(state->numOfLevels);
 
@@ -415,21 +412,20 @@ void Editor::ChangeLevel(const uint16_t newLevelNum) const
   if (state->level->levelNum == newLevelNum)
     return;
 
-  state->level->Save(state->level->name, state->numOfLevels, this->state->width, this->state->height);
+  state->level->Save(state->numOfLevels);
 
-  state->reset();
+  state->Reset();
 
   const lumpName levelName = Level::MakeLevelName(newLevelNum);
 
   auto newLevel = std::make_unique<Level>(levelName);
   EditorLevel::Load(newLevel);
 
-  state->level = std::make_unique<EditorLevel>(*newLevel, newLevelNum, this->state->width, this->state->height);
+  state->level = std::make_unique<EditorLevel>(*newLevel, newLevelNum);
 }
 
 
-EditorLevel::EditorLevel(const Level &_level, const uint16_t _levelNum, const uint16_t _width, const uint16_t _height)
-  : levelNum(_levelNum), name(_level.name)
+EditorLevel::EditorLevel(const Level &_level, const uint16_t _levelNum) : levelNum(_levelNum), name(_level.name)
 {
   vertices.reserve(_level.vertices.size());
   sidedefs.reserve(_level.sidedefs.size());
@@ -437,11 +433,8 @@ EditorLevel::EditorLevel(const Level &_level, const uint16_t _levelNum, const ui
   sectors.reserve(_level.sectors.size());
 
   // process vertices
-  for (auto &vertice : _level.vertices) {
-    const Vertex *v = &vertice;
-
-    const Vertex centered = v->fromCenterCoords(_width, _height);
-    vertices.emplace_back(centered);
+  for (auto &vertex : _level.vertices) {
+    vertices.emplace_back(vertex);
   }
 
   // process sectors

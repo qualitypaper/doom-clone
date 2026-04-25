@@ -177,7 +177,7 @@ void EditorInputHandler::flushDragging() const
     return;
 
   for (const uint32_t id : state->selection) {
-    const auto object = state->findObject(id);
+    EditorObject *object = state->findObject(id);
     if (!object)
       continue;
 
@@ -198,7 +198,7 @@ void EditorInputHandler::processKeyboardInputs() const
 
   // reset the state when pressing escape
   if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-    state->reset();
+    state->Reset();
   }
 
   const bool ctrlDown = ImGui::IsKeyDown(ImGuiKey_LeftCtrl);
@@ -214,9 +214,8 @@ void EditorInputHandler::processKeyboardInputs() const
   }
 
   if (ctrlDown && ImGui::IsKeyPressed(ImGuiKey_S)) {
-    // save the current level into a .bin file
-    // vertices, linedefs, sidedefs, sectors
-    state->level->Save(state->level->name, state->numOfLevels, state->width, state->height);
+    // save current level
+    state->level->Save(state->numOfLevels);
   }
 
   if (ctrlDown && !io.WantCaptureMouse && io.MouseWheel != 0) {

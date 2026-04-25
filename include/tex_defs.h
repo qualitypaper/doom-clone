@@ -74,8 +74,8 @@ struct Patch
 
 struct MapPatch
 {
-  uint16_t originX, originY;
-  uint16_t patch;
+  int16_t originX, originY;
+  int16_t patch;
 
   template<typename Writer>
   void serialize(Writer &w) const

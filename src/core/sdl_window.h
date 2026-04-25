@@ -38,10 +38,8 @@ public:
   [[nodiscard]] uint16_t GetRenderWidth() const { return renderWidth; }
   [[nodiscard]] uint16_t GetRenderHeight() const { return renderHeight; }
 
-  [[nodiscard]] uint16_t GetWidth() const { return height; }
-  [[nodiscard]] uint16_t GetHeight() const { return width; }
-
-
+  [[nodiscard]] uint16_t GetWidth() const { return width; }
+  [[nodiscard]] uint16_t GetHeight() const { return height; }
 
 private:
   SDL_Window *window = nullptr;

@@ -1,10 +1,11 @@
-#include "../../core/math_utils.h"
+#include "core/math_utils.h"
+#include "core/serialization/serialization.h"
+#include "core/serialization/wad_serializer.h"
 
-#include "../../core/serialization/serialization.h"
-#include "../../core/serialization/wad_serializer.h"
 #include "bsp/bsp.h"
 #include "config.h"
 #include "editor.h"
+#include "log.h"
 
 #include "ranges"
 #include <cstring>
@@ -62,9 +63,7 @@ void EditorLevel::SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLev
   writer.WriteVector(sectors);
 }
 
-void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
-                                  uint16_t &numberOfLevels,
-                                  const std::unique_ptr<BspLevel> &bspLevel) const
+void EditorLevel::SaveLevelToFile(uint16_t &numberOfLevels, const std::unique_ptr<BspLevel> &bspLevel) const
 {
   const bool fileExists = std::filesystem::exists(DATA_PATH);
 
@@ -82,7 +81,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
       allLumps = std::move(wadSerializer.GetLoadedLumps());
 
       for (size_t i = 0; i < allLumps.size(); ++i) {
-        if (!found && allLumps[i].entry.name == _name) {
+        if (!found && allLumps[i].entry.name == this->name) {
           targetLevelIndex = static_cast<int32_t>(i);
           found = true;
         }
@@ -109,7 +108,7 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   LumpData newLevelData;
   newLevelData.rawData = std::move(newLevelBuffer);
   directoryEntry newEntry{};
-  std::memcpy(newEntry.name.data(), _name.data(), newEntry.name.size());
+  std::memcpy(newEntry.name.data(), this->name.data(), newEntry.name.size());
   newLevelData.entry = newEntry;
 
   if (targetLevelIndex >= 0 && found) {
@@ -126,13 +125,10 @@ void EditorLevel::SaveLevelToFile(const std::array<char8_t, 8> _name,
   wadSerializer.Write();
 
   numberOfLevels = levelCount;
-  std::cout << "Saved Level: " << (char *)_name.data() << '\n';
+  DOOM_CORE_INFO("Saved Level: {}", 1);
 }
 
-void EditorLevel::Save(const std::array<char8_t, 8> _name,
-                       uint16_t &numberOfLevels,
-                       const uint16_t width,
-                       const uint16_t height)
+void EditorLevel::Save(uint16_t &numberOfLevels)
 {
   if (levelNum <= 0) {
     throw std::runtime_error("Level number must be greater than zero.");
@@ -143,10 +139,8 @@ void EditorLevel::Save(const std::array<char8_t, 8> _name,
   }
 
   // run bsp algorithm before saving
-  auto nativeVertices = vertices | std::views::transform([width, height](const auto &ev) {
-                          const Vertex v{ DoubleToFixed(ev.x), DoubleToFixed(ev.y) };
-
-                          return v.toCenterCoords(width, height);
+  auto nativeVertices = vertices | std::views::transform([](const auto &ev) {
+                          return Vertex{ DoubleToFixed(ev.x), DoubleToFixed(ev.y) };
                         })
     | std::ranges::to<std::vector<Vertex>>();
 
@@ -159,7 +153,7 @@ void EditorLevel::Save(const std::array<char8_t, 8> _name,
   bspBuilder.BuildBSPTree();
   bspBuilder.PrintTree();
 
-  SaveLevelToFile(_name, numberOfLevels, bspBuilder.TakeConstructedLevel());
+  SaveLevelToFile(numberOfLevels, bspBuilder.TakeConstructedLevel());
 }
 
 

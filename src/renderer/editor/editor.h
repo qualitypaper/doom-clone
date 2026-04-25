@@ -4,7 +4,6 @@
 #include "core/gameloop.h"
 #include "core/math_utils.h"
 #include "core/serialization/serialization.h"
-#include "core/serialization/wad_serializer.h"
 #include "defs.h"
 #include "imgui/imgui.h"
 
@@ -30,10 +29,10 @@ struct AABB
 {
   AABB() = default;
   AABB(Vertex start, Vertex end);
-  fixed_t maxX, maxY;
-  fixed_t minX, minY;
+  double maxX, maxY;
+  double minX, minY;
 
-  [[nodiscard]] bool contains(const fixed_t x, const fixed_t y) const
+  [[nodiscard]] bool contains(const double x, const double y) const
   {
     return x >= minX && x <= maxX && y >= minY && y <= maxY;
   }
@@ -336,13 +335,11 @@ struct EditorLevel
   {}
   explicit EditorLevel(const size_t _levelNum, const std::array<char8_t, 8> _name) : levelNum(_levelNum), name(_name)
   {}
-  EditorLevel(const Level &_level, uint16_t _levelNum, uint16_t _width, uint16_t _height_);
+  EditorLevel(const Level &_level, uint16_t _levelNum);
 
   void SerializeLevelToBuffer(const std::unique_ptr<BspLevel> &bspLevel, std::vector<uint8_t> &buffer) const;
-  void SaveLevelToFile(std::array<char8_t, 8> _name,
-                       uint16_t &numberOfLevels,
-                       const std::unique_ptr<BspLevel> &bspLevel) const;
-  void Save(std::array<char8_t, 8> _name, uint16_t &numberOfLevels, uint16_t width, uint16_t height);
+  void SaveLevelToFile(uint16_t &numberOfLevels, const std::unique_ptr<BspLevel> &bspLevel) const;
+  void Save(uint16_t &numberOfLevels);
   void Load(uint16_t width, uint16_t height);
 
   static size_t Load(std::unique_ptr<Level> &level);
@@ -358,10 +355,8 @@ struct EditorLevel
 
 struct EditorState
 {
-  EditorState(Level &_level, uint16_t _levelNum, uint16_t _numOfLevels, uint16_t _width, uint16_t _height);
-  void reset();
-
-  uint16_t width, height;
+  EditorState(Level &_level, uint16_t _levelNum, uint16_t _numOfLevels);
+  void Reset();
 
   uint16_t numOfLevels = 0;
   // information about the linedefs/sidedefs/vertices
@@ -506,7 +501,7 @@ public:
   void executeCommand(std::unique_ptr<Command> cmd) const;
   void addLineDef(int32_t sectorId, LineDef &linedef) const;
   void addVertex(double x, double y) const;
-  void drawConnectedLine(uint32_t vertexIndex) const;
+  void drawConnectedLine(uint32_t vertexId) const;
 
   void TransformVertices() const;
   [[nodiscard]] ImVec2 TransformVertex(const EditorVertex &v) const;
@@ -530,21 +525,5 @@ public:
 
     return { decltype(vec.x)(static_cast<float>(vec.x) / scaleFactor),
              decltype(vec.y)(static_cast<float>(vec.y) / scaleFactor) };
-  }
-
-  // zooms the vertex
-  // if no zoom parameter is specified will default to state->canvasZoom
-  template<HasXY T>
-  ImVec2 zoomVertex(const T &vertex, float zoom = -1) const
-  {
-    if (zoom == -1) {
-      zoom = state->canvasZoom;
-    }
-    T centered = math_utils::toCenterCoordinates(vertex, state->width, state->height);
-
-    centered = Editor::scale(centered, zoom);
-    T from_center_coordinates = math_utils::fromCenterCoordinates(centered, state->width, state->height);
-
-    return { static_cast<float>(from_center_coordinates.x), static_cast<float>(from_center_coordinates.y) };
   }
 };

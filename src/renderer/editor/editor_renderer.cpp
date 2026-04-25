@@ -1,11 +1,11 @@
 #include "editor_renderer.h"
 
+#include "../../../magic_enum.h"
 #include "commands.h"
 #include "core/math_utils.h"
 #include "core/serialization/image_converter.h"
 #include "core/serialization/texture_serializer.h"
 #include "editor.h"
-#include "magic_enum.h"
 
 #include "imgui/backends/imgui_impl_sdl2.h"
 #include "imgui/backends/imgui_impl_sdlrenderer2.h"
@@ -27,6 +27,9 @@ static ImU32 g_hoverColor = IM_COL32(255, 200, 0, 255);
 
 static float g_defaultVertexRadius = 4.0f;
 static float g_defaultLinedefThickness = 2.0f;
+
+static float g_leftPanelWidth = 300.0f;
+static float g_rightPanelWidth = 300.0f;
 
 EditorRenderer::EditorRenderer(std::shared_ptr<SdlWindow> sdlWindow, Editor &editor)
   : m_sdlWindow(std::move(sdlWindow)), m_editor(&editor)
@@ -84,7 +87,7 @@ void EditorRenderer::endFrame() const
 }
 
 
-void EditorRenderer::drawLinePreview(const float_t thickness) const
+void EditorRenderer::DrawLinePreview(const float_t thickness) const
 {
   if (!m_editor->state->isCreatingLine)
     return;
@@ -98,7 +101,7 @@ void EditorRenderer::drawLinePreview(const float_t thickness) const
   drawList->AddLine(startTransformed, mousePos, g_hoverColor, thickness);
 }
 
-void EditorRenderer::drawPopupsForSelectedObjects() const
+void EditorRenderer::DrawPopupsForSelectedObjects() const
 {
   if (m_editor->state->selection.empty())
     return;
@@ -171,54 +174,55 @@ void EditorRenderer::Render() const
 
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
-    showVertexRLineCreation(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
+    DrawCreatePopup(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
 
-  drawCoordinatesCenter(vertexRadius);
+  DrawCoordinatesCenter(vertexRadius);
 
   // render a window showing all the sectors
-  drawSectorsWindow();
+  DrawSectorsWindow();
 
   // render a window showing all sidedefs
-  drawSidedefsWindow();
+  DrawSidedefsWindow();
 
   // render textures
-  drawTexturesWindow();
+  DrawTexturesWindow();
 
   // draw map outlines
-  drawMapOutlines(vertexRadius, thickness);
+  DrawMapOutlines(vertexRadius, thickness);
 
   // draw line creation preview
-  drawLinePreview(thickness);
+  DrawLinePreview(thickness);
 
   // draw popups for selected objects
-  drawPopupsForSelectedObjects();
+  DrawPopupsForSelectedObjects();
 
   // draw block selection indication
-  drawBlockSelection();
+  DrawBlockSelection();
 
   // draw level selection select
-  drawLevelSelection();
+  DrawLevelSelection();
 
   ImGui::End();
 
   endFrame();
 }
 
-void EditorRenderer::drawLevelSelection() const
+void EditorRenderer::DrawLevelSelection() const
 {
-  ImGui::SetNextWindowPos(ImVec2(10, 10));
-  ImGui::SetNextWindowSize(ImVec2(150, 0));
+  SetUpFixedPosWindow(0, 0, g_leftPanelWidth, 50);
 
-  ImGui::Begin("LevelSelection",
-               nullptr,
-               ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+  ImGui::Begin("LevelSelection", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+
+  if (g_leftPanelWidth != ImGui::GetWindowSize().x) {
+    g_leftPanelWidth = ImGui::GetWindowSize().x;
+  }
 
   // TODO: rewrite createSelect to use a index based for loop instead of storing indices in a seperate array
   uint16_t currentLevelNum = m_editor->state->level->levelNum;
 
-  createDropdown(
-    "Select level",
+  CreateDropdown(
+    "##LevelSelect",
     std::format("Map: {}", currentLevelNum),
     m_editor->state->numOfLevels,
     [&](const int optionIndex) {
@@ -242,7 +246,7 @@ void EditorRenderer::drawLevelSelection() const
   ImGui::End();
 }
 
-void EditorRenderer::drawBlockSelection() const
+void EditorRenderer::DrawBlockSelection() const
 {
   if (!m_editor->state->isBlockSelecting)
     return;
@@ -260,13 +264,12 @@ void EditorRenderer::drawBlockSelection() const
   drawList->AddRectFilled({ minX, minY }, { maxX, maxY }, IM_COL32(100, 100, 0, 150));
 }
 
-void EditorRenderer::drawPropertiesTable(const char *tableId,
+void EditorRenderer::DrawPropertiesTable(const char *tableId,
                                          const char *columnLabel,
-                                         const std::function<void()> &drawContent) const
+                                         const std::function<void()> &drawContent)
 {
   constexpr ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersV | ImGuiTableFlags_BordersOuterH
-    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody
-    | ImGuiTableFlags_ScrollY;// Allows the list to scroll if it exceeds window height
+    | ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_ScrollY;
 
   if (!ImGui::BeginTable(tableId, 1, tableFlags)) {
     return;
@@ -283,16 +286,44 @@ void EditorRenderer::drawPropertiesTable(const char *tableId,
   ImGui::EndTable();
 }
 
-void EditorRenderer::drawSidedefsWindow() const
+void EditorRenderer::SetUpFixedPosWindow(const float xPos,
+                                         const float yPos,
+                                         const float width,
+                                         const float height,
+                                         const bool lockSize)
 {
-  ImGui::Begin("SideDefs");
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+
+  const auto windowPos = ImVec2(viewport->Pos.x + std::clamp(xPos - width, 0.0f, viewport->Size.x),
+                                std::clamp(viewport->Pos.y + yPos, 0.0f, viewport->Size.y));
+
+  ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
+
+  const float resolvedHeight = height > 0.0f ? height : std::max(100.0f, viewport->Size.y - yPos);
+  const ImGuiCond sizeCond = lockSize ? ImGuiCond_Always : ImGuiCond_FirstUseEver;
+  ImGui::SetNextWindowSize(ImVec2(width, resolvedHeight), sizeCond);
+}
+
+void EditorRenderer::DrawSidedefsWindow() const
+{
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+
+  SetUpFixedPosWindow(viewport->Size.x, 0, static_cast<uint16_t>(g_rightPanelWidth), viewport->Size.y / 2);
+
+  constexpr ImGuiWindowFlags windowFlags =
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+
+  ImGui::Begin("SideDefs", nullptr, windowFlags);
+  if (g_rightPanelWidth != ImGui::GetWindowSize().x) {
+    g_rightPanelWidth = ImGui::GetWindowSize().x;
+  }
 
   if (ImGui::Button("Create sidedef")) {
     // create new sidedef
     m_editor->state->level->sidedefs.emplace_back(-1, 0, 0, -1, -1, -1);
   }
 
-  drawPropertiesTable("PropertyTable", "Sidedefs table", [this]() {
+  DrawPropertiesTable("PropertyTable", "Sidedefs table", [this] {
     // Flags for the parent category
     constexpr ImGuiTreeNodeFlags categoryFlags = ImGuiTreeNodeFlags_SpanFullWidth;
 
@@ -375,16 +406,26 @@ void EditorRenderer::drawSidedefsWindow() const
   ImGui::End();
 }
 
-void EditorRenderer::drawSectorsWindow() const
+void EditorRenderer::DrawSectorsWindow() const
 {
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
 
-  ImGui::Begin("Sectors");
+  SetUpFixedPosWindow(
+    viewport->Size.x, viewport->Size.y / 2, static_cast<uint16_t>(g_rightPanelWidth), viewport->Size.y / 2);
+
+  constexpr ImGuiWindowFlags windowFlags =
+    ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
+
+  ImGui::Begin("Sectors", nullptr, windowFlags);
+  if (g_rightPanelWidth != ImGui::GetWindowSize().x) {
+    g_rightPanelWidth = ImGui::GetWindowSize().x;
+  }
 
   if (ImGui::Button("Create sector")) {
     m_editor->state->level->sectors.emplace_back();
   }
 
-  drawPropertiesTable("PropertyTable", "Sectors table", [this]() {
+  DrawPropertiesTable("PropertyTable", "Sectors table", [this]() {
     // Flags for the parent category
     constexpr ImGuiTreeNodeFlags categoryFlags = ImGuiTreeNodeFlags_SpanFullWidth;
 
@@ -440,17 +481,6 @@ void EditorRenderer::drawSectorsWindow() const
       }
       ImGui::Text("Floor: %s", m_editor->state->texManager->GetFlatTextureName(sector.floorPic).c_str());
 
-      // ImGui::SetNextItemWidth(200);
-      //
-      // float color[3] = { ImGui::ColorConvertU32ToFloat4(sector.color).x,
-      //                    ImGui::ColorConvertU32ToFloat4(sector.color).y,
-      //                    ImGui::ColorConvertU32ToFloat4(sector.color).z };
-      //
-      // if (ImGui::ColorPicker3("Sector color", color)) {
-      //   // update sector color
-      //   sector.color = ImGui::ColorConvertFloat4ToU32(ImVec4(color[0], color[1], color[2], 1.0f));
-      // }
-
       if (ImGui::Button("Delete")) {
         for (auto &linedef : m_editor->state->level->linedefs) {
           if (linedef.backSideDef == static_cast<int32_t>(i)) {
@@ -474,13 +504,19 @@ void EditorRenderer::drawSectorsWindow() const
   ImGui::End();
 }
 
-void EditorRenderer::drawTexturesWindow() const
+void EditorRenderer::DrawTexturesWindow() const
 {
-  ImGui::Begin("Textures");
+  SetUpFixedPosWindow(0, 50, g_leftPanelWidth, 0, false);
+  ImGui::Begin(
+    "Textures", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
+
+  if (g_leftPanelWidth != ImGui::GetWindowSize().x) {
+    g_leftPanelWidth = ImGui::GetWindowSize().x;
+  }
 
   static std::map<size_t, std::array<char, 32>> s_flatTextureOriginPaths;
 
-  drawPropertiesTable("PropertyTable", "Textures table", [this]() {
+  DrawPropertiesTable("PropertyTable", "Textures table", [this] {
     TextureManager &textureManager = *m_editor->state->texManager;
 
     const auto renderTextureEntry = [&](Texture &texture,
@@ -526,7 +562,7 @@ void EditorRenderer::drawTexturesWindow() const
 
             // i is shifted by 32 bits to create a unique key for each texture
             // since both flat and wall textures can have the same index
-            auto &originPath = s_flatTextureOriginPaths[i << 32];
+            auto &originPath = s_flatTextureOriginPaths[i];
             if (ImGui::InputText(std::format("Origin##flat{}", i).c_str(), originPath.data(), originPath.size())) {
             }
 
@@ -575,7 +611,7 @@ void EditorRenderer::drawTexturesWindow() const
           [&](Texture &baseTexture) {
             auto &texture = dynamic_cast<PatchView &>(baseTexture);
 
-            auto &originPath = s_flatTextureOriginPaths[i << 32];
+            auto &originPath = s_flatTextureOriginPaths[i << 16];
             if (ImGui::InputText(std::format("Origin##patch{}", i).c_str(), originPath.data(), originPath.size())) {
             }
 
@@ -601,9 +637,9 @@ void EditorRenderer::drawTexturesWindow() const
             const auto &wallTexture = dynamic_cast<PatchView &>(texture);
 
             const std::vector<uint32_t> img = image::ConvertWallToRaw(static_cast<uint16_t>(texture.width),
-                                                                       static_cast<uint16_t>(texture.height),
-                                                                       wallTexture.data,
-                                                                       *m_editor->state->palManager);
+                                                                      static_cast<uint16_t>(texture.height),
+                                                                      wallTexture.data,
+                                                                      *m_editor->state->palManager);
 
             SDL_Texture *sdlTexture = nullptr;
             if (LoadTextureFromMemory(
@@ -620,7 +656,64 @@ void EditorRenderer::drawTexturesWindow() const
         m_editor->state->texManager->AddDefaultWallTexture();
       }
 
+      for (size_t i = 0; i < textureManager.wallTextures.size(); ++i) {
+        auto &wallTexture = textureManager.wallTextures[i];
 
+        std::string label = std::format("{}##WallTexture", (char *)wallTexture.mapTexture.name.data());
+        ImGui::PushID(i);
+        const bool opened = ImGui::TreeNodeEx(label.c_str(), ImGuiTreeNodeFlags_SpanFullWidth);
+
+        if (!opened) {
+          ImGui::PopID();
+          continue;
+        }
+
+
+        char *textureName = (char *)wallTexture.mapTexture.name.data();
+        ImGui::InputText("Name", textureName, wallTexture.mapTexture.name.size());
+        ImGui::Text("%d Width", wallTexture.mapTexture.width);
+        ImGui::Text("%d Height", wallTexture.mapTexture.height);
+
+        if (ImGui::Button("Add Patch##WallTexture")) {
+          wallTexture.AddPatch();
+        }
+
+
+        for (size_t j = 0; j < wallTexture.mapTexture.patches.size(); ++j) {
+          auto &mapPatch = wallTexture.mapTexture.patches[j];
+          const std::string mapPatchLabel = std::format("Patch {}##WallTexture", j);
+          ImGui::PushID(j);
+          const bool isTransformOpen = ImGui::TreeNodeEx(mapPatchLabel.data(), ImGuiTreeNodeFlags_SpanFullWidth);
+          if (!isTransformOpen) {
+            ImGui::PopID();
+            continue;
+          }
+
+          int originx = mapPatch.originX;
+          int originy = mapPatch.originY;
+          int patchId = mapPatch.patch;
+
+          if (ImGui::InputInt("Origin x", &originx)) {
+            mapPatch.originX = static_cast<int16_t>(originx);
+          }
+          if (ImGui::InputInt("Origin y", &originy)) {
+            mapPatch.originY = static_cast<int16_t>(originy);
+          }
+
+          if (ImGui::InputInt(std::format("Patch##mappatch{}", i).c_str(), &patchId)) {
+            mapPatch.patch = static_cast<int16_t>(patchId);
+          }
+          ImGui::Text("Patch: %s", m_editor->state->texManager->GetPatchTextureName(mapPatch.patch).data());
+
+
+          ImGui::TreePop();
+          ImGui::PopID();
+        }
+
+
+        ImGui::TreePop();
+        ImGui::PopID();
+      }
     }
   });
 
@@ -701,7 +794,7 @@ void EditorRenderer::drawLinedefs(const float_t thickness) const
     drawLinedef(ld, thickness);
   }
 }
-void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t thickness) const
+void EditorRenderer::DrawMapOutlines(const float_t vertexRadius, const float_t thickness) const
 {
   // draw outlines
   drawLinedefs(thickness);
@@ -709,29 +802,24 @@ void EditorRenderer::drawMapOutlines(const float_t vertexRadius, const float_t t
   drawVertices(vertexRadius);
 }
 
-void EditorRenderer::drawCoordinatesCenter(const float vertexRadius) const
+void EditorRenderer::DrawCoordinatesCenter(const float vertexRadius) const
 {
-  const EditorVertex center =
-    math_utils::fromCenterCoordinates(EditorVertex(0, 0), m_sdlWindow->GetWidth(), m_sdlWindow->GetHeight());
-  const ImVec2 centerTransformed = m_editor->TransformVertex(center);
+  const ImVec2 centerTransformed = m_editor->TransformVertex({ 0, 0 });
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
   drawList->AddCircleFilled(centerTransformed, vertexRadius, IM_COL32(50, 0, 255, 255));
 }
 
-void EditorRenderer::showVertexRLineCreation(const ImVec2 &mousePos, bool &isOpen) const
+void EditorRenderer::DrawCreatePopup(const ImVec2 &mousePos, bool &isOpen) const
 {
   ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
   const bool vertexCreation = ImGui::Button("Create Vertex");
 
   if (vertexCreation) {
-    const int32_t x = mousePos.x - m_editor->state->scrollingOffset.x;
-    const int32_t y = mousePos.y - m_editor->state->scrollingOffset.y;
+    const ImVec2 untransformVertex = m_editor->UntransformVertex(mousePos);
 
-    const ImVec2 zoomed = m_editor->zoomVertex(ImVec2(x, y), 1 / m_editor->state->canvasZoom);
-
-    m_editor->addVertex(zoomed.x, zoomed.y);
+    m_editor->addVertex(untransformVertex.x, untransformVertex.y);
     isOpen = false;
   }
 
@@ -829,7 +917,7 @@ bool EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
   return deleteRequested;
 }
 
-void EditorRenderer::createDropdown(const char *label,
+void EditorRenderer::CreateDropdown(const char *label,
                                     const std::string_view previewValue,
                                     const int itemCount,
                                     const std::function<bool(int)> &isSelected,
@@ -870,7 +958,7 @@ void EditorRenderer::createSidedefSelect(const char *label,
   const int resetOptionOffset = hasResetOption ? 1 : 0;
   const int itemCount = static_cast<int>(sidedefs.size()) + resetOptionOffset;
 
-  createDropdown(
+  CreateDropdown(
     label,
     std::to_string(currentItem),
     itemCount,
@@ -903,19 +991,9 @@ void EditorRenderer::createSidedefSelect(const char *label,
     });
 }
 
-void EditorRenderer::createSelect(const char *label,
-                                  const std::vector<std::uint16_t> &options,
-                                  const uint16_t currentItem,
-                                  const std::function<void(uint16_t)> &setCurrElem,
-                                  const std::function<void()> &addNewElem)
-{}
-
-
 void EditorRenderer::drawVertex(const uint32_t vertexId, const float vertexRadius = g_defaultVertexRadius) const
 {
   const auto &v = m_editor->state->findVertex(vertexId);
-  if (v.x < 0 || v.y < 0 || m_sdlWindow->GetWidth() <= v.x || m_sdlWindow->GetHeight() <= v.y)
-    return;
 
   ImDrawList *drawList = ImGui::GetWindowDrawList();
 

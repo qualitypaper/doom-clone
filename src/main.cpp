@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 
   // setup sdl window
   auto sdlWindow = std::make_shared<SdlWindow>(
-    "Doom Clone", WINDOW_WIDTH, WINDOW_HEIGHT, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_RESIZABLE);
+    "Doom Clone", 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_RESIZABLE);
 
 
   std::unique_ptr<PaletteManager> paletteManager;

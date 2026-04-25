@@ -377,3 +377,12 @@ void TextureManager::AddDefaultWallTexture()
 {
   wallTextures.emplace_back(WadSerializer::MakeLumpName(std::format(DEFAULT_WALL_TEXTURE_FORMAT, wallTextures.size() + 1)));
 }
+
+std::string_view TextureManager::GetPatchTextureName(const int16_t patchIndex)
+{
+  if (patchIndex < 0 || patchIndex >= static_cast<int16_t>(patches.size())) {
+    return "###";
+  }
+
+  return std::string_view((char *)patches[patchIndex].name.data());
+}
