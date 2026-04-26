@@ -3,7 +3,6 @@
 #include "defs.h"
 
 #include <algorithm>
-#include <format>
 
 WadSerializer::WadSerializer(std::filesystem::path filePath) : m_filePath(std::move(filePath))
 {}
@@ -126,14 +125,14 @@ std::vector<LumpData> &WadSerializer::GetLoadedLumps()
   return m_loadedLumps;
 }
 
-std::optional<directoryEntry *> WadSerializer::FindDirectoryEntry(const lumpName &name)
+directoryEntry *WadSerializer::FindEntry(const lumpName &name)
 {
-  auto it = std::ranges::find_if(m_directory, [&](const directoryEntry &entry) {
+  const auto it = std::ranges::find_if(m_directory, [&](const directoryEntry &entry) {
     return entry.name == name;
   });
 
   if (it == m_directory.end()) {
-    return std::nullopt;
+    return nullptr;
   }
 
   return &*it;
@@ -150,6 +149,23 @@ const LumpData *WadSerializer::FindLoadedLump(const lumpName &name) const
   }
 
   return &(*it);
+}
+const directoryEntry *WadSerializer::FindEntryAfterLevels() const
+{
+  size_t lastIndex = SIZE_MAX;
+  for (size_t i = 0; i < m_directory.size(); ++i) {
+    const directoryEntry &entry = m_directory[i];
+    if (memcmp(entry.name.data(), LEVEL_NAME_PREFIX.data(), LEVEL_NAME_PREFIX.size()) == 0) {
+      lastIndex = i;
+    }
+  }
+
+  // if lastIndex points to the last entry, then there are no entries after levels
+  if (lastIndex >= m_directory.size() - 1) {
+    return nullptr;
+  }
+
+  return &m_directory[lastIndex + 1];
 }
 
 void WadSerializer::SetHeader(const header &hdr)

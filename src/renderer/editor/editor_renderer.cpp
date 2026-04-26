@@ -106,30 +106,38 @@ void EditorRenderer::DrawPopupsForSelectedObjects() const
   if (m_editor->state->selection.empty())
     return;
 
-  // used deffered deletion logic in order not to break selection iteration
+  // use deferred deletion logic in order not to break selection iteration
   std::vector<uint32_t> idsToRemove;
+  int popupIndex = 0;
 
   for (const uint32_t objectId : m_editor->state->selection) {
     const auto object = m_editor->state->findObject(objectId);
     if (!object)
       continue;
 
+    // Give each object popup a different default position to avoid all of them stacking.
+    const float xOffset = static_cast<float>((popupIndex % 2) * 340);
+    const float yOffset = static_cast<float>((popupIndex / 2) * 220);
+    ImGui::SetNextWindowPos(ImVec2(20.0f + xOffset, 80.0f + yOffset), ImGuiCond_FirstUseEver);
+
     bool toRemove = false;
 
     if (object->type == EditorObjectType::VERTEX) {
-      toRemove = drawSelectedVertexPopup(objectId);
+      toRemove = DrawSelectedVertexPopup(objectId);
     } else if (object->type == EditorObjectType::LINEDEF) {
-      toRemove = drawSelectedLinePopup(objectId);
+      toRemove = DrawSelectedLinePopup(objectId);
     }
 
     if (toRemove) {
       idsToRemove.push_back(objectId);
     }
+
+    popupIndex++;
   }
 
   // remove requested ids
   for (const uint32_t id : idsToRemove) {
-    auto type = getObjectType(id);
+    const EditorObjectType type = getObjectType(id);
 
     // TODO: make delete commands in order to split objects deletion correctly
     if (type == EditorObjectType::VERTEX) {
@@ -174,7 +182,7 @@ void EditorRenderer::Render() const
 
   // suggest creating a new line/vertex
   if (m_editor->state->renderOptionsWindow) {
-    DrawCreatePopup(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
+    DrawCreationPopup(m_editor->state->optionsWindowPos, m_editor->state->renderOptionsWindow);
   }
 
   DrawCoordinatesCenter(vertexRadius);
@@ -552,9 +560,11 @@ void EditorRenderer::DrawTexturesWindow() const
         m_editor->state->texManager->AddDefaultFlatTexture();
       }
 
-      for (size_t i = 0; i < textureManager.flatTextures.size(); ++i) {
+      std::vector<FlatTexture> &flatTextures = textureManager.GetFlatTextures();
+
+      for (size_t i = 0; i < flatTextures.size(); ++i) {
         renderTextureEntry(
-          textureManager.flatTextures[i],
+          flatTextures[i],
           i,
           "flat",
           [&](Texture &baseTexture) {
@@ -603,9 +613,10 @@ void EditorRenderer::DrawTexturesWindow() const
         m_editor->state->texManager->AddDefaultPatch();
       }
 
-      for (size_t i = 0; i < textureManager.patches.size(); ++i) {
+      std::vector<PatchView> &patches = textureManager.GetPatches();
+      for (size_t i = 0; i < patches.size(); ++i) {
         renderTextureEntry(
-          textureManager.patches[i],
+          patches[i],
           i,
           "wall",
           [&](Texture &baseTexture) {
@@ -656,8 +667,8 @@ void EditorRenderer::DrawTexturesWindow() const
         m_editor->state->texManager->AddDefaultWallTexture();
       }
 
-      for (size_t i = 0; i < textureManager.wallTextures.size(); ++i) {
-        auto &wallTexture = textureManager.wallTextures[i];
+      for (size_t i = 0; i < textureManager.GetWallTextures().size(); ++i) {
+        auto &wallTexture = textureManager.GetWallTextures()[i];
 
         std::string label = std::format("{}##WallTexture", (char *)wallTexture.mapTexture.name.data());
         ImGui::PushID(i);
@@ -668,6 +679,9 @@ void EditorRenderer::DrawTexturesWindow() const
           continue;
         }
 
+        if (ImGui::Button(std::format("Update##WallTexture{}", i).c_str())) {
+          textureManager.WriteWallTexture(wallTexture);
+        }
 
         char *textureName = (char *)wallTexture.mapTexture.name.data();
         ImGui::InputText("Name", textureName, wallTexture.mapTexture.name.size());
@@ -677,7 +691,6 @@ void EditorRenderer::DrawTexturesWindow() const
         if (ImGui::Button("Add Patch##WallTexture")) {
           wallTexture.AddPatch();
         }
-
 
         for (size_t j = 0; j < wallTexture.mapTexture.patches.size(); ++j) {
           auto &mapPatch = wallTexture.mapTexture.patches[j];
@@ -704,7 +717,6 @@ void EditorRenderer::DrawTexturesWindow() const
             mapPatch.patch = static_cast<int16_t>(patchId);
           }
           ImGui::Text("Patch: %s", m_editor->state->texManager->GetPatchTextureName(mapPatch.patch).data());
-
 
           ImGui::TreePop();
           ImGui::PopID();
@@ -810,7 +822,7 @@ void EditorRenderer::DrawCoordinatesCenter(const float vertexRadius) const
   drawList->AddCircleFilled(centerTransformed, vertexRadius, IM_COL32(50, 0, 255, 255));
 }
 
-void EditorRenderer::DrawCreatePopup(const ImVec2 &mousePos, bool &isOpen) const
+void EditorRenderer::DrawCreationPopup(const ImVec2 &mousePos, bool &isOpen) const
 {
   ImGui::SetNextWindowPos(mousePos);
   ImGui::Begin("Vertex/Line creation popup");
@@ -826,7 +838,7 @@ void EditorRenderer::DrawCreatePopup(const ImVec2 &mousePos, bool &isOpen) const
   ImGui::End();
 }
 
-bool EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
+bool EditorRenderer::DrawSelectedLinePopup(const uint32_t lineId) const
 {
   const auto index = getObjectIndex(lineId);
   auto &ld = m_editor->state->findLinedef(index);
@@ -835,7 +847,7 @@ bool EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
   auto &end = m_editor->state->findVertex(ld.end);
 
   // render popup of linedef parameters
-  const std::string windowTitle = "Linedef params " + std::to_string(index) + "###LinedefParams";
+  const std::string windowTitle = std::format("Linedef params {}###LinedefPopup_{}", index, lineId);
   ImGui::Begin(windowTitle.c_str());
   ImGui::PushID(std::to_string(lineId).c_str());
 
@@ -885,12 +897,12 @@ bool EditorRenderer::drawSelectedLinePopup(const uint32_t lineId) const
   return deleteRequested;
 }
 
-bool EditorRenderer::drawSelectedVertexPopup(const uint32_t selectedId) const
+bool EditorRenderer::DrawSelectedVertexPopup(const uint32_t selectedId) const
 {
   const uint32_t index = getObjectIndex(selectedId);
 
   const auto &vertex = m_editor->state->findVertex(index);
-  const std::string windowTitle = "Vertex params: " + std::to_string(index) + "###Vertex" + std::to_string(index);
+  const std::string windowTitle = std::format("Vertex params: {}###VertexPopup_{}", index, selectedId);
   ImGui::Begin(windowTitle.c_str());
 
   ImGui::PushID(std::to_string(selectedId).c_str());

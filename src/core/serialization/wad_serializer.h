@@ -87,8 +87,9 @@ public:
   [[nodiscard]] const std::vector<LumpData> &GetLoadedLumps() const;
   [[nodiscard]] std::vector<LumpData> &GetLoadedLumps();
 
-  [[nodiscard]] std::optional<directoryEntry *> FindDirectoryEntry(const lumpName &name);
+  [[nodiscard]] directoryEntry *FindEntry(const lumpName &name);
   [[nodiscard]] const LumpData *FindLoadedLump(const lumpName &name) const;
+  [[nodiscard]] const directoryEntry *FindEntryAfterLevels() const;
 
   void SetHeader(const header &hdr);
   void SetLumps(std::vector<LumpData> lumps);

@@ -2,6 +2,7 @@
 #define DOOMCLONE_ASSERT_H
 
 #include "base.h"
+#include "log.h"
 
 #ifdef DOOM_ENABLE_ASSERTS
 // Alteratively the same "default" message can be used for both "WITH_MSG" and "NO_MSG" and

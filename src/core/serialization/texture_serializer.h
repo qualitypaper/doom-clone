@@ -7,7 +7,6 @@
 
 #include <SDL_render.h>
 #include <algorithm>
-#include <cstdint>
 #include <vector>
 
 constexpr uint16_t FLAT_TEXTURE_SIZE = 64;
@@ -102,25 +101,57 @@ public:
   TextureManager(std::vector<FlatTexture> _flatTextures,
                  std::vector<PatchView> _wallTextures,
                  PaletteManager *_palManager)
-    : palManager(_palManager), flatTextures(std::move(_flatTextures)), patches(std::move(_wallTextures))
+    : palManager(_palManager), m_flatTextures(std::move(_flatTextures)), m_patches(std::move(_wallTextures))
   {}
 
   PaletteManager *palManager = nullptr;
-  std::vector<FlatTexture> flatTextures;
-  std::vector<PatchView> patches;
-  std::vector<WallTexture> wallTextures;
 
   void LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const;
   void LoadWallTexture(const std::filesystem::path &path, PatchView &outWallTexture) const;
   void ConvertFlatToWall(FlatTexture &texture);
 
-  [[nodiscard]] std::optional<FlatTexture *> GetFlatTexture(size_t index);
-  [[nodiscard]] std::string GetFlatTextureName(size_t index);
+  [[nodiscard]] const FlatTexture *GetFlatTexture(size_t index) const;
+  [[nodiscard]] std::string GetFlatTextureName(size_t index) const;
+
+  [[nodiscard]] const std::vector<WallTexture> &GetWallTextures() const
+  {
+    return m_wallTextures;
+  }
+  [[nodiscard]] const std::vector<FlatTexture> &GetFlatTextures() const
+  {
+    return m_flatTextures;
+  }
+  [[nodiscard]] const std::vector<PatchView> &GetPatches() const
+  {
+    return m_patches;
+  }
+
+  [[nodiscard]] std::vector<WallTexture> &GetWallTextures()
+  {
+    return m_wallTextures;
+  }
+  [[nodiscard]] std::vector<FlatTexture> &GetFlatTextures()
+  {
+    return m_flatTextures;
+  }
+  [[nodiscard]] std::vector<PatchView> &GetPatches()
+  {
+    return m_patches;
+  }
 
   void AddDefaultFlatTexture();
   void AddDefaultPatch();
   void AddDefaultWallTexture();
   std::string_view GetPatchTextureName(int16_t patchIndex);
+
+  void WritePNames(WadSerializer &wadSerializer) const;
+  void WriteWallTexture(const WallTexture &value);
+
+private:
+  std::vector<FlatTexture> m_flatTextures;
+  std::vector<PatchView> m_patches;
+  std::vector<WallTexture> m_wallTextures;
+  size_t m_prevPatchesSize = 0;
 };
 
 bool LoadTextureFromMemory(const void *data, int width, int height, SDL_Renderer *renderer, SDL_Texture **out_texture);

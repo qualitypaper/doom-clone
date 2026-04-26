@@ -124,10 +124,12 @@ void ConvertRawColumnIntoWall(std::vector<Post> &posts, const RawImage<T> &img, 
   }
 
   if (y >= img.height) {
+    posts.emplace_back(Post{ .topDelta = static_cast<uint8_t>(y), .pixels = {} });
     return;
   }
 
-  DOOM_CORE_ASSERT(y >= 0 && y < img.height && y <= std::numeric_limits<uint8_t>, "Column index out of bounds while converting raw image to wall texture.");
+  DOOM_CORE_ASSERT(y >= 0 && y < img.height && y <= std::numeric_limits<uint8_t>::max(),
+                   "Column index out of bounds while converting raw image to wall texture.");
 
   std::vector<uint8_t> runPixels;
   runPixels.reserve(img.height - y);
@@ -137,8 +139,8 @@ void ConvertRawColumnIntoWall(std::vector<Post> &posts, const RawImage<T> &img, 
     y++;
   }
 
-  posts.emplace_back(Post{ .topDelta = static_cast<uint8_t>(y - static_cast<int>(runPixels.size())),
-                           .pixels = std::move(runPixels) });
+  posts.emplace_back(
+    Post{ .topDelta = static_cast<uint8_t>(y - static_cast<int>(runPixels.size())), .pixels = std::move(runPixels) });
 }
 
 template<typename T>

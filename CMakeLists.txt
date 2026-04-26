@@ -13,7 +13,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_BUILD_TYPE Debug)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)   
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ---- Build type default ----
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -41,7 +41,9 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 target_compile_definitions(${PROJECT_NAME} PRIVATE
-PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/")
+        PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}/"
+        $<$<CONFIG:Debug>:DOOM_DEBUG>
+)
 
 # ---- Install rules ----
 install(TARGETS ${PROJECT_NAME}

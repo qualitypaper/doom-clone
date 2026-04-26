@@ -3,8 +3,6 @@
 #include "serialization.h"
 #include "wad_serializer.h"
 
-#include <iostream>
-
 PaletteManager::PaletteManager(FileReader &fr, const header &hdr)
 {
   WadSerializer wadSerializer;
@@ -14,12 +12,12 @@ PaletteManager::PaletteManager(FileReader &fr, const header &hdr)
     throw std::runtime_error("Failed to read WAD directory while loading palette.");
   }
 
-  const auto entry = wadSerializer.FindDirectoryEntry(WadSerializer::MakeLumpName("PLAYPAL"));
-  if (!entry.has_value()) {
+  const auto entry = wadSerializer.FindEntry(WadSerializer::MakeLumpName("PLAYPAL"));
+  if (!entry) {
     throw std::runtime_error("PLAYPAL lump was not found.");
   }
 
-  fr.SetPos(entry.value()->offset);
+  fr.SetPos(entry->offset);
 
   ReadPalette(fr);
 

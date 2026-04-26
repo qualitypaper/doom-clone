@@ -47,10 +47,10 @@ private:
   void DrawTexturesWindow() const;
   static void DrawPropertiesTable(const char *tableId, const char *columnLabel, const std::function<void()> &drawContent);
   static void SetUpFixedPosWindow(float xPos, float yPos, float width, float height, bool lockSize = true);
-  [[nodiscard]] bool drawSelectedLinePopup(uint32_t lineId) const;
-  [[nodiscard]] bool drawSelectedVertexPopup(uint32_t selectedId) const;
+  [[nodiscard]] bool DrawSelectedLinePopup(uint32_t lineId) const;
+  [[nodiscard]] bool DrawSelectedVertexPopup(uint32_t selectedId) const;
   void DrawPopupsForSelectedObjects() const;
-  void DrawCreatePopup(const ImVec2 &mousePos, bool &isOpen) const;
+  void DrawCreationPopup(const ImVec2 &mousePos, bool &isOpen) const;
   void DrawLevelSelection() const;
 
   // static methods

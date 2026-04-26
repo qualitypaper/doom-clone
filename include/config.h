@@ -21,3 +21,4 @@ constexpr uint8_t DESIRED_FRAMERATE = 144;
 constexpr double MOUSE_SENSITIVITY = 1;
 
 inline constexpr std::string_view DATA_PATH = PROJECT_ROOT_PATH "/doom.wad";
+constexpr std::string_view LEVEL_NAME_PREFIX = "MAP";

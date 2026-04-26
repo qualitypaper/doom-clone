@@ -170,12 +170,12 @@ void EditorLevel::Load(const uint16_t width, const uint16_t height)
     throw std::runtime_error("Failed to read WAD file.");
   }
 
-  const auto entry = wadSerializer.FindDirectoryEntry(name);
-  if (!entry.has_value()) {
+  const auto entry = wadSerializer.FindEntry(name);
+  if (!entry) {
     throw std::runtime_error("Level couldn't be found.");
   }
 
-  fr.SetPos(entry.value()->offset);
+  fr.SetPos(entry->offset);
 
   fr.ReadVector(linedefs);
   fr.ReadVector(sidedefs);
@@ -225,18 +225,18 @@ size_t EditorLevel::Load(std::unique_ptr<Level> &level)
     throw std::runtime_error("Failed to read WAD file.");
   }
 
-  const auto entry = wadSerializer.FindDirectoryEntry(level->name);
-  if (!entry.has_value()) {
+  const auto entry = wadSerializer.FindEntry(level->name);
+  if (!entry) {
     throw std::runtime_error("Level couldn't be found.");
   }
 
-  fr.SetPos(entry.value()->offset);
+  fr.SetPos(entry->offset);
 
   level->Load(fr);
 
   size_t numOfLevels = 0;
   for (auto &directoryEntry : wadSerializer.GetDirectory()) {
-    if (strncmp((char *)directoryEntry.name.data(), "Map", 3) == 0) {
+    if (strncmp((char *)directoryEntry.name.data(), LEVEL_NAME_PREFIX.data(), LEVEL_NAME_PREFIX.size()) == 0) {
       numOfLevels++;
     }
   }

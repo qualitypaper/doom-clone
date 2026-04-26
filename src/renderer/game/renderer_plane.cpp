@@ -57,7 +57,10 @@ void Renderer::DrawSpan(drawspan_t &ds) const
       + ((ds.xFrac >> 16) & (FLAT_TEXTURE_SIZE - 1));
 
     if (ds.textureId >= 0) {
-      const uint8_t palIndex = m_texManager->flatTextures[ds.textureId].data[spot];
+      const FlatTexture *flatTexture = m_texManager->GetFlatTexture(ds.textureId);
+      DOOM_CORE_ASSERT(flatTexture);
+
+      const uint8_t palIndex = flatTexture->data[spot];
       RGB col = m_palManager->GetColor(palIndex);
       *(uint32_t *)curr = col.ToU32();
     } else {
