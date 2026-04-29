@@ -10,6 +10,35 @@ static constexpr std::string_view DEFAULT_FLAT_TEX_FORMAT = "FTEX{}";
 static constexpr std::string_view DEFAULT_PATCH_FORMAT = "PTH{}";
 static constexpr std::string_view DEFAULT_WALL_TEXTURE_FORMAT = "WTEX{}";
 
+struct Texture1Header
+{
+  int32_t numTextures;
+  std::vector<int32_t> offsets;// of size numTextures
+
+  template<typename Writer>
+  void serialize(Writer &w) const
+  {
+    serialization::serialize(w, numTextures);
+    serialization::serialize(w, offsets.size());
+    for (const int32_t offset : offsets) {
+      serialization::serialize(w, offset);
+    }
+  }
+
+  template<typename Reader>
+  void deserialize(Reader &r)
+  {
+    serialization::deserialize(r, numTextures);
+    size_t offsetsSize;
+    serialization::deserialize(r, offsetsSize);
+    std::vector<int32_t> offsetsVec(offsetsSize);
+    for (size_t i = 0; i < offsetsSize; i++) {
+      serialization::deserialize(r, offsetsVec[i]);
+    }
+    offsets = std::move(offsetsVec);
+  }
+};
+
 bool LoadTextureFromMemory(const void *data,
                            const int width,
                            const int height,
@@ -447,15 +476,49 @@ void TextureManager::WriteWallTexture(const WallTexture &value)
 
   const MapTexture &mapTexture = value.mapTexture;
 
-  const directoryEntry *entry = wadSerializer.FindEntry(WadSerializer::MakeLumpName("TEXTURE1"));
+  const lumpName texture1Name = WadSerializer::MakeLumpName("TEXTURE1");
+  const directoryEntry *entry = wadSerializer.FindEntry(texture1Name);
 
-  // TODO: finish serialization of TEXTURE1 lump
   if (!entry) {
     // create TEXTURE1 lump
     const directoryEntry *pNames = wadSerializer.FindEntry(WadSerializer::MakeLumpName("PNAMES"));
     // *pNames is never null
     const size_t insertIndex = pNames - wadSerializer.GetDirectory().data();
+    // TEXTURE1 must come after PNAMES
+    const Texture1Header header{ 1, { static_cast<int32_t>(sizeof(Texture1Header)) } };
 
+    std::vector<uint8_t> buffer;
+    buffer.reserve(sizeof(Texture1Header) + sizeof(MapTexture) + mapTexture.patches.size() * sizeof(MapPatch));
+    VectorWriter writer{ buffer };
+    header.serialize(writer);
+    mapTexture.serialize(writer);
+
+    lumps.emplace(lumps.begin() + insertIndex + 1, LumpData{ std::move(buffer), directoryEntry{ 0, 0, texture1Name } });
+    wadSerializer.Write();
+    return;
   }
+  // update existing TEXTURE1 lump
+  const long i = entry - wadSerializer.GetDirectory().data();
+
+  const LumpData *texture1Lump = wadSerializer.FindLoadedLump(texture1Name);
+
+  DOOM_CORE_ASSERT(texture1Lump, "TEXTURE1 lump was not loaded.");
+
+  Texture1Header header;
+  std::vector<MapTexture> textures;
+
+  {
+    VectorReader reader(texture1Lump->rawData);
+    header.deserialize(reader);
+
+    textures.reserve(header.numTextures);
+    for (int32_t offset : header.offsets) {
+      MapTexture texture;
+      texture.deserialize(reader);
+      textures.push_back(std::move(texture));
+    }
+  }
+
+  // TODO: finish serialization of TEXTURE1 lump
 
 }
