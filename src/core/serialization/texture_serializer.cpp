@@ -10,35 +10,6 @@ static constexpr std::string_view DEFAULT_FLAT_TEX_FORMAT = "FTEX{}";
 static constexpr std::string_view DEFAULT_PATCH_FORMAT = "PTH{}";
 static constexpr std::string_view DEFAULT_WALL_TEXTURE_FORMAT = "WTEX{}";
 
-struct Texture1Header
-{
-  int32_t numTextures;
-  std::vector<int32_t> offsets;// of size numTextures
-
-  template<typename Writer>
-  void serialize(Writer &w) const
-  {
-    serialization::serialize(w, numTextures);
-    serialization::serialize(w, offsets.size());
-    for (const int32_t offset : offsets) {
-      serialization::serialize(w, offset);
-    }
-  }
-
-  template<typename Reader>
-  void deserialize(Reader &r)
-  {
-    serialization::deserialize(r, numTextures);
-    size_t offsetsSize;
-    serialization::deserialize(r, offsetsSize);
-    std::vector<int32_t> offsetsVec(offsetsSize);
-    for (size_t i = 0; i < offsetsSize; i++) {
-      serialization::deserialize(r, offsetsVec[i]);
-    }
-    offsets = std::move(offsetsVec);
-  }
-};
-
 bool LoadTextureFromMemory(const void *data,
                            const int width,
                            const int height,
@@ -189,16 +160,21 @@ void PatchView::Write()
   WadSerializer wadSerializer(DATA_PATH);
 
   if (!wadSerializer.Load(true)) {
-    throw std::runtime_error("Couldn't read a data file while reading a wall texture.");
+    DOOM_CORE_ERROR("Couldn't load the data file while reading a wall texture.");
+    return;
   }
 
   std::vector<LumpData> &lumps = wadSerializer.GetLoadedLumps();
 
   size_t index = 0;
   // new texture
-  const std::optional<directoryEntry *> &pEndOptional = wadSerializer.FindEntry(WadSerializer::MakeLumpName("P_END"));
+  const directoryEntry *pStartPtr = wadSerializer.FindEntry(WadSerializer::MakeLumpName("P_START"));
+  const directoryEntry *pEndPtr = wadSerializer.FindEntry(WadSerializer::MakeLumpName("P_END"));
 
-  if (!pEndOptional.has_value()) {
+  DOOM_CORE_ASSERT(!(!pStartPtr ^ !pEndPtr),
+                   "Only one of P_START and P_END entries is present in the WAD file, which is not expected.");
+
+  if (!pStartPtr && !pEndPtr) {
     std::vector<directoryEntry> &directory = wadSerializer.GetDirectory();
 
     directoryEntry &pStart = directory.emplace_back(0, 0, WadSerializer::MakeLumpName("P_START"));
@@ -207,9 +183,9 @@ void PatchView::Write()
     lumps.emplace_back(std::vector<uint8_t>(), pStart);
     lumps.emplace_back(std::vector<uint8_t>(), pEnd);
 
-    index = directory.size() - 1;
+    index = lumps.size() - 1;
   } else {
-    index = pEndOptional.value() - wadSerializer.GetDirectory().data();
+    index = pEndPtr - wadSerializer.GetDirectory().data();
   }
 
   const auto it = std::ranges::find_if(lumps, [&](const LumpData &lump) {
@@ -220,6 +196,7 @@ void PatchView::Write()
   wallLump.entry.name = name;
 
   std::vector<uint8_t> _binData;
+  _binData.reserve(2 * sizeof(uint16_t) + 2 * sizeof(int16_t) + data.size() * sizeof(Post));
   VectorWriter writer{ _binData };
   writer.WriteRaw(static_cast<uint16_t>(this->width));
   writer.WriteRaw(static_cast<uint16_t>(this->height));
@@ -229,6 +206,7 @@ void PatchView::Write()
 
   writer.WriteVector(this->data);
 
+  _binData.shrink_to_fit();
   wallLump.rawData = std::move(_binData);
 
   if (it == lumps.end()) {
@@ -237,7 +215,6 @@ void PatchView::Write()
     *it = std::move(wallLump);
   }
 
-  wadSerializer.SetLumps(std::move(lumps));
   wadSerializer.Write();
 }
 
@@ -299,20 +276,20 @@ std::vector<PatchView> PatchView::ReadAll()
   }
   const lumpName pStartName = WadSerializer::MakeLumpName("P_START");
 
-  const std::optional<directoryEntry *> pStartOptional = wadSerializer.FindEntry(pStartName);
-  if (!pStartOptional.has_value()) {
+  directoryEntry *pStart = wadSerializer.FindEntry(pStartName);
+  if (!pStart) {
     return {};
   }
 
   const lumpName pEndName = WadSerializer::MakeLumpName("P_END");
-  const std::optional<directoryEntry *> &pEndOptional = wadSerializer.FindEntry(pEndName);
+  const directoryEntry *pEnd = wadSerializer.FindEntry(pEndName);
 
   std::vector<PatchView> res;
-  res.reserve(pEndOptional.value() - pStartOptional.value());
+  res.reserve(pEnd - pStart);
 
-  directoryEntry *curr = pStartOptional.value() + 1;
+  directoryEntry *curr = pStart + 1;
 
-  while (curr != pEndOptional.value()) {
+  while (curr != pEnd) {
     PatchView &wallTexture = res.emplace_back(curr->name);
     wallTexture.Read();
     curr++;
@@ -331,7 +308,60 @@ void WallTexture::Write()
 }
 
 void WallTexture::Read()
-{}
+{
+  WadSerializer wadSerializer(DATA_PATH);
+
+  if (!wadSerializer.Load(false)) {
+    throw std::runtime_error("Couldn't read a data file while reading a wall texture.");
+  }
+
+  const std::optional<directoryEntry *> &directoryEntry = wadSerializer.FindEntry(this->mapTexture.name);
+
+  if (!directoryEntry.has_value()) {
+    throw std::runtime_error(
+      std::format("Couldn't find directory entry with name: {}", (char *)this->mapTexture.name.data()));
+  }
+
+  const LumpData lumpData = std::move(wadSerializer.ReadLump(*directoryEntry.value()));
+  VectorReader reader(lumpData.rawData);
+  this->mapTexture.deserialize(reader);
+}
+
+std::vector<WallTexture> WallTexture::ReadAll()
+{
+  WadSerializer wadSerializer(DATA_PATH);
+
+  if (!wadSerializer.Load(false)) {
+    return {};
+  }
+  const lumpName texture1Name = WadSerializer::MakeLumpName("TEXTURE1");
+
+  const directoryEntry *texture1 = wadSerializer.FindEntry(texture1Name);
+  if (!texture1) {
+    return {};
+  }
+
+  const LumpData lumpData = std::move(wadSerializer.ReadLump(*texture1));
+
+  VectorReader reader(lumpData.rawData);
+
+  int32_t numTextures;
+  reader.ReadRaw(numTextures);
+
+  std::vector<MapTexture> textures;
+  textures.reserve(numTextures);
+
+  reader.ReadVector(textures, false);
+
+  std::vector<WallTexture> _wallTextures;
+  _wallTextures.reserve(static_cast<size_t>(numTextures));
+
+  for (auto &el : textures) {
+    _wallTextures.emplace_back(el);
+  }
+
+  return std::move(_wallTextures);
+}
 
 void TextureManager::LoadFlatTexture(const std::filesystem::path &path, FlatTexture &outFlatTexture) const
 {
@@ -396,6 +426,19 @@ std::string TextureManager::GetFlatTextureName(const size_t index) const
 
   return std::move(textureName);
 }
+const WallTexture *TextureManager::GetWallTexture(const size_t index) const
+{
+  if (index >= m_wallTextures.size() ) return nullptr;
+
+  return &m_wallTextures[index];
+}
+const PatchView *TextureManager::GetPatch(const size_t index) const
+{
+  if (index >= m_patches.size() ) return nullptr;
+
+  return &m_patches[index];
+}
+
 void TextureManager::AddDefaultFlatTexture()
 {
   m_flatTextures.emplace_back(
@@ -443,9 +486,7 @@ void TextureManager::WritePNames(WadSerializer &wadSerializer) const
     const size_t insertIndex =
       entryAfterLevels ? entryAfterLevels - wadSerializer.GetDirectory().data() : lumps.size() - 1;
 
-    lumps.emplace(
-      lumps.begin() + insertIndex,
-      LumpData{ std::move(pNamesData), entryAfterLevels ? *entryAfterLevels : directoryEntry{ 0, 0, pNamesLumpName } });
+    lumps.emplace(lumps.begin() + insertIndex, std::move(pNamesData), directoryEntry{ 0, 0, pNamesLumpName });
 
     wadSerializer.Write();
     return;
@@ -459,7 +500,7 @@ void TextureManager::WritePNames(WadSerializer &wadSerializer) const
   wadSerializer.Write();
 }
 
-void TextureManager::WriteWallTexture(const WallTexture &value)
+void TextureManager::WriteWallTexture(const WallTexture &value) const
 {
   WadSerializer wadSerializer(DATA_PATH);
 
@@ -485,40 +526,59 @@ void TextureManager::WriteWallTexture(const WallTexture &value)
     // *pNames is never null
     const size_t insertIndex = pNames - wadSerializer.GetDirectory().data();
     // TEXTURE1 must come after PNAMES
-    const Texture1Header header{ 1, { static_cast<int32_t>(sizeof(Texture1Header)) } };
 
     std::vector<uint8_t> buffer;
-    buffer.reserve(sizeof(Texture1Header) + sizeof(MapTexture) + mapTexture.patches.size() * sizeof(MapPatch));
+    buffer.reserve(sizeof(int32_t) + sizeof(MapTexture) + mapTexture.patches.size() * sizeof(MapPatch));
     VectorWriter writer{ buffer };
-    header.serialize(writer);
+    writer.WriteRaw(1);// number of textures
     mapTexture.serialize(writer);
 
-    lumps.emplace(lumps.begin() + insertIndex + 1, LumpData{ std::move(buffer), directoryEntry{ 0, 0, texture1Name } });
+    lumps.emplace(lumps.begin() + insertIndex + 1, std::move(buffer), directoryEntry{ 0, 0, texture1Name });
     wadSerializer.Write();
     return;
   }
+
   // update existing TEXTURE1 lump
-  const long i = entry - wadSerializer.GetDirectory().data();
+  const long currIndex = entry - wadSerializer.GetDirectory().data();
 
   const LumpData *texture1Lump = wadSerializer.FindLoadedLump(texture1Name);
 
   DOOM_CORE_ASSERT(texture1Lump, "TEXTURE1 lump was not loaded.");
 
-  Texture1Header header;
+  int32_t numTextures = 0;
   std::vector<MapTexture> textures;
+  bool found = false;
 
   {
     VectorReader reader(texture1Lump->rawData);
-    header.deserialize(reader);
+    reader.ReadRaw(numTextures);
 
-    textures.reserve(header.numTextures);
-    for (int32_t offset : header.offsets) {
+    textures.reserve(numTextures);
+    for (int i = 0; i < numTextures; i++) {
       MapTexture texture;
       texture.deserialize(reader);
+
+      if (texture.name == value.mapTexture.name) {
+        texture = value.mapTexture;
+        found = true;
+      }
+
       textures.push_back(std::move(texture));
     }
   }
 
-  // TODO: finish serialization of TEXTURE1 lump
+  if (!found) {
+    textures.push_back(value.mapTexture);
+    numTextures++;
+  }
 
+  std::vector<uint8_t> buffer;
+  buffer.reserve(sizeof(int32_t)
+                 + textures.size() * (sizeof(MapTexture) + textures[0].patches.size() * sizeof(MapPatch)));
+  VectorWriter writer{ buffer };
+  writer.WriteRaw(numTextures);
+  writer.WriteVector(textures, false);
+
+  lumps[currIndex] = LumpData{ std::move(buffer), *entry };
+  wadSerializer.Write();
 }

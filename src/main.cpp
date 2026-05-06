@@ -138,22 +138,19 @@ int main(int argc, char *argv[])
   }
 
   // setup sdl window
-  auto sdlWindow = std::make_shared<SdlWindow>(
-    "Doom Clone", 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_RESIZABLE);
+  auto sdlWindow = std::make_shared<SdlWindow>("Doom Clone", 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, SDL_WINDOW_RESIZABLE);
 
 
-  std::unique_ptr<PaletteManager> paletteManager;
+  auto paletteManager = std::make_unique<PaletteManager>(PROJECT_ROOT_PATH "PLAYPAL.pal");
   std::unique_ptr<TextureManager> textureManager;
   // initialize palette/textures
   {
-    paletteManager = std::make_unique<PaletteManager>(PROJECT_ROOT_PATH "PLAYPAL.pal");
-
     std::vector<FlatTexture> flatTextures = FlatTexture::ReadAll();
-    std::vector<PatchView> wallTextures = PatchView::ReadAll();
-    // TODO: load wall textures
+    std::vector<PatchView> patches = PatchView::ReadAll();
+    std::vector<WallTexture> wallTextures = WallTexture::ReadAll();
 
-    textureManager =
-      std::make_unique<TextureManager>(std::move(flatTextures), std::move(wallTextures), paletteManager.get());
+    textureManager = std::make_unique<TextureManager>(
+      std::move(flatTextures), std::move(patches), std::move(wallTextures), paletteManager.get());
   }
 
   auto editor = std::make_shared<Editor>(sdlWindow, *level, 1, numOfLevels, *textureManager, *paletteManager);
@@ -172,8 +169,8 @@ int main(int argc, char *argv[])
                        .sdlWindow = std::move(sdlWindow),
                        .renderer = std::move(renderer),
                        .editor = std::move(editor),
-                       .texManager =  std::move(textureManager),
-            .palManager = std::move(paletteManager)
+                       .texManager = std::move(textureManager),
+                       .palManager = std::move(paletteManager)
 
   };
 

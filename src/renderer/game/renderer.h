@@ -3,6 +3,7 @@
 #include "core/framebuffer.h"
 #include "defs.h"
 #include "tables.h"
+#include "tex_defs.h"
 
 #include <array>
 #include <memory>
@@ -62,7 +63,7 @@ public:
 
   void SetLevel(std::shared_ptr<Level> _level);
 
-  void DrawColumn(int x, int y0, int y1, uint32_t color) const;
+  void DrawColumn(int x, int y0, int y1, const Post &post) const;
 
 private:
   void InitYSlope();

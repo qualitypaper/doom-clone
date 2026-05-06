@@ -75,6 +75,8 @@ struct WallTexture
 {
   explicit WallTexture(const lumpName _name) : mapTexture(_name)
   {}
+  explicit WallTexture(MapTexture _mapTexture) : mapTexture(std::move(_mapTexture))
+  {}
 
   MapTexture mapTexture;
 
@@ -99,9 +101,11 @@ class TextureManager
 public:
   TextureManager() = default;
   TextureManager(std::vector<FlatTexture> _flatTextures,
-                 std::vector<PatchView> _wallTextures,
+                 std::vector<PatchView> _patches,
+                 std::vector<WallTexture> _wallTextures,
                  PaletteManager *_palManager)
-    : palManager(_palManager), m_flatTextures(std::move(_flatTextures)), m_patches(std::move(_wallTextures))
+    : palManager(_palManager), m_flatTextures(std::move(_flatTextures)), m_patches(std::move(_patches)),
+      m_wallTextures(std::move(_wallTextures))
   {}
 
   PaletteManager *palManager = nullptr;
@@ -112,6 +116,9 @@ public:
 
   [[nodiscard]] const FlatTexture *GetFlatTexture(size_t index) const;
   [[nodiscard]] std::string GetFlatTextureName(size_t index) const;
+
+  [[nodiscard]] const WallTexture *GetWallTexture(size_t index) const;
+  [[nodiscard]] const PatchView * GetPatch(size_t index) const;
 
   [[nodiscard]] const std::vector<WallTexture> &GetWallTextures() const
   {
@@ -145,7 +152,7 @@ public:
   std::string_view GetPatchTextureName(int16_t patchIndex);
 
   void WritePNames(WadSerializer &wadSerializer) const;
-  void WriteWallTexture(const WallTexture &value);
+  void WriteWallTexture(const WallTexture &value) const;
 
 private:
   std::vector<FlatTexture> m_flatTextures;

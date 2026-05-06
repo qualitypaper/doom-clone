@@ -1,6 +1,7 @@
 #include "wad_serializer.h"
 
 #include "defs.h"
+#include "log.h"
 
 #include <algorithm>
 
@@ -155,7 +156,7 @@ const directoryEntry *WadSerializer::FindEntryAfterLevels() const
   size_t lastIndex = SIZE_MAX;
   for (size_t i = 0; i < m_directory.size(); ++i) {
     const directoryEntry &entry = m_directory[i];
-    if (memcmp(entry.name.data(), LEVEL_NAME_PREFIX.data(), LEVEL_NAME_PREFIX.size()) == 0) {
+    if (strncmp((char*) entry.name.data(), LEVEL_NAME_PREFIX.data(), LEVEL_NAME_PREFIX.size()) == 0) {
       lastIndex = i;
     }
   }
@@ -211,7 +212,8 @@ void WadSerializer::Write(const std::filesystem::path &filePath, header *hdrOver
 void WadSerializer::Write(header *hdrOverride)
 {
   if (m_filePath.empty()) {
-    throw std::runtime_error("WadSerializer file path is empty.");
+    DOOM_CORE_ERROR("WadSerializer file path is empty.");
+    return;
   }
 
   Write(m_filePath, hdrOverride);
@@ -280,4 +282,5 @@ void WadSerializer::WriteLumpsToPath(std::vector<LumpData> &allLumps,
 
   fw.SetPos(0);
   fw.WriteObject(hdr);
+  DOOM_CORE_INFO("Wrote {} lumps into a WAD file: {}", hdr.numDirectories, filePath.string());
 }

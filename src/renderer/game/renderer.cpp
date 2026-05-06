@@ -6,6 +6,7 @@
 #include "bsp/bsp.h"
 #include "core/framebuffer.h"
 #include "core/gameloop.h"
+#include "core/serialization/texture_serializer.h"
 
 #include <algorithm>
 #include <fmt/core.h>
@@ -147,7 +148,10 @@ void Renderer::Reset()
   ResetSolidSegs();
   m_fb.reset();
 }
-void Renderer::SetLevel(std::shared_ptr<Level> _level) { this->m_level = std::move(_level); }
+void Renderer::SetLevel(std::shared_ptr<Level> _level)
+{
+  this->m_level = std::move(_level);
+}
 
 void Renderer::ResetSolidSegs()
 {
@@ -157,25 +161,26 @@ void Renderer::ResetSolidSegs()
   m_solidSegs[1].end = 0x7fffffff;
 }
 
-void Renderer::DrawColumn(int x, int y0, int y1, const uint32_t color) const
+void Renderer::DrawColumn(int x, int y0, int y1, const Post &post) const
 {
   // scale the point to the window size
   x = std::clamp(x, 0, m_fb.width - 1);
   y0 = std::clamp(y0, 0, m_fb.height - 1);
   y1 = std::clamp(y1, 0, m_fb.height - 1);
 
-  // if (y0 > y1)
-  //   std::swap(y0, y1);
-
   // using window width as the pitch, because the current
   // implementation doesn't leave any extra pixels
   const uint32_t pitch = m_fb.width;
+  const uint32_t fracStep = 0xFFFFFFFFu / m_rwScale;
+  uint32_t frac = y0 - m_fb.height / 2;
 
   uint32_t *ptr = m_fb.pixels + y0 * pitch + x;
 
   for (int32_t y = y0; y <= y1; y++) {
-    *(uint32_t *)ptr = color;
+    *(uint32_t *)ptr = m_palManager->GetColor(post.pixels[frac & 127]).ToU32();
+
     ptr += pitch;
+    frac += fracStep;
   }
 }
 
@@ -397,23 +402,23 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
       }
     }
 
-    const uint32_t color = MapColor(100, 100, 100, 255);
-
     if (!ds.backSide) {
-      // test version, in order to understand which wall is which
-      ImVec4 _color = ImGui::ColorConvertU32ToFloat4(color);
-      float index = (ds.frontSide - m_level->sidedefs.data()) / static_cast<float>(m_level->sidedefs.size());
-      _color.x += index;
-      _color.y += index;
-      _color.z += index;
+      const int16_t tex = ds.frontSide->middlWallTexture;
+      const WallTexture *wallTexture = m_texManager->GetWallTexture(tex);
 
-      DrawColumn(x,
-                 yl,
-                 yh,
-                 MapColor(static_cast<uint8_t>(_color.x * 255),
-                          static_cast<uint8_t>(_color.y * 255),
-                          static_cast<uint8_t>(_color.z * 255),
-                          255));
+      if (!wallTexture) {
+        DOOM_CORE_ERROR("Couldn't find texture with index: {}", tex);
+        return;
+      }
+      const MapTexture &mapTexture = wallTexture->mapTexture;
+      const uint16_t u = x & (mapTexture.width - 1);
+      const int16_t patch = mapTexture.patches[0].patch;
+      const PatchView *patchView = m_texManager->GetPatch(patch);
+
+      if (u < patchView->width) {
+        DrawColumn(x, yl, yh, patchView->data[u]);
+      }
+
 
       m_ceilClip[x] = static_cast<int16_t>(m_fb.height);
       m_floorClip[x] = -1;
@@ -431,7 +436,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           }
 
           if (mid >= yl) {
-            DrawColumn(x, yl, mid, MapColor(200, 100, 0, 255));
+            // TODO: DrawColumn(x, yl, mid, TODO);
             m_ceilClip[x] = mid;
           } else {
             m_ceilClip[x] = yl - 1;
@@ -451,7 +456,7 @@ void Renderer::RenderSegLoop(drawseg_t &ds)
           }
 
           if (mid <= yh) {
-            DrawColumn(x, mid, yh, MapColor(0, 255, 0, 255));
+            // TODO: DrawColumn(x, mid, yh, TODO);
             m_floorClip[x] = mid;
           } else {
             m_floorClip[x] = yh + 1;
